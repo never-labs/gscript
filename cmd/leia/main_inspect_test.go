@@ -50,6 +50,73 @@ print(add(1, 2))
 	}
 }
 
+func TestInspectBytecodeDumpsJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bytecode_json.leia")
+	src := `func add(a, b) {
+    return a + b
+}
+print(add(1, 2))
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runInspectCommand([]string{"bytecode", "--json", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runInspectCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report inspectBytecodeReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON bytecode report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.SchemaVersion != 1 || report.Source != path || report.SelectedProto != "<main>" || !report.Recursive {
+		t.Fatalf("report = %+v, want schema v1 recursive main report", report)
+	}
+	if report.Proto.DisplayName != "<main>" || report.Proto.InstructionCount == 0 || report.Proto.ChildProtoCount != 1 || len(report.Proto.Children) != 1 {
+		t.Fatalf("main proto = %+v, want one child and bytecode metadata", report.Proto)
+	}
+	if report.Proto.Tier1.Reason == "" || report.Proto.Tier2.Reason == "" {
+		t.Fatalf("jit decisions missing reasons: %+v %+v", report.Proto.Tier1, report.Proto.Tier2)
+	}
+	if child := report.Proto.Children[0]; child.DisplayName != "add" || child.NumParams != 2 || !strings.Contains(child.Disassembly, "RETURN") {
+		t.Fatalf("child proto = %+v, want add function disassembly", child)
+	}
+}
+
+func TestInspectBytecodeDumpsNamedProtoJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fn_json.leia")
+	src := `func add(a, b) {
+    return a + b
+}
+print(add(1, 2))
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runInspectCommand([]string{"bytecode", "--json", "--proto", "add", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runInspectCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report inspectBytecodeReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON bytecode report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.SchemaVersion != 1 || report.SelectedProto != "add" || report.Recursive {
+		t.Fatalf("report = %+v, want selected non-recursive add report", report)
+	}
+	if report.Proto.DisplayName != "add" || report.Proto.NumParams != 2 || report.Proto.ChildProtoCount != 0 || len(report.Proto.Children) != 0 {
+		t.Fatalf("proto = %+v, want selected add proto only", report.Proto)
+	}
+	if strings.Contains(report.Proto.Disassembly, "=== <main>") || !strings.Contains(report.Proto.Disassembly, "RETURN") {
+		t.Fatalf("disassembly = %q, want named proto disassembly only", report.Proto.Disassembly)
+	}
+}
+
 func TestInspectDirectivesDumpsFileDirectives(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "directives.leia")

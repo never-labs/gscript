@@ -18,7 +18,7 @@ Generated from the current `leia` binary capabilities.
 | `examples` | `usage: leia examples [list|show|run|check] [--json] [ID-or-path]` | List, inspect, run, or check repository example projects. |
 | `fmt` | `usage: leia fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]` | Normalize source formatting. |
 | `help` | `usage: leia help [command]` | Show command help. |
-| `inspect` | `usage: leia inspect bytecode [--proto NAME] <file.leia>
+| `inspect` | `usage: leia inspect bytecode [--json] [--proto NAME] <file.leia>
        leia inspect directives [--json] <file.leia>` | Inspect compiled artifacts and file directives. |
 | `lint` | `usage: leia lint [--format=text|json|sarif] <path-or-dir> [...]` | Report source diagnostics. |
 | `lsp` | `usage: leia lsp` | Run the Leia Language Server Protocol endpoint over stdio. |

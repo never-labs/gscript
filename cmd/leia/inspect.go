@@ -16,7 +16,7 @@ import (
 
 func runInspectCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: leia inspect bytecode [--proto NAME] <file.leia>")
+		fmt.Fprintln(errw, "usage: leia inspect bytecode [--json] [--proto NAME] <file.leia>")
 		fmt.Fprintln(errw, "       leia inspect directives [--json] <file.leia>")
 		return 2
 	}
@@ -26,7 +26,7 @@ func runInspectCommand(args []string, outw, errw io.Writer) int {
 	case "directives":
 		return runInspectDirectivesCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: leia inspect bytecode [--proto NAME] <file.leia>")
+		fmt.Fprintln(outw, "usage: leia inspect bytecode [--json] [--proto NAME] <file.leia>")
 		fmt.Fprintln(outw, "       leia inspect directives [--json] <file.leia>")
 		return 0
 	default:
@@ -38,13 +38,14 @@ func runInspectCommand(args []string, outw, errw io.Writer) int {
 func runInspectBytecodeCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("inspect bytecode", flag.ContinueOnError)
 	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print bytecode metadata as JSON")
 	protoName := fs.String("proto", "", "dump only a named proto")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	paths := fs.Args()
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: leia inspect bytecode [--proto NAME] <file.leia>")
+		fmt.Fprintln(errw, "usage: leia inspect bytecode [--json] [--proto NAME] <file.leia>")
 		return 2
 	}
 	proto, err := compileFileForInspect(paths[0])
@@ -58,11 +59,118 @@ func runInspectBytecodeCommand(args []string, outw, errw io.Writer) int {
 			fmt.Fprintf(errw, "leia inspect bytecode: proto %q not found\n", *protoName)
 			return 1
 		}
+		if *jsonOut {
+			if err := writeInspectBytecodeJSON(outw, paths[0], *protoName, target, false); err != nil {
+				fmt.Fprintf(errw, "leia inspect bytecode: write json: %v\n", err)
+				return 1
+			}
+			return 0
+		}
 		fmt.Fprint(outw, bytecodevm.Disassemble(target))
+		return 0
+	}
+	if *jsonOut {
+		if err := writeInspectBytecodeJSON(outw, paths[0], "<main>", proto, true); err != nil {
+			fmt.Fprintf(errw, "leia inspect bytecode: write json: %v\n", err)
+			return 1
+		}
 		return 0
 	}
 	dumpInspectProto(outw, "<main>", proto, 0)
 	return 0
+}
+
+type inspectBytecodeReport struct {
+	SchemaVersion int                `json:"schema_version"`
+	Source        string             `json:"source"`
+	SelectedProto string             `json:"selected_proto"`
+	Recursive     bool               `json:"recursive"`
+	Proto         inspectProtoReport `json:"proto"`
+}
+
+type inspectProtoReport struct {
+	Name               string                   `json:"name"`
+	DisplayName        string                   `json:"display_name"`
+	Source             string                   `json:"source,omitempty"`
+	LineDefined        int                      `json:"line_defined"`
+	NumParams          int                      `json:"num_params"`
+	MaxStack           int                      `json:"max_stack"`
+	InstructionCount   int                      `json:"instruction_count"`
+	ConstantCount      int                      `json:"constant_count"`
+	UpvalueCount       int                      `json:"upvalue_count"`
+	ChildProtoCount    int                      `json:"child_proto_count"`
+	JITDisabled        bool                     `json:"jit_disabled"`
+	IsVarArg           bool                     `json:"is_vararg"`
+	UsesVarargBytecode bool                     `json:"uses_vararg_bytecode"`
+	LeafNoCall         bool                     `json:"leaf_no_call"`
+	NoGlobalOps        bool                     `json:"no_global_ops"`
+	Tier1              inspectJITDecisionReport `json:"tier1"`
+	Tier2              inspectJITDecisionReport `json:"tier2"`
+	Disassembly        string                   `json:"disassembly"`
+	Children           []inspectProtoReport     `json:"children,omitempty"`
+}
+
+type inspectJITDecisionReport struct {
+	Allowed            bool   `json:"allowed"`
+	Reason             string `json:"reason"`
+	IsVarArg           bool   `json:"is_vararg"`
+	UsesVarargBytecode bool   `json:"uses_vararg_bytecode"`
+}
+
+func writeInspectBytecodeJSON(w io.Writer, source, selected string, proto *bytecodevm.FuncProto, recursive bool) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(inspectBytecodeReport{
+		SchemaVersion: 1,
+		Source:        source,
+		SelectedProto: selected,
+		Recursive:     recursive,
+		Proto:         inspectProtoRow(selected, proto, recursive),
+	})
+}
+
+func inspectProtoRow(displayName string, proto *bytecodevm.FuncProto, recursive bool) inspectProtoReport {
+	if proto == nil {
+		return inspectProtoReport{DisplayName: displayName}
+	}
+	tier1 := proto.MethodJITTier1CallableDecision()
+	tier2 := proto.MethodJITTier2CallableDecision()
+	row := inspectProtoReport{
+		Name:               proto.Name,
+		DisplayName:        displayName,
+		Source:             proto.Source,
+		LineDefined:        proto.LineDefined,
+		NumParams:          proto.NumParams,
+		MaxStack:           proto.MaxStack,
+		InstructionCount:   len(proto.Code),
+		ConstantCount:      len(proto.Constants),
+		UpvalueCount:       len(proto.Upvalues),
+		ChildProtoCount:    len(proto.Protos),
+		JITDisabled:        proto.JITDisabled,
+		IsVarArg:           proto.IsVarArg,
+		UsesVarargBytecode: proto.UsesVarargBytecode,
+		LeafNoCall:         proto.LeafNoCall,
+		NoGlobalOps:        proto.NoGlobalOps,
+		Tier1:              inspectJITDecisionRow(tier1),
+		Tier2:              inspectJITDecisionRow(tier2),
+		Disassembly:        bytecodevm.Disassemble(proto),
+	}
+	if recursive {
+		row.Children = make([]inspectProtoReport, 0, len(proto.Protos))
+		for _, child := range proto.Protos {
+			row.Children = append(row.Children, inspectProtoRow(child.Name, child, true))
+		}
+	}
+	return row
+}
+
+func inspectJITDecisionRow(decision bytecodevm.MethodJITCallableDecision) inspectJITDecisionReport {
+	return inspectJITDecisionReport{
+		Allowed:            decision.Allowed,
+		Reason:             decision.Reason,
+		IsVarArg:           decision.IsVarArg,
+		UsesVarargBytecode: decision.UsesVarargBytecode,
+	}
 }
 
 type inspectFileDirective struct {

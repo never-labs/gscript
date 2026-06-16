@@ -47,6 +47,7 @@ if errors.As(err, &budgetErr) {
 | `leia lint --format=json` | Array of diagnostics with `file`, `code`, `severity`, `message`, `line`, and `column`. |
 | `leia lint --format=sarif` | SARIF 2.1.0 for code scanning integrations. |
 | `leia check --json` | Aggregate check report with step status and exit codes. |
+| `leia inspect bytecode --json` | Compiled bytecode metadata, disassembly text, nested proto summary, and JIT callable decisions. |
 | `leia inspect directives --json` | Parsed `//leia:` file directives. |
 | `leia mod ... --json` | Module graph, list, verify, capability, and vendoring reports. |
 | `leia capabilities --json` | Binary feature, command, stdlib, default-import, builtin dialect, LLM, and tooling capabilities. |

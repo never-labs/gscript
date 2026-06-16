@@ -31,7 +31,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "examples", Usage: "usage: leia examples [list|show|run|check] [--json] [ID-or-path]", Summary: "List, inspect, run, or check repository example projects.", Run: runExamplesCommand},
 		{Name: "fmt", Usage: "usage: leia fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]", Summary: "Normalize source formatting.", Run: runFmtCommand},
 		{Name: "help", Usage: "usage: leia help [command]", Summary: "Show command help.", Run: runHelpCommand},
-		{Name: "inspect", Usage: "usage: leia inspect bytecode [--proto NAME] <file.leia>\n       leia inspect directives [--json] <file.leia>", Summary: "Inspect compiled artifacts and file directives.", Run: runInspectCommand},
+		{Name: "inspect", Usage: "usage: leia inspect bytecode [--json] [--proto NAME] <file.leia>\n       leia inspect directives [--json] <file.leia>", Summary: "Inspect compiled artifacts and file directives.", Run: runInspectCommand},
 		{Name: "lint", Usage: "usage: leia lint [--format=text|json|sarif] <path-or-dir> [...]", Summary: "Report source diagnostics.", Run: runLintCommand},
 		{Name: "lsp", Usage: "usage: leia lsp", Summary: "Run the Leia Language Server Protocol endpoint over stdio.", Run: runLSPCommand},
 		{Name: "mod", Usage: "usage: leia mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|gomod|verify] [flags]", Summary: "Manage local module metadata and require graphs.", Run: runModCommand},

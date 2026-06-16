@@ -1205,6 +1205,64 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixInspectBytecodeJSONIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "inspect.leia")
+	src := `func add(a, b) {
+    return a + b
+}
+print(add(1, 2))
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "inspect", "bytecode", "--json", path)
+	var report struct {
+		SchemaVersion int    `json:"schema_version"`
+		Source        string `json:"source"`
+		SelectedProto string `json:"selected_proto"`
+		Recursive     bool   `json:"recursive"`
+		Proto         struct {
+			DisplayName      string `json:"display_name"`
+			NumParams        int    `json:"num_params"`
+			InstructionCount int    `json:"instruction_count"`
+			ChildProtoCount  int    `json:"child_proto_count"`
+			Tier1            struct {
+				Allowed bool   `json:"allowed"`
+				Reason  string `json:"reason"`
+			} `json:"tier1"`
+			Tier2 struct {
+				Allowed bool   `json:"allowed"`
+				Reason  string `json:"reason"`
+			} `json:"tier2"`
+			Disassembly string `json:"disassembly"`
+			Children    []struct {
+				DisplayName      string `json:"display_name"`
+				NumParams        int    `json:"num_params"`
+				InstructionCount int    `json:"instruction_count"`
+				Disassembly      string `json:"disassembly"`
+			} `json:"children"`
+		} `json:"proto"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("inspect bytecode JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Source != path || report.SelectedProto != "<main>" || !report.Recursive {
+		t.Fatalf("inspect bytecode JSON = %+v, want recursive main schema v1 report", report)
+	}
+	if report.Proto.DisplayName != "<main>" || report.Proto.InstructionCount == 0 || report.Proto.ChildProtoCount != 1 || len(report.Proto.Children) != 1 {
+		t.Fatalf("inspect bytecode main proto = %+v, want one child and bytecode metadata", report.Proto)
+	}
+	if report.Proto.Tier1.Reason == "" || report.Proto.Tier2.Reason == "" {
+		t.Fatalf("inspect bytecode JSON missing JIT callable reasons: %+v %+v", report.Proto.Tier1, report.Proto.Tier2)
+	}
+	child := report.Proto.Children[0]
+	if child.DisplayName != "add" || child.NumParams != 2 || child.InstructionCount == 0 || !strings.Contains(child.Disassembly, "RETURN") {
+		t.Fatalf("inspect bytecode child proto = %+v, want add disassembly", child)
+	}
+}
+
 func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")
