@@ -394,13 +394,14 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 def check_release_gate_docs() -> None:
     release_matrix_cmd = "go test ./tests -run 'TestReleaseMatrix' -count=1"
     release_profile_cmd = "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z"
+    ci_release_version_cmd = "go run ./cmd/leia ci release --release-version vX.Y.Z --list"
     release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
         root / "docs" / "release" / "index.md",
         [
             "## Machine-Checkable Release Evidence",
-            "go run ./cmd/leia ci release --list",
+            ci_release_version_cmd,
             release_profile_cmd,
             "profile is the release validation source of truth",
             "q conformance",
@@ -421,7 +422,7 @@ def check_release_gate_docs() -> None:
         root / "docs" / "release" / "index.md",
         [
             "## Machine-Checkable Release Evidence",
-            "go run ./cmd/leia ci release --list",
+            ci_release_version_cmd,
             release_profile_cmd,
             "scripts/docs_check.sh",
             release_distribution_cmd,

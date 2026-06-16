@@ -64,6 +64,31 @@ func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
 	}
 }
 
+func TestCICommandReleaseProfilePassesReleaseVersion(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"release", "--release-version", "v1.2.3", "--list"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if got := strings.TrimSpace(stdout.String()); got != "bash scripts/production_check.sh --full --release-profile --release-version v1.2.3" {
+		t.Fatalf("stdout = %q, want versioned release production check", stdout.String())
+	}
+}
+
+func TestCICommandRejectsReleaseVersionOutsideReleaseProfile(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"pr", "--release-version", "v1.2.3", "--list"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runCICommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--release-version is only valid with the release profile") {
+		t.Fatalf("stderr = %q, want release-version profile error", stderr.String())
+	}
+}
+
 func TestCICommandReleaseRejectsNoLuaJIT(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runCICommand([]string{"release", "--no-luajit"}, &stdout, &stderr)
@@ -123,12 +148,12 @@ func TestCICommandRunsReleaseDistributionCheck(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runCICommand([]string{"release"}, &stdout, &stderr)
+	code := runCICommand([]string{"release", "--release-version", "v1.2.3"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(commands) != 1 || !containsCommand(commands, "bash scripts/production_check.sh --full --release-profile") {
-		t.Fatalf("commands = %#v, want only production release profile", commands)
+	if len(commands) != 1 || !containsCommand(commands, "bash scripts/production_check.sh --full --release-profile --release-version v1.2.3") {
+		t.Fatalf("commands = %#v, want only versioned production release profile", commands)
 	}
 }
 

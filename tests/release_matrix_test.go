@@ -300,6 +300,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
 	docsCheckCmd := "bash scripts/docs_check.sh"
 	ciReleaseListCmd := "go run ./cmd/leia ci release --list"
+	ciReleaseVersionListCmd := "go run ./cmd/leia ci release --release-version vX.Y.Z --list"
 	productionFullCmd := "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z"
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
@@ -326,7 +327,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 			path: "docs/release/index.md",
 			snippets: []string{
 				"## Machine-Checkable Release Evidence",
-				ciReleaseListCmd,
+				ciReleaseVersionListCmd,
 				productionFullCmd,
 				"profile is the release validation source of truth",
 				"q conformance",
@@ -339,7 +340,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 		{
 			path: "docs/release/notes-template.md",
 			snippets: []string{
-				ciReleaseListCmd,
+				ciReleaseVersionListCmd,
 				productionFullCmd,
 				releaseMatrixCmd,
 				docsCheckCmd,
@@ -349,6 +350,12 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				releaseNotesCmd,
 				strictReleaseArtifactsCmd,
 				"List known issues, or write `None known` after release validation.",
+			},
+		},
+		{
+			path: "docs/guides/tooling.md",
+			snippets: []string{
+				ciReleaseListCmd,
 			},
 		},
 		{
@@ -872,6 +879,10 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	releaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--list")
 	if strings.TrimSpace(releaseOut) != "bash scripts/production_check.sh --full --release-profile" {
 		t.Fatalf("ci release --list must delegate to production release profile only; got:\n%s", releaseOut)
+	}
+	versionedReleaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list")
+	if strings.TrimSpace(versionedReleaseOut) != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+		t.Fatalf("ci release --release-version --list must delegate to versioned production release profile only; got:\n%s", versionedReleaseOut)
 	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")

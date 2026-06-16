@@ -52,7 +52,7 @@ bash scripts/performance_gate.sh --full
 ## Validation
 
 ```bash
-go run ./cmd/leia ci release --list
+go run ./cmd/leia ci release --release-version vX.Y.Z --list
 bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z
 go test ./tests -run 'TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh

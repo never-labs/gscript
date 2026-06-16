@@ -8,7 +8,7 @@ Run at least:
 
 ```bash
 bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z
-go run ./cmd/leia ci release --list
+go run ./cmd/leia ci release --release-version vX.Y.Z --list
 bash scripts/performance_gate.sh --full
 ```
 

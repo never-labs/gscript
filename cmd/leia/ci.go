@@ -22,11 +22,11 @@ type ciCommand struct {
 
 func runCICommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]")
+		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit] [--release-version VERSION]")
 		return 2
 	}
 	if args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
-		fmt.Fprintln(outw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]")
+		fmt.Fprintln(outw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit] [--release-version VERSION]")
 		return 0
 	}
 	profile := args[0]
@@ -34,18 +34,23 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	listOnly := fs.Bool("list", false, "print commands without running them")
 	noLuaJIT := fs.Bool("no-luajit", false, "skip LuaJIT where supported")
+	releaseVersion := fs.String("release-version", "", "release tag to validate with the release profile")
 	if code, done := parseCLIFlags(fs, args[1:]); done {
 		return code
 	}
 	if len(fs.Args()) != 0 {
-		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]")
+		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit] [--release-version VERSION]")
 		return 2
 	}
 	if profile == "release" && *noLuaJIT {
 		fmt.Fprintln(errw, "leia ci: release profile requires LuaJIT evidence; use pr or perf --no-luajit for non-release checks")
 		return 2
 	}
-	commands, err := ciProfileCommands(profile, *noLuaJIT)
+	if profile != "release" && *releaseVersion != "" {
+		fmt.Fprintln(errw, "leia ci: --release-version is only valid with the release profile")
+		return 2
+	}
+	commands, err := ciProfileCommands(profile, *noLuaJIT, *releaseVersion)
 	if err != nil {
 		fmt.Fprintf(errw, "leia ci: %v\n", err)
 		return 2
@@ -71,7 +76,7 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 	return 0
 }
 
-func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
+func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]ciCommand, error) {
 	switch profile {
 	case "smoke":
 		return []ciCommand{
@@ -95,8 +100,12 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 			{Name: "Performance gate", Args: appendNoLuaJIT([]string{"bash", "scripts/performance_gate.sh", "--full"}, noLuaJIT)},
 		}, nil
 	case "release":
+		args := []string{"bash", "scripts/production_check.sh", "--full", "--release-profile"}
+		if releaseVersion != "" {
+			args = append(args, "--release-version", releaseVersion)
+		}
 		return []ciCommand{
-			{Name: "Production check", Args: []string{"bash", "scripts/production_check.sh", "--full", "--release-profile"}},
+			{Name: "Production check", Args: args},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown ci profile %q (want smoke, pr, perf, or release)", profile)
