@@ -267,8 +267,8 @@ func buildReportCapabilities() []cliReportCapability {
 		{Command: "leia fmt --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"file_count", "changed_count", "diagnostic_count"}},
 		{Command: "leia inspect bytecode --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"proto_count", "proto.instruction_count", "proto.constant_count", "proto.upvalue_count", "proto.child_proto_count"}},
 		{Command: "leia lint --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"diagnostic_count", "error_count", "warning_count"}, CollectionFields: []string{"diagnostics"}},
-		{Command: "leia test --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"total", "passed", "failed"}},
-		{Command: "leia test --list --json", Formats: []string{"json"}, SchemaVersion: 1, CountFields: []string{"file_count"}, CollectionFields: []string{"files"}},
+		{Command: "leia test --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"total", "passed", "failed"}},
+		{Command: "leia test --list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"file_count"}, CollectionFields: []string{"files"}},
 		{Command: "leia version --json", Formats: []string{"json"}, SchemaVersion: 1},
 	}
 }

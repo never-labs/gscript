@@ -1350,6 +1350,7 @@ func TestReleaseMatrixTestCommandJSONReportsAreMachineReadable(t *testing.T) {
 	var runReport struct {
 		SchemaVersion int    `json:"schema_version"`
 		OK            bool   `json:"ok"`
+		Status        string `json:"status"`
 		Total         int    `json:"total"`
 		Passed        int    `json:"passed"`
 		Failed        int    `json:"failed"`
@@ -1362,13 +1363,14 @@ func TestReleaseMatrixTestCommandJSONReportsAreMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(runOut), &runReport); err != nil {
 		t.Fatalf("test run JSON failed to decode: %v\n%s", err, runOut)
 	}
-	if runReport.SchemaVersion != 1 || !runReport.OK || runReport.Total != 1 || runReport.Passed != 1 || runReport.Failed != 0 || runReport.GoldenMode != "auto" || len(runReport.Files) != 1 || runReport.Files[0].File != path || !runReport.Files[0].OK {
+	if runReport.SchemaVersion != 1 || !runReport.OK || runReport.Status != "pass" || runReport.Total != 1 || runReport.Passed != 1 || runReport.Failed != 0 || runReport.GoldenMode != "auto" || len(runReport.Files) != 1 || runReport.Files[0].File != path || !runReport.Files[0].OK {
 		t.Fatalf("test run JSON = %+v, want passing schema v1 report", runReport)
 	}
 
 	listOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "test", "--list", "--json", dir)
 	var listReport struct {
 		SchemaVersion int      `json:"schema_version"`
+		Status        string   `json:"status"`
 		ListOnly      bool     `json:"list_only"`
 		GoldenMode    string   `json:"golden_mode"`
 		FileCount     int      `json:"file_count"`
@@ -1377,7 +1379,7 @@ func TestReleaseMatrixTestCommandJSONReportsAreMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(listOut), &listReport); err != nil {
 		t.Fatalf("test list JSON failed to decode: %v\n%s", err, listOut)
 	}
-	if listReport.SchemaVersion != 1 || !listReport.ListOnly || listReport.GoldenMode != "auto" || listReport.FileCount != 1 || len(listReport.Files) != 1 || listReport.Files[0] != path {
+	if listReport.SchemaVersion != 1 || listReport.Status != "pass" || !listReport.ListOnly || listReport.GoldenMode != "auto" || listReport.FileCount != 1 || len(listReport.Files) != 1 || listReport.Files[0] != path {
 		t.Fatalf("test list JSON = %+v, want one-file schema v1 list report", listReport)
 	}
 }

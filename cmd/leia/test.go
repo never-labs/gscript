@@ -77,6 +77,7 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 			var buf bytes.Buffer
 			if err := json.NewEncoder(&buf).Encode(testListReport{
 				SchemaVersion: 1,
+				Status:        "pass",
 				ListOnly:      true,
 				GoldenMode:    *goldenMode,
 				FileCount:     len(files),
@@ -149,6 +150,7 @@ func writeCLIOutput(outw io.Writer, outputPath string, data []byte) error {
 type testRunResult struct {
 	SchemaVersion int              `json:"schema_version"`
 	OK            bool             `json:"ok"`
+	Status        string           `json:"status"`
 	Total         int              `json:"total"`
 	Passed        int              `json:"passed"`
 	Failed        int              `json:"failed"`
@@ -159,6 +161,7 @@ type testRunResult struct {
 
 type testListReport struct {
 	SchemaVersion int      `json:"schema_version"`
+	Status        string   `json:"status"`
 	ListOnly      bool     `json:"list_only"`
 	GoldenMode    string   `json:"golden_mode"`
 	FileCount     int      `json:"file_count"`
@@ -188,6 +191,7 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 		return testRunResult{
 			SchemaVersion: 1,
 			OK:            false,
+			Status:        "issues",
 			Total:         1,
 			Failed:        1,
 			Files:         []testFileResult{{File: path, OK: false, Error: err.Error()}},
@@ -198,6 +202,7 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 	result := testRunResult{
 		SchemaVersion: 1,
 		OK:            true,
+		Status:        "pass",
 		Total:         len(files),
 		Seed:          seed,
 		GoldenMode:    goldenMode,
@@ -301,7 +306,15 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 		}
 	}
 	result.OK = result.Failed == 0
+	result.Status = testStatus(result.OK)
 	return result
+}
+
+func testStatus(ok bool) string {
+	if ok {
+		return "pass"
+	}
+	return "issues"
 }
 
 func testGoldenOutputFile(filename string) (string, bool, error) {
