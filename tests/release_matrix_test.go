@@ -1501,7 +1501,9 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 		RequireWorkflows    bool     `json:"require_workflows"`
 		GoreleaserAvailable bool     `json:"goreleaser_available"`
 		LocalInstallFixture string   `json:"local_install_fixture"`
+		WorkflowCount       int      `json:"workflow_count"`
 		WorkflowFiles       []string `json:"workflow_files"`
+		InstallTargetCount  int      `json:"install_target_count"`
 		InstallTargets      []string `json:"install_targets"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
@@ -1509,6 +1511,9 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 	}
 	if report.SchemaVersion != 1 || report.Status != "pass" || report.RequireGoreleaser || report.RequireWorkflows || report.LocalInstallFixture != "verified" {
 		t.Fatalf("release distribution JSON = %+v, want passing schema v1 report", report)
+	}
+	if report.WorkflowCount != len(report.WorkflowFiles) || report.InstallTargetCount != len(report.InstallTargets) {
+		t.Fatalf("release distribution JSON counts = workflows %d/%d targets %d/%d", report.WorkflowCount, len(report.WorkflowFiles), report.InstallTargetCount, len(report.InstallTargets))
 	}
 	for _, target := range []string{"darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64"} {
 		if !stringSliceContains(report.InstallTargets, target) {

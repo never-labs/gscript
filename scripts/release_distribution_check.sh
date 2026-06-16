@@ -95,9 +95,11 @@ print_json_report() {
   printf '  "require_workflows": %s,\n' "$require_workflows"
   printf '  "goreleaser_available": %s,\n' "$goreleaser_available"
   printf '  "local_install_fixture": "%s",\n' "$local_install_fixture"
+  printf '  "workflow_count": %d,\n' "${#workflow_files[@]}"
   printf '  "workflow_files": '
   print_json_string_array "  " "${workflow_files[@]}"
   printf ',\n'
+  printf '  "install_target_count": %d,\n' "${#install_targets[@]}"
   printf '  "install_targets": '
   print_json_string_array "  " "${install_targets[@]}"
   printf '\n'
