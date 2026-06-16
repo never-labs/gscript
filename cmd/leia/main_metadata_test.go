@@ -8,6 +8,8 @@ import (
 	goruntime "runtime"
 	"strings"
 	"testing"
+
+	stdinstall "github.com/never-labs/leia/internal/stdlib/install"
 )
 
 func TestCapabilitiesJSON(t *testing.T) {
@@ -148,6 +150,33 @@ func TestCapabilitiesJSON(t *testing.T) {
 	}
 	if caps.Tooling.Config.FileName != "leia.toml" || !containsString(caps.Tooling.Config.Formats, "json") {
 		t.Fatalf("config capabilities = %+v, want leia.toml/json", caps.Tooling.Config)
+	}
+}
+
+func TestCapabilitiesDefaultImportsStaySyncedWithPrelude(t *testing.T) {
+	caps := buildCapabilities()
+	aliases := stdinstall.DefaultAliases()
+	if len(caps.DefaultImports) != len(aliases) {
+		t.Fatalf("default_imports length = %d, want %d", len(caps.DefaultImports), len(aliases))
+	}
+	seen := map[string]cliDefaultImport{}
+	for _, item := range caps.DefaultImports {
+		if item.Name == "" || item.Module == "" || item.Member == "" {
+			t.Fatalf("default import must include name, module, and member: %+v", item)
+		}
+		if previous, ok := seen[item.Name]; ok {
+			t.Fatalf("duplicate default import %q: %+v and %+v", item.Name, previous, item)
+		}
+		seen[item.Name] = item
+	}
+	for _, alias := range aliases {
+		got, ok := seen[alias.Name]
+		if !ok {
+			t.Fatalf("capabilities default_imports missing %s -> %s.%s", alias.Name, alias.Module, alias.Member)
+		}
+		if got.Module != alias.Module || got.Member != alias.Member {
+			t.Fatalf("capabilities default import %s = %s.%s, want %s.%s", alias.Name, got.Module, got.Member, alias.Module, alias.Member)
+		}
 	}
 }
 
