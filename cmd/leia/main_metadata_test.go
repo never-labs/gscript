@@ -222,6 +222,12 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("env report capability = %+v, want count field %q", envReport, want)
 		}
 	}
+	docGenerateReport := capabilitiesReport(caps.Tooling.Reports, "leia doc generate --format=json")
+	for _, want := range []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"} {
+		if docGenerateReport == nil || !containsString(docGenerateReport.CountFields, want) {
+			t.Fatalf("doc generate report capability = %+v, want count field %q", docGenerateReport, want)
+		}
+	}
 }
 
 func TestCapabilitiesDefaultImportsStaySyncedWithPrelude(t *testing.T) {

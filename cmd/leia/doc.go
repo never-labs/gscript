@@ -137,6 +137,7 @@ func generatedDocFiles(layout, format string, cliDoc, stdlibDoc, dialectDoc []by
 
 type docCLIReference struct {
 	SchemaVersion int             `json:"schema_version"`
+	CommandCount  int             `json:"command_count"`
 	Commands      []docCLICommand `json:"commands"`
 }
 
@@ -148,12 +149,15 @@ type docCLICommand struct {
 
 type docStdlibInventory struct {
 	SchemaVersion  int                `json:"schema_version"`
+	LayerCount     int                `json:"layer_count"`
+	DefaultCount   int                `json:"default_import_count"`
 	Layers         []cliStdlibLayer   `json:"layers"`
 	DefaultImports []cliDefaultImport `json:"default_imports"`
 }
 
 type docDialectReference struct {
 	SchemaVersion int                    `json:"schema_version"`
+	DialectCount  int                    `json:"dialect_count"`
 	Dialects      []cliDialectCapability `json:"dialects"`
 }
 
@@ -209,9 +213,11 @@ func generateCLIReferenceMarkdown() []byte {
 }
 
 func generateCLIReferenceJSON() []byte {
+	commands := cliReferenceData()
 	return marshalGeneratedDoc(docCLIReference{
 		SchemaVersion: 1,
-		Commands:      cliReferenceData(),
+		CommandCount:  len(commands),
+		Commands:      commands,
 	})
 }
 
@@ -247,10 +253,14 @@ func generateStdlibInventoryMarkdown() []byte {
 }
 
 func generateStdlibInventoryJSON() []byte {
+	layers := buildStdlibLayerCapabilities()
+	defaults := buildDefaultImportCapabilities()
 	return marshalGeneratedDoc(docStdlibInventory{
 		SchemaVersion:  1,
-		Layers:         buildStdlibLayerCapabilities(),
-		DefaultImports: buildDefaultImportCapabilities(),
+		LayerCount:     len(layers),
+		DefaultCount:   len(defaults),
+		Layers:         layers,
+		DefaultImports: defaults,
 	})
 }
 
@@ -342,27 +352,37 @@ func generateDialectReferenceMarkdown() []byte {
 }
 
 func generateDialectReferenceJSON() []byte {
+	dialects := buildDialectCapabilities()
 	return marshalGeneratedDoc(docDialectReference{
 		SchemaVersion: 1,
-		Dialects:      buildDialectCapabilities(),
+		DialectCount:  len(dialects),
+		Dialects:      dialects,
 	})
 }
 
 func generateCombinedReferenceJSON() []byte {
+	commands := cliReferenceData()
+	layers := buildStdlibLayerCapabilities()
+	defaults := buildDefaultImportCapabilities()
+	dialects := buildDialectCapabilities()
 	return marshalGeneratedDoc(docReferenceBundle{
 		SchemaVersion: 1,
 		CLI: docCLIReference{
 			SchemaVersion: 1,
-			Commands:      cliReferenceData(),
+			CommandCount:  len(commands),
+			Commands:      commands,
 		},
 		Stdlib: docStdlibInventory{
 			SchemaVersion:  1,
-			Layers:         buildStdlibLayerCapabilities(),
-			DefaultImports: buildDefaultImportCapabilities(),
+			LayerCount:     len(layers),
+			DefaultCount:   len(defaults),
+			Layers:         layers,
+			DefaultImports: defaults,
 		},
 		Dialects: docDialectReference{
 			SchemaVersion: 1,
-			Dialects:      buildDialectCapabilities(),
+			DialectCount:  len(dialects),
+			Dialects:      dialects,
 		},
 	})
 }

@@ -1564,6 +1564,58 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixDocGenerateReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "doc", "generate", "--format=json")
+	var report struct {
+		SchemaVersion int `json:"schema_version"`
+		CLI           struct {
+			SchemaVersion int `json:"schema_version"`
+			CommandCount  int `json:"command_count"`
+			Commands      []struct {
+				Name    string `json:"name"`
+				Usage   string `json:"usage"`
+				Summary string `json:"summary"`
+			} `json:"commands"`
+		} `json:"cli"`
+		Stdlib struct {
+			SchemaVersion int `json:"schema_version"`
+			LayerCount    int `json:"layer_count"`
+			DefaultCount  int `json:"default_import_count"`
+			Layers        []struct {
+				Name string `json:"name"`
+			} `json:"layers"`
+			DefaultImports []struct {
+				Name   string `json:"name"`
+				Module string `json:"module"`
+				Member string `json:"member"`
+			} `json:"default_imports"`
+		} `json:"stdlib"`
+		Dialects struct {
+			SchemaVersion int `json:"schema_version"`
+			DialectCount  int `json:"dialect_count"`
+			Dialects      []struct {
+				Name string `json:"name"`
+			} `json:"dialects"`
+		} `json:"dialects"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("doc generate JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.CLI.SchemaVersion != 1 || report.Stdlib.SchemaVersion != 1 || report.Dialects.SchemaVersion != 1 {
+		t.Fatalf("doc generate JSON schema versions = %+v, want schema v1 bundle", report)
+	}
+	if report.CLI.CommandCount != len(report.CLI.Commands) || report.CLI.CommandCount == 0 {
+		t.Fatalf("doc generate CLI count = %d/%d", report.CLI.CommandCount, len(report.CLI.Commands))
+	}
+	if report.Stdlib.LayerCount != len(report.Stdlib.Layers) || report.Stdlib.LayerCount == 0 || report.Stdlib.DefaultCount != len(report.Stdlib.DefaultImports) || report.Stdlib.DefaultCount == 0 {
+		t.Fatalf("doc generate stdlib counts = layers %d/%d defaults %d/%d", report.Stdlib.LayerCount, len(report.Stdlib.Layers), report.Stdlib.DefaultCount, len(report.Stdlib.DefaultImports))
+	}
+	if report.Dialects.DialectCount != len(report.Dialects.Dialects) || report.Dialects.DialectCount == 0 {
+		t.Fatalf("doc generate dialect count = %d/%d", report.Dialects.DialectCount, len(report.Dialects.Dialects))
+	}
+}
+
 func TestReleaseMatrixDocsCheckReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 120*time.Second, "bash", "scripts/docs_check.sh", "--json")

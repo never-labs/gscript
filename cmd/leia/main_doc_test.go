@@ -113,7 +113,7 @@ func TestDocGenerateWritesJSONReferenceFiles(t *testing.T) {
 	if err := json.Unmarshal(cliDoc, &cliRef); err != nil {
 		t.Fatalf("decode cli json: %v", err)
 	}
-	if cliRef.SchemaVersion != 1 || len(cliRef.Commands) == 0 || cliRef.Commands[0].Usage == "" {
+	if cliRef.SchemaVersion != 1 || cliRef.CommandCount != len(cliRef.Commands) || len(cliRef.Commands) == 0 || cliRef.Commands[0].Usage == "" {
 		t.Fatalf("cli json = %#v, want versioned command reference with usage", cliRef)
 	}
 	stdlibDoc, err := os.ReadFile(filepath.Join(dir, "reference", "stdlib", "index.json"))
@@ -124,7 +124,7 @@ func TestDocGenerateWritesJSONReferenceFiles(t *testing.T) {
 	if err := json.Unmarshal(stdlibDoc, &stdlibRef); err != nil {
 		t.Fatalf("decode stdlib json: %v", err)
 	}
-	if stdlibRef.SchemaVersion != 1 || len(stdlibRef.Layers) == 0 || len(stdlibRef.Layers[0].Modules) == 0 || !docDefaultImportsContain(stdlibRef.DefaultImports, "mat", "linalg", "matrix") {
+	if stdlibRef.SchemaVersion != 1 || stdlibRef.LayerCount != len(stdlibRef.Layers) || stdlibRef.DefaultCount != len(stdlibRef.DefaultImports) || len(stdlibRef.Layers) == 0 || len(stdlibRef.Layers[0].Modules) == 0 || !docDefaultImportsContain(stdlibRef.DefaultImports, "mat", "linalg", "matrix") {
 		t.Fatalf("stdlib json = %#v, want versioned stdlib inventory", stdlibRef)
 	}
 	dialectDoc, err := os.ReadFile(filepath.Join(dir, "reference", "dialects", "index.json"))
@@ -135,7 +135,7 @@ func TestDocGenerateWritesJSONReferenceFiles(t *testing.T) {
 	if err := json.Unmarshal(dialectDoc, &dialectRef); err != nil {
 		t.Fatalf("decode dialect json: %v", err)
 	}
-	if dialectRef.SchemaVersion != 1 || len(dialectRef.Dialects) == 0 {
+	if dialectRef.SchemaVersion != 1 || dialectRef.DialectCount != len(dialectRef.Dialects) || len(dialectRef.Dialects) == 0 {
 		t.Fatalf("dialect json = %#v, want versioned dialect reference", dialectRef)
 	}
 }
@@ -150,7 +150,7 @@ func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &bundle); err != nil {
 		t.Fatalf("decode combined json: %v", err)
 	}
-	if bundle.SchemaVersion != 1 || len(bundle.CLI.Commands) == 0 || len(bundle.Stdlib.Layers) == 0 || !docDefaultImportsContain(bundle.Stdlib.DefaultImports, "sqrt", "math", "sqrt") || len(bundle.Dialects.Dialects) == 0 {
+	if bundle.SchemaVersion != 1 || bundle.CLI.CommandCount != len(bundle.CLI.Commands) || len(bundle.CLI.Commands) == 0 || bundle.Stdlib.LayerCount != len(bundle.Stdlib.Layers) || bundle.Stdlib.DefaultCount != len(bundle.Stdlib.DefaultImports) || len(bundle.Stdlib.Layers) == 0 || !docDefaultImportsContain(bundle.Stdlib.DefaultImports, "sqrt", "math", "sqrt") || bundle.Dialects.DialectCount != len(bundle.Dialects.Dialects) || len(bundle.Dialects.Dialects) == 0 {
 		t.Fatalf("bundle = %#v, want CLI and stdlib references", bundle)
 	}
 }
