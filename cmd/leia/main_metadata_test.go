@@ -244,6 +244,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia fmt --json", "files"},
 		{"leia inspect bytecode --json", "proto.children"},
 		{"leia test --json", "files"},
+		{"scripts/production_check.sh --list --json", "release_critical_skip_names"},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		if report == nil || !containsString(report.CollectionFields, tc.collection) {
@@ -282,6 +283,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod vendor --json", []string{"module_count", "diagnostic_count"}},
 		{"scripts/editor_check.sh --json", []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}},
 		{"scripts/performance_gate.sh --json", []string{"failure_count", "output_line_count"}},
+		{"scripts/production_check.sh --list --json", []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}},
 		{"scripts/public_release_blockers_check.sh --json", []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count"}},
 		{"scripts/release_artifacts.sh --dry-run --json", []string{"artifact_count"}},
 	} {

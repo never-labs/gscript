@@ -1788,17 +1788,19 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		RunCount          int  `json:"run_count"`
 		SkipCount         int  `json:"skip_count"`
 		CriticalSkipCount int  `json:"critical_skip_count"`
+		CriticalNameCount int  `json:"release_critical_skip_name_count"`
 		RunnableChecks    []struct {
 			Name    string `json:"name"`
 			Command string `json:"command"`
 		} `json:"runnable_checks"`
 		SkippedChecks        []string `json:"skipped_checks"`
+		ReleaseCriticalNames []string `json:"release_critical_skip_names"`
 		ReleaseCriticalSkips []string `json:"release_critical_skips"`
 	}
 	if err := json.Unmarshal([]byte(quickOut), &quickReport); err != nil {
 		t.Fatalf("quick production plan JSON failed to decode: %v\n%s", err, quickOut)
 	}
-	if quickReport.SchemaVersion != 1 || quickReport.Mode != "quick" || quickReport.ReleaseProfile || !quickReport.ListOnly || quickReport.RunCount != len(quickReport.RunnableChecks) || quickReport.SkipCount != len(quickReport.SkippedChecks) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkips) {
+	if quickReport.SchemaVersion != 1 || quickReport.Mode != "quick" || quickReport.ReleaseProfile || !quickReport.ListOnly || quickReport.RunCount != len(quickReport.RunnableChecks) || quickReport.SkipCount != len(quickReport.SkippedChecks) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkips) || quickReport.CriticalNameCount != len(quickReport.ReleaseCriticalNames) {
 		t.Fatalf("quick production plan JSON = %+v, want quick schema v1 plan", quickReport)
 	}
 
@@ -1812,18 +1814,25 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		RunCount          int    `json:"run_count"`
 		SkipCount         int    `json:"skip_count"`
 		CriticalSkipCount int    `json:"critical_skip_count"`
+		CriticalNameCount int    `json:"release_critical_skip_name_count"`
 		RunnableChecks    []struct {
 			Name    string `json:"name"`
 			Command string `json:"command"`
 		} `json:"runnable_checks"`
 		SkippedChecks        []string `json:"skipped_checks"`
+		ReleaseCriticalNames []string `json:"release_critical_skip_names"`
 		ReleaseCriticalSkips []string `json:"release_critical_skips"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("production plan JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) {
+	if report.SchemaVersion != 1 || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) || report.CriticalNameCount != len(report.ReleaseCriticalNames) {
 		t.Fatalf("production plan JSON = %+v, want release profile schema v1 plan", report)
+	}
+	for _, want := range []string{"Correctness", "Performance Gate", "Public Release Blockers", "Release Smoke"} {
+		if !stringSliceContains(report.ReleaseCriticalNames, want) {
+			t.Fatalf("production plan JSON release critical names missing %q: %+v", want, report.ReleaseCriticalNames)
+		}
 	}
 	commands := map[string]string{}
 	for _, check := range report.RunnableChecks {

@@ -201,6 +201,7 @@ print_plan_json() {
     printf '  "run_count": %d,\n' "${#RUN_NAMES[@]}"
     printf '  "skip_count": %d,\n' "${#SKIP_REASONS[@]}"
     printf '  "critical_skip_count": %d,\n' "${#critical[@]}"
+    printf '  "release_critical_skip_name_count": %d,\n' "${#RELEASE_CRITICAL_SKIP_NAMES[@]}"
     printf '  "runnable_checks": [\n'
     local i=0
     while [ "$i" -lt "${#RUN_NAMES[@]}" ]; do
@@ -218,6 +219,9 @@ print_plan_json() {
     else
         print_json_string_array "  " "${SKIP_REASONS[@]}"
     fi
+    printf ',\n'
+    printf '  "release_critical_skip_names": '
+    print_json_string_array "  " "${RELEASE_CRITICAL_SKIP_NAMES[@]}"
     printf ',\n'
     printf '  "release_critical_skips": '
     if [ "${#critical[@]}" -eq 0 ]; then
