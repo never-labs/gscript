@@ -16,6 +16,7 @@ Machine-readable release evidence:
 
 ```bash
 bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json
+go run ./cmd/leia doc check --json
 bash scripts/q_conformance_gate.sh --scope core --bench smoke --json
 LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh > /tmp/leia-q-perf-output.txt
 python3 benchmarks/q_perf_report.py --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md
@@ -32,7 +33,7 @@ bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
 profile is the release validation source of truth: correctness, documentation,
 performance, q conformance, language conformance, public blockers,
 distribution configuration, and local artifact installation evidence are all
-listed there. Documentation evidence is produced by `scripts/docs_check.sh`
+listed there. Documentation evidence is produced by `leia doc check --json`
 inside that profile.
 
 The release evidence should cite:

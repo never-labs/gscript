@@ -437,7 +437,7 @@ def check_release_gate_docs() -> None:
             "## Machine-Checkable Release Evidence",
             ci_release_version_cmd,
             release_profile_cmd,
-            "scripts/docs_check.sh",
+            "go run ./cmd/leia doc check --json",
             release_distribution_cmd,
             "tests/language/MANIFEST.md",
             "tests/language/KNOWN_FAILURES.md",

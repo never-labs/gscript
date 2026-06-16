@@ -99,13 +99,14 @@ surface.
 go run ./cmd/leia doc generate --layout site --output docs
 go run ./cmd/leia doc generate --format json
 go run ./cmd/leia doc check
-bash scripts/docs_check.sh
+go run ./cmd/leia doc check --json
 ```
 
-Generated reference pages are checked in. `scripts/docs_check.sh` verifies
+Generated reference pages are checked in. `leia doc check` verifies
 generated CLI/stdlib/dialect references, spec HTML freshness, spec runnable examples,
 Markdown links, release reference coverage, retired naming, and documented
-repository script entrypoints.
+repository script entrypoints. Use `--json` for machine-readable documentation
+evidence.
 
 GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`. The
 workflow runs `go run ./cmd/leia doc check` before building the site.
