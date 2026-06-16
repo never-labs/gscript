@@ -1574,28 +1574,33 @@ func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1")
 	var report struct {
-		SchemaVersion          int    `json:"schema_version"`
-		Status                 string `json:"status"`
-		Version                string `json:"version"`
-		Build                  bool   `json:"build"`
-		RequireClean           bool   `json:"require_clean"`
-		RequireTag             bool   `json:"require_tag"`
-		GOOS                   string `json:"goos"`
-		GOARCH                 string `json:"goarch"`
-		Artifact               string `json:"artifact"`
-		LSPArtifact            string `json:"lsp_artifact"`
-		Metadata               string `json:"metadata"`
-		InstallArchive         string `json:"install_archive"`
-		DryRunVerified         bool   `json:"dry_run_verified"`
-		BuildVerified          bool   `json:"build_verified"`
-		InstallArchiveVerified bool   `json:"install_archive_verified"`
-		OutputDir              string `json:"output_dir"`
+		SchemaVersion          int      `json:"schema_version"`
+		Status                 string   `json:"status"`
+		Version                string   `json:"version"`
+		Build                  bool     `json:"build"`
+		RequireClean           bool     `json:"require_clean"`
+		RequireTag             bool     `json:"require_tag"`
+		GOOS                   string   `json:"goos"`
+		GOARCH                 string   `json:"goarch"`
+		Artifact               string   `json:"artifact"`
+		LSPArtifact            string   `json:"lsp_artifact"`
+		Metadata               string   `json:"metadata"`
+		InstallArchive         string   `json:"install_archive"`
+		ArtifactCount          int      `json:"artifact_count"`
+		ArtifactFiles          []string `json:"artifact_files"`
+		DryRunVerified         bool     `json:"dry_run_verified"`
+		BuildVerified          bool     `json:"build_verified"`
+		InstallArchiveVerified bool     `json:"install_archive_verified"`
+		OutputDir              string   `json:"output_dir"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("release artifact JSON failed to decode: %v\n%s", err, out)
 	}
 	if report.SchemaVersion != 1 || report.Status != "pass" || report.Version != "v1.2.3-rc.1" || report.Build || report.RequireClean || report.RequireTag || !report.DryRunVerified || report.BuildVerified || report.InstallArchiveVerified || report.OutputDir != "" {
 		t.Fatalf("release artifact JSON = %+v, want passing dry-run schema v1 report", report)
+	}
+	if report.ArtifactCount != len(report.ArtifactFiles) || report.ArtifactCount != 4 {
+		t.Fatalf("release artifact JSON artifact counts = %d/%d, want 4", report.ArtifactCount, len(report.ArtifactFiles))
 	}
 	if report.GOOS == "" || report.GOARCH == "" {
 		t.Fatalf("release artifact JSON missing platform: %+v", report)

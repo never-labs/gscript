@@ -131,6 +131,13 @@ print_json_report() {
   printf '  "lsp_artifact": "%s",\n' "$(json_escape "$lsp_binary_name")"
   printf '  "metadata": "%s",\n' "$(json_escape "$metadata_name")"
   printf '  "install_archive": "%s",\n' "$(json_escape "$install_archive_name")"
+  printf '  "artifact_count": 4,\n'
+  printf '  "artifact_files": [\n'
+  printf '    "%s",\n' "$(json_escape "$binary_name")"
+  printf '    "%s",\n' "$(json_escape "$lsp_binary_name")"
+  printf '    "%s",\n' "$(json_escape "$metadata_name")"
+  printf '    "%s"\n' "$(json_escape "$install_archive_name")"
+  printf '  ],\n'
   printf '  "dry_run_verified": %s,\n' "$dry_run_verified"
   printf '  "build_verified": %s,\n' "$build_verified"
   printf '  "install_archive_verified": %s,\n' "$install_archive_verified"
