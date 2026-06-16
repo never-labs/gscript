@@ -30,9 +30,13 @@ Use JSON reports when another tool or CI step needs stable machine-readable
 results:
 
 ```bash
+go run ./cmd/leia capabilities --json
 go run ./cmd/leia test --json --output test-report.json tests/smoke/01_basic.leia
 go run ./cmd/leia evaluate --json --report eval-report.json examples/evaluate/basic_assert.leia
 ```
+
+`capabilities --json` includes `tooling.report_count` and `tooling.reports`,
+the registry of CLI and release-script JSON reports.
 
 ## CI Profiles
 
@@ -188,6 +192,7 @@ collect environment, docs/test status, and optional benchmark summaries.
 ## Release Evidence
 
 ```bash
+go run ./cmd/leia capabilities --json
 bash scripts/production_check.sh --quick
 bash scripts/production_check.sh --quick --list --json
 go test ./tests -run 'TestReleaseMatrix' -count=1
