@@ -107,6 +107,7 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertTrue(report["validate_only"])
         self.assertEqual(report["failure_count"], 0)
         self.assertEqual(report["failures"], [])
+        self.assertEqual(report["output_line_count"], len(report["output_lines"]))
         self.assertIn("timing.json", report["timing_json"])
         self.assertIn("Performance gate passed.", "\n".join(report["output_lines"]))
 
@@ -118,6 +119,7 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertEqual(report["status"], "issues")
         self.assertEqual(report["failure_count"], 1)
         self.assertEqual(report["failures"], ["timing validation failed"])
+        self.assertEqual(report["output_line_count"], len(report["output_lines"]))
         self.assertIn("Performance gate violations", "\n".join(report["output_lines"]))
 
     def test_json_requires_validate_only(self):

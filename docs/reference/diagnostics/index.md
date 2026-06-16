@@ -64,6 +64,8 @@ kind counts for missing files, open release decisions, stale text, unconfirmed
 policies, missing guidance, and missing documentation snippets.
 `leia diag bundle --json` exposes `file_count` for the generated bundle files
 listed in `files`.
+`scripts/performance_gate.sh --validate-only FILE --json` exposes
+`output_line_count` for captured validation output.
 
 Current lint codes:
 

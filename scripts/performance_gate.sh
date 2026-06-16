@@ -313,6 +313,8 @@ print_validate_json_report() {
     if [ "$#" -gt 0 ]; then
         failures=("$@")
     fi
+    local output_line_count
+    output_line_count="$(awk 'END { print NR + 0 }' "$output_file")"
     printf '{\n'
     printf '  "schema_version": 1,\n'
     printf '  "status": "%s",\n' "$status"
@@ -323,6 +325,7 @@ print_validate_json_report() {
     printf '  "wall_threshold": %s,\n' "$WALL_THRESHOLD"
     printf '  "luajit_threshold": %s,\n' "$LUAJIT_THRESHOLD"
     printf '  "failure_count": %d,\n' "${#failures[@]}"
+    printf '  "output_line_count": %d,\n' "$output_line_count"
     printf '  "failures": [\n'
     local i=0
     while [ "$i" -lt "${#failures[@]}" ]; do

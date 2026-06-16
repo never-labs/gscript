@@ -253,6 +253,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod tidy --json", []string{"removed_count", "missing_count", "diagnostic_count"}},
 		{"leia mod vendor --json", []string{"module_count", "diagnostic_count"}},
 		{"scripts/editor_check.sh --json", []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}},
+		{"scripts/performance_gate.sh --json", []string{"failure_count", "output_line_count"}},
 		{"scripts/public_release_blockers_check.sh --json", []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count"}},
 		{"scripts/release_artifacts.sh --dry-run --json", []string{"artifact_count"}},
 	} {
