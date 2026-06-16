@@ -1981,6 +1981,7 @@ func TestReleaseMatrixDiagnosticsBundleReportIsMachineReadable(t *testing.T) {
 		RunGoTests    bool     `json:"run_go_tests"`
 		RunBenchmarks bool     `json:"run_benchmarks"`
 		FailureCount  int      `json:"failure_count"`
+		FileCount     int      `json:"file_count"`
 		Summary       string   `json:"summary"`
 		Manifest      string   `json:"manifest"`
 		Files         []string `json:"files"`
@@ -1990,6 +1991,9 @@ func TestReleaseMatrixDiagnosticsBundleReportIsMachineReadable(t *testing.T) {
 	}
 	if report.SchemaVersion != 1 || report.Status != "pass" || report.OutputDir != outDir || report.RunGoTests || report.RunBenchmarks || report.FailureCount != 0 {
 		t.Fatalf("diagnostics bundle JSON = %+v, want passing no-test/no-benchmark schema v1 report", report)
+	}
+	if report.FileCount != len(report.Files) {
+		t.Fatalf("diagnostics bundle JSON file count = %d/%d in %+v", report.FileCount, len(report.Files), report)
 	}
 	for _, want := range []string{"summary.md", "manifest.txt", "git_revision.txt", "git_status.txt", "git_diff_stat.txt", "go_version.txt", "go_env_summary.txt", "go_test_quick.skipped", "benchmarks.skipped"} {
 		if !stringSliceContains(report.Files, want) {

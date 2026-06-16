@@ -62,6 +62,8 @@ status field, top-level count fields, and collection fields. In particular,
 `scripts/public_release_blockers_check.sh --json` exposes `blocker_count` and
 kind counts for missing files, open release decisions, stale text, unconfirmed
 policies, missing guidance, and missing documentation snippets.
+`leia diag bundle --json` exposes `file_count` for the generated bundle files
+listed in `files`.
 
 Current lint codes:
 

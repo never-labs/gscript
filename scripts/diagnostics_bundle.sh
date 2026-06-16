@@ -142,6 +142,8 @@ print_json_report() {
     if [ "$failures" -gt 0 ]; then
         status="fail"
     fi
+    local file_count
+    file_count="$(awk 'NF { count++ } END { print count + 0 }' "$MANIFEST")"
     printf '{\n'
     printf '  "schema_version": 1,\n'
     printf '  "status": "%s",\n' "$status"
@@ -149,6 +151,7 @@ print_json_report() {
     printf '  "run_go_tests": %s,\n' "$(if [ "$RUN_GO_TESTS" -eq 1 ]; then printf true; else printf false; fi)"
     printf '  "run_benchmarks": %s,\n' "$(if [ "$RUN_BENCHMARKS" -eq 1 ]; then printf true; else printf false; fi)"
     printf '  "failure_count": %d,\n' "$failures"
+    printf '  "file_count": %d,\n' "$file_count"
     printf '  "summary": "%s",\n' "$(json_escape "${SUMMARY#$OUT_DIR/}")"
     printf '  "manifest": "%s",\n' "$(json_escape "${MANIFEST#$OUT_DIR/}")"
     printf '  "files": '
