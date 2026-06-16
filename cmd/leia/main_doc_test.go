@@ -32,7 +32,7 @@ func TestDocGenerateWritesReferenceFiles(t *testing.T) {
 	if !bytes.Contains(cliDoc, []byte("`run`")) || !bytes.Contains(cliDoc, []byte("`doc`")) {
 		t.Fatalf("cli.md = %q, want command reference", string(cliDoc))
 	}
-	if !bytes.Contains(stdlibDoc, []byte("`json`")) || !bytes.Contains(stdlibDoc, []byte("JSON encode/decode")) || !bytes.Contains(stdlibDoc, []byte("Safe default")) {
+	if !bytes.Contains(stdlibDoc, []byte("`json`")) || !bytes.Contains(stdlibDoc, []byte("JSON encode/decode")) || !bytes.Contains(stdlibDoc, []byte("Safe default")) || !bytes.Contains(stdlibDoc, []byte("## Default Imports")) || !bytes.Contains(stdlibDoc, []byte("| `mat` | `linalg.matrix` |")) {
 		t.Fatalf("stdlib.md = %q, want stdlib inventory", string(stdlibDoc))
 	}
 	if !bytes.Contains(dialectDoc, []byte("`sh`")) || !bytes.Contains(dialectDoc, []byte("`agent`")) || !bytes.Contains(dialectDoc, []byte("Built-In Dialects")) {
@@ -57,7 +57,7 @@ func TestDocGenerateWritesSiteLayout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(stdlibDoc, []byte("generated from the standard-library metadata")) {
+	if !bytes.Contains(stdlibDoc, []byte("generated from the standard-library metadata")) || !bytes.Contains(stdlibDoc, []byte("## Default Imports")) {
 		t.Fatalf("stdlib site doc = %q, want generated stdlib inventory", string(stdlibDoc))
 	}
 	dialectDoc, err := os.ReadFile(dialectPath)
@@ -124,7 +124,7 @@ func TestDocGenerateWritesJSONReferenceFiles(t *testing.T) {
 	if err := json.Unmarshal(stdlibDoc, &stdlibRef); err != nil {
 		t.Fatalf("decode stdlib json: %v", err)
 	}
-	if stdlibRef.SchemaVersion != 1 || len(stdlibRef.Layers) == 0 || len(stdlibRef.Layers[0].Modules) == 0 {
+	if stdlibRef.SchemaVersion != 1 || len(stdlibRef.Layers) == 0 || len(stdlibRef.Layers[0].Modules) == 0 || !docDefaultImportsContain(stdlibRef.DefaultImports, "mat", "linalg", "matrix") {
 		t.Fatalf("stdlib json = %#v, want versioned stdlib inventory", stdlibRef)
 	}
 	dialectDoc, err := os.ReadFile(filepath.Join(dir, "reference", "dialects", "index.json"))
@@ -150,9 +150,18 @@ func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &bundle); err != nil {
 		t.Fatalf("decode combined json: %v", err)
 	}
-	if bundle.SchemaVersion != 1 || len(bundle.CLI.Commands) == 0 || len(bundle.Stdlib.Layers) == 0 || len(bundle.Dialects.Dialects) == 0 {
+	if bundle.SchemaVersion != 1 || len(bundle.CLI.Commands) == 0 || len(bundle.Stdlib.Layers) == 0 || !docDefaultImportsContain(bundle.Stdlib.DefaultImports, "sqrt", "math", "sqrt") || len(bundle.Dialects.Dialects) == 0 {
 		t.Fatalf("bundle = %#v, want CLI and stdlib references", bundle)
 	}
+}
+
+func docDefaultImportsContain(imports []cliDefaultImport, name, module, member string) bool {
+	for _, item := range imports {
+		if item.Name == name && item.Module == module && item.Member == member {
+			return true
+		}
+	}
+	return false
 }
 
 func TestDocHelpFlagsExitSuccessfully(t *testing.T) {

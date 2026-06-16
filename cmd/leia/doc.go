@@ -147,8 +147,9 @@ type docCLICommand struct {
 }
 
 type docStdlibInventory struct {
-	SchemaVersion int              `json:"schema_version"`
-	Layers        []cliStdlibLayer `json:"layers"`
+	SchemaVersion  int                `json:"schema_version"`
+	Layers         []cliStdlibLayer   `json:"layers"`
+	DefaultImports []cliDefaultImport `json:"default_imports"`
 }
 
 type docDialectReference struct {
@@ -227,13 +228,24 @@ func generateStdlibInventoryMarkdown() []byte {
 			fmt.Fprintf(&b, "| `%s` | `%s` | %s | %t | %s |\n", layer.Name, strings.TrimSpace(module.Name), module.Description, module.SafeDefault, capabilities)
 		}
 	}
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "## Default Imports")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "These global convenience bindings are generated from the same alias table used by standard-library installation. Each alias is available only when its source module is installed.")
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, "| Name | Source |")
+	fmt.Fprintln(&b, "|---|---|")
+	for _, alias := range caps.DefaultImports {
+		fmt.Fprintf(&b, "| `%s` | `%s.%s` |\n", alias.Name, alias.Module, alias.Member)
+	}
 	return b.Bytes()
 }
 
 func generateStdlibInventoryJSON() []byte {
 	return marshalGeneratedDoc(docStdlibInventory{
-		SchemaVersion: 1,
-		Layers:        buildStdlibLayerCapabilities(),
+		SchemaVersion:  1,
+		Layers:         buildStdlibLayerCapabilities(),
+		DefaultImports: buildDefaultImportCapabilities(),
 	})
 }
 
@@ -339,8 +351,9 @@ func generateCombinedReferenceJSON() []byte {
 			Commands:      cliReferenceData(),
 		},
 		Stdlib: docStdlibInventory{
-			SchemaVersion: 1,
-			Layers:        buildStdlibLayerCapabilities(),
+			SchemaVersion:  1,
+			Layers:         buildStdlibLayerCapabilities(),
+			DefaultImports: buildDefaultImportCapabilities(),
 		},
 		Dialects: docDialectReference{
 			SchemaVersion: 1,

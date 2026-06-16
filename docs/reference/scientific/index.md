@@ -16,10 +16,11 @@ are also installed as globals:
 
 | Source module | Default helpers |
 |---|---|
-| `math` | `sqrt`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `exp`, `log`, `abs`, `floor`, `ceil`, `round`, `sign`, `near` |
-| `linalg` | `vec`, `row`, `col`, `mat`, `eye`, `diag`, `at`, `T`, `trace`, `dot`, `norm`, `matvec`, `matmul`, `solve`, `axpy`, `add_scaled` |
-| `stats` | `sum`, `mean`, `avg`, `variance`, `std`, `rms`, `rmse`, `cumsum`, `diff`, `describe` |
-| `rand` | `seed`, `randn`, `sample`, `shuffle` |
+| `table` | `append` |
+| `math` | `abs`, `sqrt`, `exp`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `floor`, `ceil`, `round`, `min`, `max`, `clamp`, `near`, `pow` |
+| `linalg` | `vector`, `vec`, `mat`, `row`, `col`, `eye`, `diag`, `zeros`, `ones`, `at`, `norm`, `dot`, `matvec`, `matmul`, `axpy`, `solve`, `trace`, `transpose` |
+| `stats` | `sum`, `mean`, `avg`, `variance`, `std`, `describe`, `rms`, `rmse`, `cumsum`, `diff`, `normalize` |
+| `rand` | `randn`, `sample` |
 
 Globals are convenience bindings, not syntax. They follow `WithLibs`: disabling
 a module removes that module's default helpers while leaving ordinary language

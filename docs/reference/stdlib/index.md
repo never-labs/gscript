@@ -57,3 +57,59 @@ This inventory is generated from the standard-library metadata used by the curre
 | `data` | `stats` | Numeric reductions, normalization, scans, and resampling helpers. | true | none |
 | `data` | `vec` | Vector construction, arithmetic, geometry, and numeric helpers. | true | none |
 | `compat` | `bit32` | Lua-compatible 32-bit bit operations. | true | none |
+
+## Default Imports
+
+These global convenience bindings are generated from the same alias table used by standard-library installation. Each alias is available only when its source module is installed.
+
+| Name | Source |
+|---|---|
+| `append` | `table.append` |
+| `abs` | `math.abs` |
+| `sqrt` | `math.sqrt` |
+| `exp` | `math.exp` |
+| `sin` | `math.sin` |
+| `cos` | `math.cos` |
+| `tan` | `math.tan` |
+| `asin` | `math.asin` |
+| `acos` | `math.acos` |
+| `atan` | `math.atan` |
+| `floor` | `math.floor` |
+| `ceil` | `math.ceil` |
+| `round` | `math.round` |
+| `min` | `math.min` |
+| `max` | `math.max` |
+| `clamp` | `math.clamp` |
+| `near` | `math.near` |
+| `pow` | `math.pow` |
+| `vector` | `linalg.vector` |
+| `vec` | `linalg.vec` |
+| `mat` | `linalg.matrix` |
+| `row` | `linalg.row` |
+| `col` | `linalg.col` |
+| `eye` | `linalg.eye` |
+| `diag` | `linalg.diag` |
+| `zeros` | `linalg.zeros` |
+| `ones` | `linalg.ones` |
+| `at` | `linalg.at` |
+| `norm` | `linalg.norm` |
+| `dot` | `linalg.dot` |
+| `matvec` | `linalg.matvec` |
+| `matmul` | `linalg.matmul` |
+| `axpy` | `linalg.axpy` |
+| `solve` | `linalg.solve` |
+| `trace` | `linalg.trace` |
+| `transpose` | `linalg.transpose` |
+| `sum` | `stats.sum` |
+| `mean` | `stats.mean` |
+| `avg` | `stats.mean` |
+| `variance` | `stats.variance` |
+| `std` | `stats.std` |
+| `describe` | `stats.describe` |
+| `rms` | `stats.rms` |
+| `rmse` | `stats.rmse` |
+| `cumsum` | `stats.cumsum` |
+| `diff` | `stats.diff` |
+| `normalize` | `stats.normalize` |
+| `randn` | `rand.normal_vec` |
+| `sample` | `rand.sample` |
