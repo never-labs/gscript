@@ -110,6 +110,9 @@ func TestCICommandListJSONReportsProfilePlan(t *testing.T) {
 	if got := command.Command; got != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
 		t.Fatalf("command = %q, want versioned production check", got)
 	}
+	if command.ArgCount != len(command.Args) || command.ArgCount != 6 {
+		t.Fatalf("command arg_count = %d args = %#v, want count 6 matching args", command.ArgCount, command.Args)
+	}
 	for _, want := range []string{"bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
 		if !containsString(command.Args, want) {
 			t.Fatalf("args = %#v, want %q", command.Args, want)

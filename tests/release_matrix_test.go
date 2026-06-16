@@ -1863,9 +1863,10 @@ func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
 		ReleaseVersion string `json:"release_version"`
 		CommandCount   int    `json:"command_count"`
 		Commands       []struct {
-			Name    string   `json:"name"`
-			Args    []string `json:"args"`
-			Command string   `json:"command"`
+			Name     string   `json:"name"`
+			Args     []string `json:"args"`
+			ArgCount int      `json:"arg_count"`
+			Command  string   `json:"command"`
 		} `json:"commands"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
@@ -1877,6 +1878,9 @@ func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
 	command := report.Commands[0]
 	if command.Name != "Production check" || command.Command != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
 		t.Fatalf("ci profile plan command = %+v, want versioned production check", command)
+	}
+	if command.ArgCount != len(command.Args) || command.ArgCount != 6 {
+		t.Fatalf("ci profile plan arg_count = %d args = %#v, want count 6 matching args", command.ArgCount, command.Args)
 	}
 	for _, want := range []string{"bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
 		if !stringSliceContains(command.Args, want) {

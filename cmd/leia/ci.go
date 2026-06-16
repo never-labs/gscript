@@ -35,9 +35,10 @@ type ciPlanReport struct {
 }
 
 type ciPlanCommand struct {
-	Name    string   `json:"name"`
-	Args    []string `json:"args"`
-	Command string   `json:"command"`
+	Name     string   `json:"name"`
+	Args     []string `json:"args"`
+	ArgCount int      `json:"arg_count"`
+	Command  string   `json:"command"`
 }
 
 func runCICommand(args []string, outw, errw io.Writer) int {
@@ -118,9 +119,10 @@ func ciPlan(profile string, noLuaJIT bool, releaseVersion string, commands []ciC
 	planCommands := make([]ciPlanCommand, 0, len(commands))
 	for _, cmd := range commands {
 		planCommands = append(planCommands, ciPlanCommand{
-			Name:    cmd.Name,
-			Args:    append([]string(nil), cmd.Args...),
-			Command: shellJoin(cmd.Args),
+			Name:     cmd.Name,
+			Args:     append([]string(nil), cmd.Args...),
+			ArgCount: len(cmd.Args),
+			Command:  shellJoin(cmd.Args),
 		})
 	}
 	return ciPlanReport{
