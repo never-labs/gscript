@@ -225,6 +225,20 @@ go replace example.com/local => ../local
 	if string(written) != got {
 		t.Fatalf("written go.mod differs:\n%s\nwant:\n%s", string(written), got)
 	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"gomod", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod gomod --json code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var jsonReport modGoModReport
+	if err := json.Unmarshal(stdout.Bytes(), &jsonReport); err != nil {
+		t.Fatalf("stdout is not JSON gomod report: %v; stdout = %q", err, stdout.String())
+	}
+	if !jsonReport.OK || jsonReport.DiagnosticCount != len(jsonReport.Diagnostics) || jsonReport.DiagnosticCount != 0 || !strings.Contains(jsonReport.Content, "module example.com/native\n") {
+		t.Fatalf("gomod JSON report = %+v, want counted generated content", jsonReport)
+	}
 }
 
 func TestModCapabilityReportsMatrix(t *testing.T) {
@@ -294,7 +308,7 @@ require github.com/acme/toolkit v1.2.3
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON download report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Modules) != 1 || !report.Modules[0].Downloaded || !report.Modules[0].Extracted {
+	if !report.OK || report.ModuleCount != len(report.Modules) || report.ModuleCount != 1 || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 || !report.Modules[0].Downloaded || !report.Modules[0].Extracted {
 		t.Fatalf("download report = %+v, want downloaded and extracted module", report)
 	}
 	if _, err := os.Stat(filepath.Join(report.Modules[0].ExtractDir, "main.leia")); err != nil {
@@ -534,7 +548,7 @@ require github.com/acme/toolkit v1.2.3
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON vendor report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Modules) != 2 {
+	if !report.OK || report.ModuleCount != len(report.Modules) || report.ModuleCount != 2 || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 {
 		t.Fatalf("vendor report = %+v, want direct and transitive modules", report)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "main.leia")); err != nil {
@@ -570,7 +584,7 @@ require github.com/acme/toolkit v1.2.3
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON vendor report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Modules) != 1 {
+	if !report.OK || report.ModuleCount != len(report.Modules) || report.ModuleCount != 1 || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 {
 		t.Fatalf("vendor report = %+v, want one copied module", report)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "main.leia")); err != nil {
@@ -1052,7 +1066,7 @@ replace example.com/lib => ./local/lib
 	if err := json.Unmarshal(stdout.Bytes(), &explain); err != nil {
 		t.Fatalf("stdout is not JSON explain report: %v; stdout = %q", err, stdout.String())
 	}
-	if !explain.OK || explain.Kind != "replace" || explain.Path != "example.com/lib" {
+	if !explain.OK || explain.DiagnosticCount != len(explain.Diagnostics) || explain.DiagnosticCount != 0 || explain.Kind != "replace" || explain.Path != "example.com/lib" {
 		t.Fatalf("explain = %+v, want replace resolution", explain)
 	}
 	if !strings.HasSuffix(explain.File, filepath.Join("local", "lib", "foo.leia")) {

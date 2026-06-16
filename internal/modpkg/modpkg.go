@@ -57,14 +57,15 @@ type TidyReport struct {
 }
 
 type ExplainReport struct {
-	SchemaVersion int          `json:"schema_version"`
-	OK            bool         `json:"ok"`
-	Module        string       `json:"module"`
-	Kind          string       `json:"kind,omitempty"`
-	Path          string       `json:"path,omitempty"`
-	Root          string       `json:"root,omitempty"`
-	File          string       `json:"file,omitempty"`
-	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+	SchemaVersion   int          `json:"schema_version"`
+	OK              bool         `json:"ok"`
+	Module          string       `json:"module"`
+	Kind            string       `json:"kind,omitempty"`
+	Path            string       `json:"path,omitempty"`
+	Root            string       `json:"root,omitempty"`
+	File            string       `json:"file,omitempty"`
+	DiagnosticCount int          `json:"diagnostic_count"`
+	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type ListReport struct {
@@ -119,13 +120,14 @@ type CapabilityReport struct {
 }
 
 type GoModReport struct {
-	SchemaVersion int          `json:"schema_version"`
-	OK            bool         `json:"ok"`
-	Manifest      string       `json:"manifest,omitempty"`
-	GoMod         string       `json:"go_mod,omitempty"`
-	Content       string       `json:"content,omitempty"`
-	Written       bool         `json:"written,omitempty"`
-	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+	SchemaVersion   int          `json:"schema_version"`
+	OK              bool         `json:"ok"`
+	Manifest        string       `json:"manifest,omitempty"`
+	GoMod           string       `json:"go_mod,omitempty"`
+	Content         string       `json:"content,omitempty"`
+	Written         bool         `json:"written,omitempty"`
+	DiagnosticCount int          `json:"diagnostic_count"`
+	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type CapabilityModule struct {
@@ -576,9 +578,10 @@ func setTidyReportCounts(report *TidyReport) {
 	report.DiagnosticCount = len(report.Diagnostics)
 }
 
-func Explain(path, module string) ExplainReport {
+func Explain(path, module string) (report ExplainReport) {
 	abs, err := filepath.Abs(path)
-	report := ExplainReport{SchemaVersion: 1, Module: module}
+	report = ExplainReport{SchemaVersion: 1, Module: module}
+	defer setExplainReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -604,6 +607,10 @@ func Explain(path, module string) ExplainReport {
 	report.Root = result.Root
 	report.File = result.File
 	return report
+}
+
+func setExplainReportCounts(report *ExplainReport) {
+	report.DiagnosticCount = len(report.Diagnostics)
 }
 
 func List(path string) (report ListReport) {
@@ -1017,9 +1024,10 @@ func WriteFile(path string, file modfile.File) error {
 	return os.WriteFile(path, modfile.Format(file), 0644)
 }
 
-func GenerateGoMod(path string, write bool) GoModReport {
+func GenerateGoMod(path string, write bool) (report GoModReport) {
 	abs, err := filepath.Abs(path)
-	report := GoModReport{SchemaVersion: 1}
+	report = GoModReport{SchemaVersion: 1}
+	defer setGoModReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -1046,6 +1054,10 @@ func GenerateGoMod(path string, write bool) GoModReport {
 	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
+}
+
+func setGoModReportCounts(report *GoModReport) {
+	report.DiagnosticCount = len(report.Diagnostics)
 }
 
 func GoModContent(manifest modfile.File) ([]byte, error) {

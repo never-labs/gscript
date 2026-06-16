@@ -221,7 +221,7 @@ func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			report := Explain(dir, tt.module)
-			if !report.OK || len(report.Diagnostics) != 0 {
+			if !report.OK || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 {
 				t.Fatalf("Explain(%q) = %#v, want ok", tt.module, report)
 			}
 			if report.Kind != tt.wantKind || report.Path != tt.wantPath {
@@ -433,6 +433,7 @@ func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	if !report.OK {
 		t.Fatalf("Download OK = false, diagnostics = %#v", report.Diagnostics)
 	}
+	assertDownloadReportCounts(t, report)
 	if len(report.Modules) != 1 {
 		t.Fatalf("Download modules = %#v, want one", report.Modules)
 	}
@@ -448,6 +449,7 @@ func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	if !again.OK || len(again.Modules) != 1 {
 		t.Fatalf("second Download = %#v, want cached ok", again)
 	}
+	assertDownloadReportCounts(t, again)
 	if again.Modules[0].Downloaded || again.Modules[0].Extracted {
 		t.Fatalf("second Download entry = %#v, want cache hit", again.Modules[0])
 	}
@@ -560,6 +562,7 @@ _ = dep
 	if !report.OK {
 		t.Fatalf("Download OK = false, diagnostics = %#v", report.Diagnostics)
 	}
+	assertDownloadReportCounts(t, report)
 	if len(report.Modules) != 2 {
 		t.Fatalf("Download modules = %#v, want direct and transitive modules", report.Modules)
 	}
@@ -616,6 +619,7 @@ _ = value
 	if !report.OK {
 		t.Fatalf("Download OK = false, diagnostics = %#v", report.Diagnostics)
 	}
+	assertDownloadReportCounts(t, report)
 	if len(report.Modules) != 1 || report.Modules[0].Path != "github.com/acme/transitive" {
 		t.Fatalf("Download modules = %#v, want only transitive remote module", report.Modules)
 	}
@@ -654,6 +658,7 @@ func TestVendorCopiesDownloadedModules(t *testing.T) {
 	if !report.OK {
 		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
 	}
+	assertVendorReportCounts(t, report)
 	if len(report.Modules) != 1 {
 		t.Fatalf("Vendor modules = %#v, want one", report.Modules)
 	}
@@ -695,6 +700,7 @@ _ = value
 	if !report.OK {
 		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
 	}
+	assertVendorReportCounts(t, report)
 	if len(report.Modules) != 2 {
 		t.Fatalf("Vendor modules = %#v, want direct and transitive modules", report.Modules)
 	}
@@ -734,6 +740,7 @@ func TestVendorSkipsLocalReplaceAndCopiesTransitiveDownloadedModules(t *testing.
 	if !report.OK {
 		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
 	}
+	assertVendorReportCounts(t, report)
 	if len(report.Modules) != 1 || report.Modules[0].Path != "github.com/acme/transitive" {
 		t.Fatalf("Vendor modules = %#v, want only transitive remote module", report.Modules)
 	}
@@ -780,7 +787,7 @@ func TestVendorRequiresDownloadedCache(t *testing.T) {
 	}, "\n"))
 
 	report := Vendor(dir, VendorOptions{CacheDir: filepath.Join(dir, "cache")})
-	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "LEIA9113" {
+	if report.OK || report.ModuleCount != len(report.Modules) || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 1 || report.Diagnostics[0].Code != "LEIA9113" {
 		t.Fatalf("Vendor = %#v, want missing download diagnostic", report)
 	}
 }
@@ -881,6 +888,22 @@ func assertSumEntry(t *testing.T, entries []SumEntry, want SumEntry) {
 		return
 	}
 	t.Fatalf("missing sum entry %#v in %#v", want, entries)
+}
+
+func assertDownloadReportCounts(t *testing.T, report DownloadReport) {
+	t.Helper()
+
+	if report.ModuleCount != len(report.Modules) || report.DiagnosticCount != len(report.Diagnostics) {
+		t.Fatalf("Download counts = modules %d/%d diagnostics %d/%d in %#v", report.ModuleCount, len(report.Modules), report.DiagnosticCount, len(report.Diagnostics), report)
+	}
+}
+
+func assertVendorReportCounts(t *testing.T, report VendorReport) {
+	t.Helper()
+
+	if report.ModuleCount != len(report.Modules) || report.DiagnosticCount != len(report.Diagnostics) {
+		t.Fatalf("Vendor counts = modules %d/%d diagnostics %d/%d in %#v", report.ModuleCount, len(report.Modules), report.DiagnosticCount, len(report.Diagnostics), report)
+	}
 }
 
 func assertDiagnostic(t *testing.T, diags []Diagnostic, code, message string) {

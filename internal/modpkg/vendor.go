@@ -14,12 +14,14 @@ type VendorOptions struct {
 }
 
 type VendorReport struct {
-	SchemaVersion int           `json:"schema_version"`
-	OK            bool          `json:"ok"`
-	Manifest      string        `json:"manifest,omitempty"`
-	VendorDir     string        `json:"vendor_dir,omitempty"`
-	Modules       []VendorEntry `json:"modules,omitempty"`
-	Diagnostics   []Diagnostic  `json:"diagnostics,omitempty"`
+	SchemaVersion   int           `json:"schema_version"`
+	OK              bool          `json:"ok"`
+	Manifest        string        `json:"manifest,omitempty"`
+	VendorDir       string        `json:"vendor_dir,omitempty"`
+	ModuleCount     int           `json:"module_count"`
+	DiagnosticCount int           `json:"diagnostic_count"`
+	Modules         []VendorEntry `json:"modules,omitempty"`
+	Diagnostics     []Diagnostic  `json:"diagnostics,omitempty"`
 }
 
 type VendorEntry struct {
@@ -29,9 +31,10 @@ type VendorEntry struct {
 	Target  string `json:"target"`
 }
 
-func Vendor(path string, opts VendorOptions) VendorReport {
+func Vendor(path string, opts VendorOptions) (report VendorReport) {
 	abs, err := filepath.Abs(path)
-	report := VendorReport{SchemaVersion: 1}
+	report = VendorReport{SchemaVersion: 1}
+	defer setVendorReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -84,6 +87,11 @@ func Vendor(path string, opts VendorOptions) VendorReport {
 	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
+}
+
+func setVendorReportCounts(report *VendorReport) {
+	report.ModuleCount = len(report.Modules)
+	report.DiagnosticCount = len(report.Diagnostics)
 }
 
 func vendorRequirement(cacheDir, vendorDir, modulePath, version string) (VendorEntry, error) {

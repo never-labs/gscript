@@ -239,9 +239,13 @@ func TestCapabilitiesJSON(t *testing.T) {
 		fields  []string
 	}{
 		{"leia mod capability --json", []string{"capability_count", "module_count", "diagnostic_count"}},
+		{"leia mod download --json", []string{"module_count", "diagnostic_count"}},
+		{"leia mod explain --json", []string{"diagnostic_count"}},
+		{"leia mod gomod --json", []string{"diagnostic_count"}},
 		{"leia mod list --json", []string{"require_count", "replace_count", "collection_count", "diagnostic_count"}},
 		{"leia mod lock --json", []string{"entry_count", "diagnostic_count"}},
 		{"leia mod tidy --json", []string{"removed_count", "missing_count", "diagnostic_count"}},
+		{"leia mod vendor --json", []string{"module_count", "diagnostic_count"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		for _, want := range tc.fields {

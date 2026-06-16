@@ -20,12 +20,14 @@ type DownloadOptions struct {
 }
 
 type DownloadReport struct {
-	SchemaVersion int             `json:"schema_version"`
-	OK            bool            `json:"ok"`
-	Manifest      string          `json:"manifest,omitempty"`
-	CacheDir      string          `json:"cache_dir,omitempty"`
-	Modules       []DownloadEntry `json:"modules,omitempty"`
-	Diagnostics   []Diagnostic    `json:"diagnostics,omitempty"`
+	SchemaVersion   int             `json:"schema_version"`
+	OK              bool            `json:"ok"`
+	Manifest        string          `json:"manifest,omitempty"`
+	CacheDir        string          `json:"cache_dir,omitempty"`
+	ModuleCount     int             `json:"module_count"`
+	DiagnosticCount int             `json:"diagnostic_count"`
+	Modules         []DownloadEntry `json:"modules,omitempty"`
+	Diagnostics     []Diagnostic    `json:"diagnostics,omitempty"`
 }
 
 type DownloadEntry struct {
@@ -40,9 +42,10 @@ type DownloadEntry struct {
 	Extracted  bool   `json:"extracted"`
 }
 
-func Download(path string, opts DownloadOptions) DownloadReport {
+func Download(path string, opts DownloadOptions) (report DownloadReport) {
 	abs, err := filepath.Abs(path)
-	report := DownloadReport{SchemaVersion: 1}
+	report = DownloadReport{SchemaVersion: 1}
+	defer setDownloadReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -72,6 +75,11 @@ func Download(path string, opts DownloadOptions) DownloadReport {
 	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
+}
+
+func setDownloadReportCounts(report *DownloadReport) {
+	report.ModuleCount = len(report.Modules)
+	report.DiagnosticCount = len(report.Diagnostics)
 }
 
 func downloadRequirements(root string, manifest modfile.File, cacheDir string, opts DownloadOptions, diags *[]Diagnostic, seen map[string]bool) []DownloadEntry {
