@@ -271,6 +271,7 @@ func buildReportCapabilities() []cliReportCapability {
 		{Command: "leia check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"step_count", "failed_count", "skipped_count"}},
 		{Command: "leia ci --list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"command_count"}, CollectionFields: []string{"commands"}},
 		{Command: "leia config --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"diagnostic_count"}},
+		{Command: "leia diag bundle --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"failure_count"}, CollectionFields: []string{"files"}},
 		{Command: "leia doc check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, CollectionFields: []string{"failures"}},
 		{Command: "leia doc generate --format=json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
 		{Command: "leia env --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CollectionFields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.dialects"}},
@@ -294,12 +295,17 @@ func buildReportCapabilities() []cliReportCapability {
 		{Command: "leia test --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"total", "passed", "failed"}},
 		{Command: "leia test --list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"file_count"}, CollectionFields: []string{"files"}},
 		{Command: "leia version --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status"},
+		{Command: "scripts/editor_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CollectionFields: []string{"textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}},
 		{Command: "scripts/install.sh --dry-run --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"install_count"}, CollectionFields: []string{"binaries", "install_paths"}},
+		{Command: "scripts/performance_gate.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"failure_count"}, CollectionFields: []string{"failures", "output_lines"}},
+		{Command: "scripts/production_check.sh --list --json", Formats: []string{"json"}, SchemaVersion: 1, CountFields: []string{"run_count", "skip_count", "critical_skip_count"}, CollectionFields: []string{"runnable_checks", "skipped_checks", "release_critical_skips"}},
 		{Command: "scripts/public_release_blockers_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"blocker_count"}, CollectionFields: []string{"blockers", "blocker_details"}},
+		{Command: "scripts/q_conformance_gate.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"language_case_count", "example_case_count", "benchmark_case_count"}, CollectionFields: []string{"language_cases", "example_cases", "benchmark_cases"}},
 		{Command: "scripts/release_artifacts.sh --dry-run --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status"},
 		{Command: "scripts/release_artifacts_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"artifact_count"}, CollectionFields: []string{"artifact_files"}},
 		{Command: "scripts/release_distribution_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"workflow_count", "install_target_count"}, CollectionFields: []string{"workflow_files", "install_targets"}},
 		{Command: "scripts/release_notes_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"checked_file_count", "failure_count"}, CollectionFields: []string{"checked_files", "failures"}},
+		{Command: "scripts/worktree_audit.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"finding_count"}, CollectionFields: []string{"findings"}},
 	}
 }
 

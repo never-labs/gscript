@@ -170,6 +170,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		"leia check --json",
 		"leia ci --list --json",
 		"leia config --json",
+		"leia diag bundle --json",
 		"leia doc check --json",
 		"leia doc generate --format=json",
 		"leia env --json",
@@ -193,12 +194,17 @@ func TestCapabilitiesJSON(t *testing.T) {
 		"leia test --json",
 		"leia test --list --json",
 		"leia version --json",
+		"scripts/editor_check.sh --json",
 		"scripts/install.sh --dry-run --json",
+		"scripts/performance_gate.sh --json",
+		"scripts/production_check.sh --list --json",
 		"scripts/public_release_blockers_check.sh --json",
+		"scripts/q_conformance_gate.sh --json",
 		"scripts/release_artifacts.sh --dry-run --json",
 		"scripts/release_artifacts_check.sh --json",
 		"scripts/release_distribution_check.sh --json",
 		"scripts/release_notes_check.sh --json",
+		"scripts/worktree_audit.sh --json",
 	} {
 		if !capabilitiesHaveReport(caps.Tooling.Reports, want) {
 			t.Fatalf("report capabilities = %#v, want command %q", caps.Tooling.Reports, want)
