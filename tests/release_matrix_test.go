@@ -1223,9 +1223,12 @@ print(add(1, 2))
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "inspect", "bytecode", "--json", path)
 	var report struct {
 		SchemaVersion int    `json:"schema_version"`
+		OK            bool   `json:"ok"`
+		Status        string `json:"status"`
 		Source        string `json:"source"`
 		SelectedProto string `json:"selected_proto"`
 		Recursive     bool   `json:"recursive"`
+		ProtoCount    int    `json:"proto_count"`
 		Proto         struct {
 			DisplayName      string `json:"display_name"`
 			NumParams        int    `json:"num_params"`
@@ -1251,7 +1254,7 @@ print(add(1, 2))
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("inspect bytecode JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Source != path || report.SelectedProto != "<main>" || !report.Recursive {
+	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.Source != path || report.SelectedProto != "<main>" || !report.Recursive || report.ProtoCount != 2 {
 		t.Fatalf("inspect bytecode JSON = %+v, want recursive main schema v1 report", report)
 	}
 	if report.Proto.DisplayName != "<main>" || report.Proto.InstructionCount == 0 || report.Proto.ChildProtoCount != 1 || len(report.Proto.Children) != 1 {

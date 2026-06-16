@@ -71,7 +71,7 @@ print(add(1, 2))
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON bytecode report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.SchemaVersion != 1 || report.Source != path || report.SelectedProto != "<main>" || !report.Recursive {
+	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.Source != path || report.SelectedProto != "<main>" || !report.Recursive || report.ProtoCount != 2 {
 		t.Fatalf("report = %+v, want schema v1 recursive main report", report)
 	}
 	if report.Proto.DisplayName != "<main>" || report.Proto.InstructionCount == 0 || report.Proto.ChildProtoCount != 1 || len(report.Proto.Children) != 1 {
@@ -106,7 +106,7 @@ print(add(1, 2))
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON bytecode report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.SchemaVersion != 1 || report.SelectedProto != "add" || report.Recursive {
+	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.SelectedProto != "add" || report.Recursive || report.ProtoCount != 1 {
 		t.Fatalf("report = %+v, want selected non-recursive add report", report)
 	}
 	if report.Proto.DisplayName != "add" || report.Proto.NumParams != 2 || report.Proto.ChildProtoCount != 0 || len(report.Proto.Children) != 0 {

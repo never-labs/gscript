@@ -82,9 +82,12 @@ func runInspectBytecodeCommand(args []string, outw, errw io.Writer) int {
 
 type inspectBytecodeReport struct {
 	SchemaVersion int                `json:"schema_version"`
+	OK            bool               `json:"ok"`
+	Status        string             `json:"status"`
 	Source        string             `json:"source"`
 	SelectedProto string             `json:"selected_proto"`
 	Recursive     bool               `json:"recursive"`
+	ProtoCount    int                `json:"proto_count"`
 	Proto         inspectProtoReport `json:"proto"`
 }
 
@@ -122,11 +125,28 @@ func writeInspectBytecodeJSON(w io.Writer, source, selected string, proto *bytec
 	enc.SetIndent("", "  ")
 	return enc.Encode(inspectBytecodeReport{
 		SchemaVersion: 1,
+		OK:            true,
+		Status:        "pass",
 		Source:        source,
 		SelectedProto: selected,
 		Recursive:     recursive,
+		ProtoCount:    inspectProtoCount(proto, recursive),
 		Proto:         inspectProtoRow(selected, proto, recursive),
 	})
+}
+
+func inspectProtoCount(proto *bytecodevm.FuncProto, recursive bool) int {
+	if proto == nil {
+		return 0
+	}
+	if !recursive {
+		return 1
+	}
+	count := 1
+	for _, child := range proto.Protos {
+		count += inspectProtoCount(child, true)
+	}
+	return count
 }
 
 func inspectProtoRow(displayName string, proto *bytecodevm.FuncProto, recursive bool) inspectProtoReport {
