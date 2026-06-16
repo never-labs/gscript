@@ -997,6 +997,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
 		"bash scripts/production_check.sh --quick --list --json",
 		"go run ./cmd/leia ci release --release-version vX.Y.Z --list --json",
+		"bash scripts/performance_gate.sh --validate-only /tmp/leia_performance_gate/timing_gate.json --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench none --json",
 		"bash scripts/editor_check.sh --json",
 		"bash scripts/release_distribution_check.sh --json",

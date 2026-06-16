@@ -26,6 +26,7 @@ PROFILE="core"
 STRICT=1
 NO_LUAJIT=0
 VALIDATE_ONLY=""
+JSON_OUT=0
 JOBS="${LEIA_PERF_JOBS:-}"
 MAX_JOBS="${LEIA_PERF_MAX_JOBS:-8}"
 
@@ -136,6 +137,7 @@ Options:
   --jobs N                Run up to N benchmarks concurrently. Default: auto, capped by LEIA_PERF_MAX_JOBS or 8.
   --strict / --no-strict  Enable or skip strict_guard.py truth pass. Default: --strict.
   --validate-only JSON    Only validate an existing timing_compare JSON artifact.
+  --json                  Print a validate-only machine-readable report. Valid with --validate-only.
   -h, --help              Show this help.
 
 The gate writes timing_gate.json, timing_gate.md, strict_gate.json, and
@@ -255,6 +257,9 @@ while [ "$#" -gt 0 ]; do
             fi
             VALIDATE_ONLY="$1"
             ;;
+        --json)
+            JSON_OUT=1
+            ;;
         -h|--help)
             usage
             exit 0
@@ -267,6 +272,72 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+if [ "$JSON_OUT" -eq 1 ] && [ -z "$VALIDATE_ONLY" ]; then
+    echo "--json is only supported with --validate-only" >&2
+    exit 2
+fi
+
+json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    value="${value//$'\t'/\\t}"
+    printf '%s' "$value"
+}
+
+print_json_string_array_from_file() {
+    local file="$1"
+    printf '['
+    local first=1
+    while IFS= read -r line; do
+        if [ "$first" -eq 0 ]; then
+            printf ','
+        fi
+        printf '\n    "%s"' "$(json_escape "$line")"
+        first=0
+    done < "$file"
+    if [ "$first" -eq 0 ]; then
+        printf '\n  '
+    fi
+    printf ']'
+}
+
+print_validate_json_report() {
+    local status="$1"
+    local output_file="$2"
+    shift 2
+    local failures=()
+    if [ "$#" -gt 0 ]; then
+        failures=("$@")
+    fi
+    printf '{\n'
+    printf '  "schema_version": 1,\n'
+    printf '  "status": "%s",\n' "$status"
+    printf '  "validate_only": true,\n'
+    printf '  "timing_json": "%s",\n' "$(json_escape "$VALIDATE_ONLY")"
+    printf '  "no_luajit": %s,\n' "$([ "$NO_LUAJIT" -eq 1 ] && printf true || printf false)"
+    printf '  "threshold": %s,\n' "$THRESHOLD"
+    printf '  "wall_threshold": %s,\n' "$WALL_THRESHOLD"
+    printf '  "luajit_threshold": %s,\n' "$LUAJIT_THRESHOLD"
+    printf '  "failure_count": %d,\n' "${#failures[@]}"
+    printf '  "failures": [\n'
+    local i=0
+    while [ "$i" -lt "${#failures[@]}" ]; do
+        printf '    "%s"' "$(json_escape "${failures[$i]}")"
+        if [ "$i" -lt $((${#failures[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        i=$((i + 1))
+    done
+    printf '  ],\n'
+    printf '  "output_lines": '
+    print_json_string_array_from_file "$output_file"
+    printf '\n}\n'
+}
 
 validate_artifact() {
     local json_path="$1"
@@ -497,6 +568,26 @@ validate_luajit_artifact() {
 }
 
 if [ -n "$VALIDATE_ONLY" ]; then
+    if [ "$JSON_OUT" -eq 1 ]; then
+        validate_log="$(mktemp "${TMPDIR:-/tmp}/leia-performance-validate.XXXXXX")"
+        failures=()
+        if ! validate_artifact "$VALIDATE_ONLY" >"$validate_log" 2>&1; then
+            failures+=("timing validation failed")
+        fi
+        if ! validate_luajit_artifact "$VALIDATE_ONLY" >>"$validate_log" 2>&1; then
+            failures+=("luajit submit guard failed")
+        fi
+        status="pass"
+        if [ "${#failures[@]}" -gt 0 ]; then
+            status="issues"
+        fi
+        print_validate_json_report "$status" "$validate_log" "${failures[@]+"${failures[@]}"}"
+        rm -f "$validate_log"
+        if [ "$status" = "issues" ]; then
+            exit 1
+        fi
+        exit 0
+    fi
     validate_artifact "$VALIDATE_ONLY"
     validate_luajit_artifact "$VALIDATE_ONLY"
     exit $?

@@ -162,6 +162,7 @@ go run ./cmd/leia bench strict --bench table/table_array_access --runs 3 --warmu
   --json /tmp/leia-strict.json \
   --markdown /tmp/leia-strict.md
 bash scripts/performance_gate.sh --feature-smoke
+bash scripts/performance_gate.sh --validate-only /tmp/leia_performance_gate/timing_gate.json --json
 ```
 
 Use `--no-luajit` when LuaJIT is not installed or when a benchmark has no useful

@@ -98,6 +98,40 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertIn("Performance gate current/HEAD ranking", proc.stdout)
         self.assertIn("Performance gate passed.", proc.stdout)
 
+    def test_validate_only_json_reports_machine_readable_pass(self):
+        proc = run_validate(timing_payload(1.05, 1.00), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        report = json.loads(proc.stdout)
+        self.assertEqual(report["schema_version"], 1)
+        self.assertEqual(report["status"], "pass")
+        self.assertTrue(report["validate_only"])
+        self.assertEqual(report["failure_count"], 0)
+        self.assertEqual(report["failures"], [])
+        self.assertIn("timing.json", report["timing_json"])
+        self.assertIn("Performance gate passed.", "\n".join(report["output_lines"]))
+
+    def test_validate_only_json_reports_machine_readable_failure(self):
+        proc = run_validate(timing_payload(1.50, 1.00), "--json")
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        report = json.loads(proc.stdout)
+        self.assertEqual(report["schema_version"], 1)
+        self.assertEqual(report["status"], "issues")
+        self.assertEqual(report["failure_count"], 1)
+        self.assertEqual(report["failures"], ["timing validation failed"])
+        self.assertIn("Performance gate violations", "\n".join(report["output_lines"]))
+
+    def test_json_requires_validate_only(self):
+        proc = subprocess.run(
+            ["bash", str(SCRIPT), "--json", "--no-strict", "--no-luajit"],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(proc.returncode, 2, proc.stdout)
+        self.assertIn("--json is only supported with --validate-only", proc.stdout)
+
     def test_validate_only_accepts_current_only_new_benchmark(self):
         proc = run_validate(timing_payload(1.05, None, benchmark_id="data/q_query_rollup", head_status="missing"))
         self.assertEqual(proc.returncode, 0, proc.stdout)
