@@ -16,8 +16,12 @@ import (
 
 type cliCapabilities struct {
 	SchemaVersion  int                    `json:"schema_version"`
+	Status         string                 `json:"status"`
 	Platform       cliPlatformCapability  `json:"platform"`
 	Execution      cliExecutionCapability `json:"execution"`
+	CommandCount   int                    `json:"command_count"`
+	StdlibCount    int                    `json:"stdlib_module_count"`
+	DialectCount   int                    `json:"dialect_count"`
 	Commands       []string               `json:"commands"`
 	StdlibModules  []string               `json:"stdlib_modules"`
 	StdlibLayers   []cliStdlibLayer       `json:"stdlib_layers"`
@@ -149,8 +153,11 @@ func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
 func buildCapabilities() cliCapabilities {
 	modules := catalog.ModuleNames()
 	sort.Strings(modules)
+	commands := cliCommandNames()
+	dialects := buildDialectCapabilities()
 	return cliCapabilities{
 		SchemaVersion: 1,
+		Status:        "pass",
 		Platform: cliPlatformCapability{
 			GOOS:   goruntime.GOOS,
 			GOARCH: goruntime.GOARCH,
@@ -161,11 +168,14 @@ func buildCapabilities() cliCapabilities {
 			JIT:         cliJITAvailable(),
 			MethodJIT:   cliMethodJITAvailable(),
 		},
-		Commands:       cliCommandNames(),
+		CommandCount:   len(commands),
+		StdlibCount:    len(modules),
+		DialectCount:   len(dialects),
+		Commands:       commands,
 		StdlibModules:  modules,
 		StdlibLayers:   buildStdlibLayerCapabilities(),
 		DefaultImports: buildDefaultImportCapabilities(),
-		Dialects:       buildDialectCapabilities(),
+		Dialects:       dialects,
 		LLM: cliLLMCapability{
 			Enabled: true,
 			Syntax: []string{
@@ -254,7 +264,7 @@ func buildCapabilities() cliCapabilities {
 
 func buildReportCapabilities() []cliReportCapability {
 	return []cliReportCapability{
-		{Command: "leia capabilities --json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
+		{Command: "leia capabilities --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"command_count", "stdlib_module_count", "dialect_count"}, CollectionFields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
 		{Command: "leia check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"step_count", "failed_count", "skipped_count"}},
 		{Command: "leia ci --list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"command_count"}, CollectionFields: []string{"commands"}},
 		{Command: "leia config --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"diagnostic_count"}},

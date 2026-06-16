@@ -28,6 +28,9 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if caps.SchemaVersion != 1 {
 		t.Fatalf("schema_version = %d, want 1", caps.SchemaVersion)
 	}
+	if caps.Status != "pass" || caps.CommandCount != len(caps.Commands) || caps.StdlibCount != len(caps.StdlibModules) || caps.DialectCount != len(caps.Dialects) {
+		t.Fatalf("capability report counts/status = status %q commands %d/%d stdlib %d/%d dialects %d/%d", caps.Status, caps.CommandCount, len(caps.Commands), caps.StdlibCount, len(caps.StdlibModules), caps.DialectCount, len(caps.Dialects))
+	}
 	if caps.Platform.GOOS != goruntime.GOOS || caps.Platform.GOARCH != goruntime.GOARCH {
 		t.Fatalf("platform = %s/%s, want %s/%s", caps.Platform.GOOS, caps.Platform.GOARCH, goruntime.GOOS, goruntime.GOARCH)
 	}
