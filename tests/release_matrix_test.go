@@ -1198,6 +1198,30 @@ func TestReleaseMatrixGoreleaserTargetsMatchInstallDryRun(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixArtifactVersionValidationIsExplicit(t *testing.T) {
+	root := findRepoRoot(t)
+	checkResult := runCommandResult(root, 30*time.Second, "bash", "scripts/release_artifacts_check.sh", "--version", "bad version")
+	if checkResult.err == nil {
+		t.Fatalf("release_artifacts_check.sh bad version unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", checkResult.stdout, checkResult.stderr)
+	}
+	if !strings.Contains(checkResult.stderr, "release artifact check version must match vMAJOR.MINOR.PATCH") {
+		t.Fatalf("release_artifacts_check.sh bad version stderr = %q", checkResult.stderr)
+	}
+
+	artifactResult := runCommandResult(root, 30*time.Second, "bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "bad version")
+	if artifactResult.err == nil {
+		t.Fatalf("release_artifacts.sh bad version unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", artifactResult.stdout, artifactResult.stderr)
+	}
+	if !strings.Contains(artifactResult.stderr, "release artifact version must match vMAJOR.MINOR.PATCH") {
+		t.Fatalf("release_artifacts.sh bad version stderr = %q", artifactResult.stderr)
+	}
+
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_artifacts_check.sh", "--version", "v1.2.3-rc.1")
+	if !strings.Contains(out, "release_artifacts_check.sh: pass") {
+		t.Fatalf("release_artifacts_check.sh prerelease output = %q, want pass", out)
+	}
+}
+
 func TestReleaseMatrixDocsIndexCoversReferenceEntrypoints(t *testing.T) {
 	root := findRepoRoot(t)
 	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))

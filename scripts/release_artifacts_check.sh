@@ -206,6 +206,11 @@ require_file "$release_script"
 require_file "$install_script"
 require_file "$repo_root/$smoke_script"
 
+if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ && "$version" != "smoke-check" ]]; then
+  echo "error: release artifact check version must match vMAJOR.MINOR.PATCH, prerelease, or smoke-check: $version" >&2
+  exit 2
+fi
+
 if [[ "$require_clean" == "true" && -n "$(git status --porcelain)" ]]; then
   echo "error: release artifact check requires a clean git worktree" >&2
   exit 1

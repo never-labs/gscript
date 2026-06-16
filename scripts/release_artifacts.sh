@@ -81,6 +81,11 @@ require_cmd() {
 require_cmd git
 require_cmd go
 
+if [[ -n "$requested_version" && ! "$requested_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ && "$requested_version" != "smoke-check" ]]; then
+  echo "error: release artifact version must match vMAJOR.MINOR.PATCH or prerelease: $requested_version" >&2
+  exit 2
+fi
+
 if [[ "$out_dir" != /* ]]; then
   out_dir="$repo_root/$out_dir"
 fi
