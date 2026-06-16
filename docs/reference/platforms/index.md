@@ -24,13 +24,19 @@ go run ./cmd/leia capabilities --json
 ```
 
 The JSON report includes execution modes, commands, standard-library layers,
-tooling surfaces, LLM support, and builtin dialect metadata. The `dialects`
-array is derived from the runtime dialect registry and is the supported
-machine-readable way for editors, playgrounds, and automation tools to discover
-which tagged literals and tagged blocks are installed:
+default imports, tooling surfaces, LLM support, and builtin dialect metadata.
+The `dialects` array is derived from the runtime dialect registry and the
+`default_imports` array is derived from the same alias table used by stdlib
+installation. These are the supported machine-readable paths for editors,
+playgrounds, and automation tools to discover installed tagged forms and global
+convenience bindings:
 
 ```json
 {
+  "default_imports": [
+    {"name": "sqrt", "module": "math", "member": "sqrt"},
+    {"name": "mat", "module": "linalg", "member": "matrix"}
+  ],
   "dialects": [
     {
       "name": "sh",

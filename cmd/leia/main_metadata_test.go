@@ -43,6 +43,26 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !capabilitiesHaveStdlibModule(caps.StdlibLayers, "llm", "llm") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "host", "fs") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "data", "soa") {
 		t.Fatalf("stdlib_layers = %#v, want llm/llm, host/fs, and data/soa", caps.StdlibLayers)
 	}
+	for _, tc := range []struct {
+		name   string
+		module string
+		member string
+	}{
+		{name: "sqrt", module: "math", member: "sqrt"},
+		{name: "near", module: "math", member: "near"},
+		{name: "mat", module: "linalg", member: "matrix"},
+		{name: "eye", module: "linalg", member: "eye"},
+		{name: "matmul", module: "linalg", member: "matmul"},
+		{name: "mean", module: "stats", member: "mean"},
+		{name: "describe", module: "stats", member: "describe"},
+		{name: "randn", module: "rand", member: "normal_vec"},
+		{name: "sample", module: "rand", member: "sample"},
+		{name: "append", module: "table", member: "append"},
+	} {
+		if !capabilitiesHaveDefaultImport(caps.DefaultImports, tc.name, tc.module, tc.member) {
+			t.Fatalf("default_imports = %#v, want %s -> %s.%s", caps.DefaultImports, tc.name, tc.module, tc.member)
+		}
+	}
 	if len(caps.Dialects) == 0 {
 		t.Fatal("dialects is empty")
 	}
@@ -179,6 +199,15 @@ func capabilitiesHaveStdlibModule(layers []cliStdlibLayer, layerName, moduleName
 			if module.Name == moduleName {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func capabilitiesHaveDefaultImport(imports []cliDefaultImport, name, module, member string) bool {
+	for _, item := range imports {
+		if item.Name == name && item.Module == module && item.Member == member {
+			return true
 		}
 	}
 	return false

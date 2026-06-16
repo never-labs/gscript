@@ -11,18 +11,20 @@ import (
 
 	"github.com/never-labs/leia/internal/stdlib/bind"
 	"github.com/never-labs/leia/internal/stdlib/catalog"
+	stdinstall "github.com/never-labs/leia/internal/stdlib/install"
 )
 
 type cliCapabilities struct {
-	SchemaVersion int                    `json:"schema_version"`
-	Platform      cliPlatformCapability  `json:"platform"`
-	Execution     cliExecutionCapability `json:"execution"`
-	Commands      []string               `json:"commands"`
-	StdlibModules []string               `json:"stdlib_modules"`
-	StdlibLayers  []cliStdlibLayer       `json:"stdlib_layers"`
-	Dialects      []cliDialectCapability `json:"dialects"`
-	LLM           cliLLMCapability       `json:"llm"`
-	Tooling       cliToolingCapability   `json:"tooling"`
+	SchemaVersion  int                    `json:"schema_version"`
+	Platform       cliPlatformCapability  `json:"platform"`
+	Execution      cliExecutionCapability `json:"execution"`
+	Commands       []string               `json:"commands"`
+	StdlibModules  []string               `json:"stdlib_modules"`
+	StdlibLayers   []cliStdlibLayer       `json:"stdlib_layers"`
+	DefaultImports []cliDefaultImport     `json:"default_imports"`
+	Dialects       []cliDialectCapability `json:"dialects"`
+	LLM            cliLLMCapability       `json:"llm"`
+	Tooling        cliToolingCapability   `json:"tooling"`
 }
 
 type cliPlatformCapability struct {
@@ -47,6 +49,12 @@ type cliStdlibModule struct {
 	Description  string   `json:"description"`
 	Capabilities []string `json:"capabilities,omitempty"`
 	SafeDefault  bool     `json:"safe_default,omitempty"`
+}
+
+type cliDefaultImport struct {
+	Name   string `json:"name"`
+	Module string `json:"module"`
+	Member string `json:"member"`
 }
 
 type cliDialectCapability struct {
@@ -141,10 +149,11 @@ func buildCapabilities() cliCapabilities {
 			JIT:         cliJITAvailable(),
 			MethodJIT:   cliMethodJITAvailable(),
 		},
-		Commands:      cliCommandNames(),
-		StdlibModules: modules,
-		StdlibLayers:  buildStdlibLayerCapabilities(),
-		Dialects:      buildDialectCapabilities(),
+		Commands:       cliCommandNames(),
+		StdlibModules:  modules,
+		StdlibLayers:   buildStdlibLayerCapabilities(),
+		DefaultImports: buildDefaultImportCapabilities(),
+		Dialects:       buildDialectCapabilities(),
 		LLM: cliLLMCapability{
 			Enabled: true,
 			Syntax: []string{
@@ -226,6 +235,19 @@ func buildCapabilities() cliCapabilities {
 			},
 		},
 	}
+}
+
+func buildDefaultImportCapabilities() []cliDefaultImport {
+	aliases := stdinstall.DefaultAliases()
+	out := make([]cliDefaultImport, len(aliases))
+	for i, alias := range aliases {
+		out[i] = cliDefaultImport{
+			Name:   alias.Name,
+			Module: alias.Module,
+			Member: alias.Member,
+		}
+	}
+	return out
 }
 
 func buildStdlibLayerCapabilities() []cliStdlibLayer {
