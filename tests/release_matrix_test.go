@@ -2660,6 +2660,20 @@ collection vendor ./vendor
 	if tidyReport.SchemaVersion != 1 || !tidyReport.OK || tidyReport.RemovedCount != len(tidyReport.Removed) || tidyReport.MissingCount != len(tidyReport.Missing) || tidyReport.DiagnosticCount != len(tidyReport.Diagnostics) || tidyReport.MissingCount != 0 || tidyReport.DiagnosticCount != 0 {
 		t.Fatalf("mod tidy JSON = %+v, want counted tidy result", tidyReport)
 	}
+
+	verifyOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "verify", "--json", tmp)
+	var verifyReport struct {
+		SchemaVersion   int           `json:"schema_version"`
+		OK              bool          `json:"ok"`
+		DiagnosticCount int           `json:"diagnostic_count"`
+		Diagnostics     []interface{} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal([]byte(verifyOut), &verifyReport); err != nil {
+		t.Fatalf("mod verify JSON failed to decode: %v\n%s", err, verifyOut)
+	}
+	if verifyReport.SchemaVersion != 1 || !verifyReport.OK || verifyReport.DiagnosticCount != len(verifyReport.Diagnostics) || verifyReport.DiagnosticCount != 0 {
+		t.Fatalf("mod verify JSON = %+v, want counted top-level diagnostics", verifyReport)
+	}
 }
 
 func TestReleaseMatrixSecurityDocsUseModuleScopedCapabilityCommand(t *testing.T) {

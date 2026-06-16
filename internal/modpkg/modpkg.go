@@ -37,11 +37,12 @@ type GraphFile struct {
 }
 
 type VerifyReport struct {
-	SchemaVersion int          `json:"schema_version"`
-	OK            bool         `json:"ok"`
-	Manifest      string       `json:"manifest,omitempty"`
-	Graph         GraphReport  `json:"graph"`
-	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+	SchemaVersion   int          `json:"schema_version"`
+	OK              bool         `json:"ok"`
+	Manifest        string       `json:"manifest,omitempty"`
+	Graph           GraphReport  `json:"graph"`
+	DiagnosticCount int          `json:"diagnostic_count"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type TidyReport struct {
@@ -499,9 +500,10 @@ func Verify(path string) VerifyReport {
 	return VerifyWithOptions(path, VerifyOptions{})
 }
 
-func VerifyWithOptions(path string, opts VerifyOptions) VerifyReport {
+func VerifyWithOptions(path string, opts VerifyOptions) (report VerifyReport) {
 	abs, err := filepath.Abs(path)
-	report := VerifyReport{SchemaVersion: 1}
+	report = VerifyReport{SchemaVersion: 1}
+	defer setVerifyReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -524,6 +526,13 @@ func VerifyWithOptions(path string, opts VerifyOptions) VerifyReport {
 	report.Diagnostics = append(report.Diagnostics, VerifySumWithOptions(abs, opts)...)
 	report.OK = len(report.Diagnostics) == 0
 	return report
+}
+
+func setVerifyReportCounts(report *VerifyReport) {
+	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func Tidy(path string) (report TidyReport) {

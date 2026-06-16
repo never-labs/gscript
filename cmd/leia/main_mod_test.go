@@ -68,7 +68,7 @@ _ = jsonMod
 	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
 		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
 	}
-	if !verify.OK || verify.Manifest != manifestPath {
+	if !verify.OK || verify.Manifest != manifestPath || verify.DiagnosticCount != len(verify.Diagnostics) || verify.DiagnosticCount != 0 {
 		t.Fatalf("verify = %+v, want ok manifest", verify)
 	}
 }
