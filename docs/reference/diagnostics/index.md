@@ -55,7 +55,7 @@ if errors.As(err, &budgetErr) {
 | `leia inspect bytecode --json` | Compiled bytecode metadata, disassembly text, nested proto summary, and JIT callable decisions. |
 | `leia inspect directives --json` | Parsed `//leia:` file directives. |
 | `leia mod ... --json` | Module graph, list, verify, capability, and vendoring reports. |
-| `leia capabilities --json` | Binary feature, command, stdlib, default-import, builtin dialect, LLM, and tooling capabilities. |
+| `leia capabilities --json` | Binary feature, command, stdlib, default-import, builtin dialect, LLM, and tooling capabilities, including `tooling.report_count` and the `tooling.reports` JSON report registry. |
 
 Current lint codes:
 

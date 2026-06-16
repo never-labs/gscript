@@ -15,6 +15,7 @@ bash scripts/performance_gate.sh --full
 Machine-readable release evidence:
 
 ```bash
+go run ./cmd/leia capabilities --json
 bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
 bash scripts/q_conformance_gate.sh --scope core --bench smoke --json
@@ -28,6 +29,9 @@ bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp
 bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json
 bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
 ```
+
+`leia capabilities --json` includes `tooling.report_count` and
+`tooling.reports`, the registry of CLI and release-script JSON reports.
 
 `leia ci release` delegates to the same production release profile. That
 profile is the release validation source of truth: correctness, documentation,
