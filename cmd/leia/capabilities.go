@@ -15,20 +15,22 @@ import (
 )
 
 type cliCapabilities struct {
-	SchemaVersion  int                    `json:"schema_version"`
-	Status         string                 `json:"status"`
-	Platform       cliPlatformCapability  `json:"platform"`
-	Execution      cliExecutionCapability `json:"execution"`
-	CommandCount   int                    `json:"command_count"`
-	StdlibCount    int                    `json:"stdlib_module_count"`
-	DialectCount   int                    `json:"dialect_count"`
-	Commands       []string               `json:"commands"`
-	StdlibModules  []string               `json:"stdlib_modules"`
-	StdlibLayers   []cliStdlibLayer       `json:"stdlib_layers"`
-	DefaultImports []cliDefaultImport     `json:"default_imports"`
-	Dialects       []cliDialectCapability `json:"dialects"`
-	LLM            cliLLMCapability       `json:"llm"`
-	Tooling        cliToolingCapability   `json:"tooling"`
+	SchemaVersion      int                    `json:"schema_version"`
+	Status             string                 `json:"status"`
+	Platform           cliPlatformCapability  `json:"platform"`
+	Execution          cliExecutionCapability `json:"execution"`
+	CommandCount       int                    `json:"command_count"`
+	StdlibCount        int                    `json:"stdlib_module_count"`
+	StdlibLayerCount   int                    `json:"stdlib_layer_count"`
+	DefaultImportCount int                    `json:"default_import_count"`
+	DialectCount       int                    `json:"dialect_count"`
+	Commands           []string               `json:"commands"`
+	StdlibModules      []string               `json:"stdlib_modules"`
+	StdlibLayers       []cliStdlibLayer       `json:"stdlib_layers"`
+	DefaultImports     []cliDefaultImport     `json:"default_imports"`
+	Dialects           []cliDialectCapability `json:"dialects"`
+	LLM                cliLLMCapability       `json:"llm"`
+	Tooling            cliToolingCapability   `json:"tooling"`
 }
 
 type cliPlatformCapability struct {
@@ -157,6 +159,8 @@ func buildCapabilities() cliCapabilities {
 	commands := cliCommandNames()
 	dialects := buildDialectCapabilities()
 	reports := buildReportCapabilities()
+	stdlibLayers := buildStdlibLayerCapabilities()
+	defaultImports := buildDefaultImportCapabilities()
 	return cliCapabilities{
 		SchemaVersion: 1,
 		Status:        "pass",
@@ -170,14 +174,16 @@ func buildCapabilities() cliCapabilities {
 			JIT:         cliJITAvailable(),
 			MethodJIT:   cliMethodJITAvailable(),
 		},
-		CommandCount:   len(commands),
-		StdlibCount:    len(modules),
-		DialectCount:   len(dialects),
-		Commands:       commands,
-		StdlibModules:  modules,
-		StdlibLayers:   buildStdlibLayerCapabilities(),
-		DefaultImports: buildDefaultImportCapabilities(),
-		Dialects:       dialects,
+		CommandCount:       len(commands),
+		StdlibCount:        len(modules),
+		StdlibLayerCount:   len(stdlibLayers),
+		DefaultImportCount: len(defaultImports),
+		DialectCount:       len(dialects),
+		Commands:           commands,
+		StdlibModules:      modules,
+		StdlibLayers:       stdlibLayers,
+		DefaultImports:     defaultImports,
+		Dialects:           dialects,
 		LLM: cliLLMCapability{
 			Enabled: true,
 			Syntax: []string{
@@ -267,14 +273,14 @@ func buildCapabilities() cliCapabilities {
 
 func buildReportCapabilities() []cliReportCapability {
 	return []cliReportCapability{
-		{Command: "leia capabilities --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"command_count", "stdlib_module_count", "dialect_count", "tooling.report_count"}, CollectionFields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
+		{Command: "leia capabilities --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}, CollectionFields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
 		{Command: "leia check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"step_count", "failed_count", "skipped_count"}, CollectionFields: []string{"steps"}},
 		{Command: "leia ci --list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"command_count", "commands[].arg_count"}, CollectionFields: []string{"commands"}},
 		{Command: "leia config --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"diagnostic_count"}, CollectionFields: []string{"diagnostics"}},
 		{Command: "leia diag bundle --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"failure_count", "file_count"}, CollectionFields: []string{"files"}},
 		{Command: "leia doc check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, CollectionFields: []string{"failures"}},
 		{Command: "leia doc generate --format=json", Formats: []string{"json"}, SchemaVersion: 1, CountFields: []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"}, CollectionFields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
-		{Command: "leia env --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.dialect_count", "capabilities.tooling.report_count"}, CollectionFields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.dialects", "capabilities.tooling.reports"}},
+		{Command: "leia env --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.stdlib_layer_count", "capabilities.default_import_count", "capabilities.dialect_count", "capabilities.tooling.report_count"}, CollectionFields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}},
 		{Command: "leia evaluate --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos", "metrics[].count"}, CollectionFields: []string{"inputs", "cases", "findings", "notes"}},
 		{Command: "leia examples check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"result_count", "runnable", "skipped", "failed"}, CollectionFields: []string{"results"}},
 		{Command: "leia examples list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"example_count"}, CollectionFields: []string{"examples"}},

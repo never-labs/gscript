@@ -28,8 +28,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if caps.SchemaVersion != 1 {
 		t.Fatalf("schema_version = %d, want 1", caps.SchemaVersion)
 	}
-	if caps.Status != "pass" || caps.CommandCount != len(caps.Commands) || caps.StdlibCount != len(caps.StdlibModules) || caps.DialectCount != len(caps.Dialects) {
-		t.Fatalf("capability report counts/status = status %q commands %d/%d stdlib %d/%d dialects %d/%d", caps.Status, caps.CommandCount, len(caps.Commands), caps.StdlibCount, len(caps.StdlibModules), caps.DialectCount, len(caps.Dialects))
+	if caps.Status != "pass" || caps.CommandCount != len(caps.Commands) || caps.StdlibCount != len(caps.StdlibModules) || caps.StdlibLayerCount != len(caps.StdlibLayers) || caps.DefaultImportCount != len(caps.DefaultImports) || caps.DialectCount != len(caps.Dialects) {
+		t.Fatalf("capability report counts/status = status %q commands %d/%d stdlib %d/%d layers %d/%d defaults %d/%d dialects %d/%d", caps.Status, caps.CommandCount, len(caps.Commands), caps.StdlibCount, len(caps.StdlibModules), caps.StdlibLayerCount, len(caps.StdlibLayers), caps.DefaultImportCount, len(caps.DefaultImports), caps.DialectCount, len(caps.Dialects))
 	}
 	if caps.Platform.GOOS != goruntime.GOOS || caps.Platform.GOARCH != goruntime.GOARCH {
 		t.Fatalf("platform = %s/%s, want %s/%s", caps.Platform.GOOS, caps.Platform.GOARCH, goruntime.GOOS, goruntime.GOARCH)
@@ -220,7 +220,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		}
 	}
 	envReport := capabilitiesReport(caps.Tooling.Reports, "leia env --json")
-	for _, want := range []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.dialect_count", "capabilities.tooling.report_count"} {
+	for _, want := range []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.stdlib_layer_count", "capabilities.default_import_count", "capabilities.dialect_count", "capabilities.tooling.report_count"} {
 		if envReport == nil || !containsString(envReport.CountFields, want) {
 			t.Fatalf("env report capability = %+v, want count field %q", envReport, want)
 		}
@@ -273,6 +273,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		command string
 		fields  []string
 	}{
+		{"leia capabilities --json", []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}},
 		{"leia ci --list --json", []string{"command_count", "commands[].arg_count"}},
 		{"leia mod capability --json", []string{"capability_count", "module_count", "diagnostic_count"}},
 		{"leia mod download --json", []string{"module_count", "diagnostic_count"}},
