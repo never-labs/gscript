@@ -157,6 +157,9 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if caps.Tooling.Config.FileName != "leia.toml" || !containsString(caps.Tooling.Config.Formats, "json") {
 		t.Fatalf("config capabilities = %+v, want leia.toml/json", caps.Tooling.Config)
 	}
+	if caps.Tooling.ReportCount != len(caps.Tooling.Reports) {
+		t.Fatalf("tooling report_count = %d, want %d", caps.Tooling.ReportCount, len(caps.Tooling.Reports))
+	}
 	for _, report := range caps.Tooling.Reports {
 		if report.Command == "" || report.SchemaVersion <= 0 || !containsString(report.Formats, "json") {
 			t.Fatalf("report capability = %+v, want command, json format, and schema version", report)
