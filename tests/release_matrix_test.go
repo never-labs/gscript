@@ -1453,6 +1453,49 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixDocsCheckReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 120*time.Second, "bash", "scripts/docs_check.sh", "--json")
+	var report struct {
+		SchemaVersion int      `json:"schema_version"`
+		Status        string   `json:"status"`
+		FailureCount  int      `json:"failure_count"`
+		Failures      []string `json:"failures"`
+		Counts        struct {
+			MarkdownFiles                     int `json:"markdown_files"`
+			RelativeDocumentationLinks        int `json:"relative_documentation_links"`
+			RepositoryScriptCodeBlockMentions int `json:"repository_script_code_block_mentions"`
+			ReleaseGateDocs                   int `json:"release_gate_docs"`
+			ReferenceEntrypoints              int `json:"reference_entrypoints"`
+			SpecContractDocs                  int `json:"spec_contract_docs"`
+			ExamplesIndexDirectories          int `json:"examples_index_directories"`
+			ExamplesCapabilityDriftGates      int `json:"examples_capability_drift_gates"`
+			ReadmeUserFacingGates             int `json:"readme_user_facing_gates"`
+			GeneratedReferenceDocs            int `json:"generated_reference_docs"`
+			GeneratedSpecHTML                 int `json:"generated_spec_html"`
+			RunnableSpecExamples              int `json:"runnable_spec_examples"`
+		} `json:"counts"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("docs check JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.FailureCount != 0 || len(report.Failures) != 0 {
+		t.Fatalf("docs check JSON = %+v, want passing schema v1 report", report)
+	}
+	if report.Counts.MarkdownFiles == 0 || report.Counts.RelativeDocumentationLinks == 0 || report.Counts.RepositoryScriptCodeBlockMentions == 0 {
+		t.Fatalf("docs check JSON missing core documentation counts: %+v", report.Counts)
+	}
+	if report.Counts.ReleaseGateDocs == 0 || report.Counts.ReferenceEntrypoints == 0 || report.Counts.SpecContractDocs == 0 {
+		t.Fatalf("docs check JSON missing release/spec counts: %+v", report.Counts)
+	}
+	if report.Counts.ExamplesIndexDirectories == 0 || report.Counts.ExamplesCapabilityDriftGates == 0 || report.Counts.ReadmeUserFacingGates == 0 {
+		t.Fatalf("docs check JSON missing example/readme counts: %+v", report.Counts)
+	}
+	if report.Counts.GeneratedReferenceDocs == 0 || report.Counts.GeneratedSpecHTML != 1 || report.Counts.RunnableSpecExamples == 0 {
+		t.Fatalf("docs check JSON missing generated documentation counts: %+v", report.Counts)
+	}
+}
+
 func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1")

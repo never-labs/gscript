@@ -8,7 +8,7 @@ cd "$ROOT"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/docs_check.sh [--help]
+Usage: scripts/docs_check.sh [--json] [--help]
 
 Checks README/docs Markdown for:
   - relative .md/.html links whose target file exists;
@@ -40,8 +40,13 @@ The repository-script mention check covers:
 EOF
 }
 
+JSON=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --json)
+            JSON=1
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -53,6 +58,7 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+export DOCS_CHECK_JSON="$JSON"
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "error: python3 is required for docs_check.sh" >&2
@@ -177,24 +183,29 @@ if errors:
     raise SystemExit(1)
 PY
 
-if ! go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1; then
+go_test_stdout="/dev/stdout"
+if [ "$JSON" -eq 1 ]; then
+    go_test_stdout="/dev/null"
+fi
+if ! go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1 >"$go_test_stdout"; then
     echo "error: docs/spec runnable Leia example gate failed" >&2
     exit 1
 fi
-if ! go test ./tests/docs/spec -count=1; then
+if ! go test ./tests/docs/spec -count=1 >"$go_test_stdout"; then
     echo "error: docs/spec contract gate failed" >&2
     exit 1
 fi
-if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints' -count=1; then
+if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints' -count=1 >"$go_test_stdout"; then
     echo "error: docs release/spec reference gate failed" >&2
     exit 1
 fi
-if ! go test ./cmd/leia -run 'TestExamplesDocsIndexCoversTopLevelExampleDirectories|TestExamplesDocsIndexCommandsReferenceRegisteredExamples' -count=1; then
+if ! go test ./cmd/leia -run 'TestExamplesDocsIndexCoversTopLevelExampleDirectories|TestExamplesDocsIndexCommandsReferenceRegisteredExamples' -count=1 >"$go_test_stdout"; then
     echo "error: docs examples index gate failed" >&2
     exit 1
 fi
 
 python3 - <<'PY'
+import json
 import os
 import re
 import sys
@@ -699,6 +710,36 @@ check_spec_contract_docs()
 check_examples_index()
 check_examples_capability_drift_gates()
 check_readme_user_facing_gates()
+
+def report() -> dict:
+    return {
+        "schema_version": 1,
+        "status": "issues" if errors else "pass",
+        "failure_count": len(errors),
+        "failures": errors,
+        "counts": {
+            "markdown_files": len(doc_files),
+            "relative_documentation_links": checked_links,
+            "repository_script_code_block_mentions": checked_script_mentions,
+            "release_gate_docs": checked_release_gate_docs,
+            "reference_entrypoints": checked_reference_entrypoints,
+            "spec_contract_docs": checked_spec_contract_docs,
+            "examples_index_directories": checked_examples_index_dirs,
+            "examples_capability_drift_gates": checked_examples_capability_drift_gates,
+            "readme_user_facing_gates": checked_readme_user_facing_gates,
+            "retired_path_mentions": checked_retired_paths,
+            "retired_name_mentions": checked_retired_names,
+            "generated_reference_docs": int(os.environ["GENERATED_REFERENCE_COUNT"]),
+            "generated_spec_html": 1,
+            "runnable_spec_examples": checked_spec_runnable_examples,
+        },
+    }
+
+if os.environ.get("DOCS_CHECK_JSON") == "1":
+    print(json.dumps(report(), indent=2, sort_keys=True))
+    if errors:
+        sys.exit(1)
+    sys.exit(0)
 
 if errors:
     print("docs_check.sh found problems:", file=sys.stderr)
