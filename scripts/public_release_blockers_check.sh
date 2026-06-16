@@ -46,9 +46,19 @@ done
 cd "$repo_root"
 
 blockers=()
+blocker_kinds=()
+blocker_areas=()
+blocker_actions=()
+blocker_statuses=()
+blocker_paths=()
 
 add_blocker() {
   blockers+=("$1")
+  blocker_kinds+=("${2:-general}")
+  blocker_areas+=("${3:-}")
+  blocker_actions+=("${4:-}")
+  blocker_statuses+=("${5:-}")
+  blocker_paths+=("${6:-}")
 }
 
 json_escape() {
@@ -81,6 +91,32 @@ print_json_report() {
     printf '\n'
     i=$((i + 1))
   done
+  printf '  ],\n'
+  printf '  "blocker_details": [\n'
+  i=0
+  while [[ "$i" -lt ${#blockers[@]} ]]; do
+    printf '    {\n'
+    printf '      "message": "%s",\n' "$(json_escape "${blockers[$i]}")"
+    printf '      "kind": "%s"' "$(json_escape "${blocker_kinds[$i]}")"
+    if [[ -n "${blocker_areas[$i]}" ]]; then
+      printf ',\n      "area": "%s"' "$(json_escape "${blocker_areas[$i]}")"
+    fi
+    if [[ -n "${blocker_actions[$i]}" ]]; then
+      printf ',\n      "action": "%s"' "$(json_escape "${blocker_actions[$i]}")"
+    fi
+    if [[ -n "${blocker_statuses[$i]}" ]]; then
+      printf ',\n      "decision_status": "%s"' "$(json_escape "${blocker_statuses[$i]}")"
+    fi
+    if [[ -n "${blocker_paths[$i]}" ]]; then
+      printf ',\n      "path": "%s"' "$(json_escape "${blocker_paths[$i]}")"
+    fi
+    printf '\n    }'
+    if [[ "$i" -lt $((${#blockers[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
   printf '  ]\n'
   printf '}\n'
 }
@@ -88,26 +124,26 @@ print_json_report() {
 require_file() {
   local file="$1"
   if [[ ! -f "$file" ]]; then
-    add_blocker "missing required public release file: $file"
+    add_blocker "missing required public release file: $file" "missing_file" "Release files" "Add required public release file" "Open" "$file"
     return 1
   fi
 }
 
 if [[ ! -f LICENSE ]]; then
-  add_blocker "missing root LICENSE file"
+  add_blocker "missing root LICENSE file" "missing_file" "License" "Choose the repository license and add a root LICENSE file" "Open" "LICENSE"
 fi
 
 if [[ -f README.md ]] && grep -Fq "No license has been selected in this repository yet." README.md; then
-  add_blocker "README.md still declares that no license has been selected"
+  add_blocker "README.md still declares that no license has been selected" "stale_text" "License" "Remove no-license placeholder after selecting a license" "Open" "README.md"
 fi
 
 require_file SECURITY.md || true
 if [[ -f SECURITY.md ]]; then
   if grep -Fq "when available" SECURITY.md; then
-    add_blocker "SECURITY.md still uses an unconfirmed reporting route"
+    add_blocker "SECURITY.md still uses an unconfirmed reporting route" "unconfirmed_policy" "Security reporting" "Confirm the private vulnerability reporting route" "Open" "SECURITY.md"
   fi
   if ! grep -Fq "Do not file public issues for vulnerabilities" SECURITY.md; then
-    add_blocker "SECURITY.md must keep private-reporting guidance"
+    add_blocker "SECURITY.md must keep private-reporting guidance" "missing_guidance" "Security reporting" "Keep private-reporting guidance in SECURITY.md" "Open" "SECURITY.md"
   fi
 fi
 
@@ -122,9 +158,9 @@ if [[ -f docs/release/decisions.md ]]; then
     [[ "$area" != "Area" && "$area" != "---" ]] || continue
     if ! grep -Eq '^(Resolved|Accepted|N/A)([:.]|$)' <<<"$status"; then
       if [[ -n "$decision_needed" && "$decision_needed" != "---" ]]; then
-        add_blocker "unresolved release decision: $area: $decision_needed ($status)"
+        add_blocker "unresolved release decision: $area: $decision_needed ($status)" "release_decision" "$area" "$decision_needed" "$status" "docs/release/decisions.md"
       else
-        add_blocker "unresolved release decision: $area ($status)"
+        add_blocker "unresolved release decision: $area ($status)" "release_decision" "$area" "" "$status" "docs/release/decisions.md"
       fi
     fi
   done < docs/release/decisions.md
@@ -139,7 +175,7 @@ if [[ -f docs/release/index.md ]]; then
     "state tested platforms and execution modes" \
     "SHA256 checksums"; do
     if ! grep -Fq "$snippet" docs/release/index.md; then
-      add_blocker "docs/release/index.md missing public blocker snippet: $snippet"
+      add_blocker "docs/release/index.md missing public blocker snippet: $snippet" "missing_doc_snippet" "Release documentation" "Restore required public blocker snippet" "Open" "docs/release/index.md"
     fi
   done
 fi
@@ -148,7 +184,7 @@ require_file docs/reference/platforms/index.md || true
 if [[ -f docs/reference/platforms/index.md ]]; then
   for level in Tested Supported Available Unknown; do
     if ! grep -Fq "| $level |" docs/reference/platforms/index.md; then
-      add_blocker "docs/reference/platforms/index.md missing support level: $level"
+      add_blocker "docs/reference/platforms/index.md missing support level: $level" "missing_doc_snippet" "Platform support" "Document support level $level" "Open" "docs/reference/platforms/index.md"
     fi
   done
 fi

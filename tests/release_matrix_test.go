@@ -1190,11 +1190,19 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 		RequireResolved bool     `json:"require_resolved"`
 		BlockerCount    int      `json:"blocker_count"`
 		Blockers        []string `json:"blockers"`
+		BlockerDetails  []struct {
+			Message        string `json:"message"`
+			Kind           string `json:"kind"`
+			Area           string `json:"area"`
+			Action         string `json:"action"`
+			DecisionStatus string `json:"decision_status"`
+			Path           string `json:"path"`
+		} `json:"blocker_details"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("public release blocker JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Status != "blocked" || report.RequireResolved || report.BlockerCount != len(report.Blockers) {
+	if report.SchemaVersion != 1 || report.Status != "blocked" || report.RequireResolved || report.BlockerCount != len(report.Blockers) || report.BlockerCount != len(report.BlockerDetails) {
 		t.Fatalf("public release blocker JSON = %+v, want blocked schema v1 report", report)
 	}
 	for _, snippet := range []string{
@@ -1205,6 +1213,21 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 		if !stringSliceContains(report.Blockers, snippet) {
 			t.Fatalf("public release blocker JSON missing blocker %q: %+v", snippet, report.Blockers)
 		}
+	}
+	var foundLicenseDecision bool
+	for _, detail := range report.BlockerDetails {
+		if detail.Message == "" || detail.Kind == "" {
+			t.Fatalf("public release blocker detail must include message and kind: %+v", detail)
+		}
+		if detail.Area == "License" && detail.Kind == "release_decision" {
+			foundLicenseDecision = true
+			if detail.Action != "Choose the repository license and whether a `NOTICE` file is required." || detail.DecisionStatus != "Open." || detail.Path != "docs/release/decisions.md" {
+				t.Fatalf("license decision detail = %+v, want actionable release decision metadata", detail)
+			}
+		}
+	}
+	if !foundLicenseDecision {
+		t.Fatalf("public release blocker details missing License release decision: %+v", report.BlockerDetails)
 	}
 }
 
