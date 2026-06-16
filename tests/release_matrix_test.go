@@ -1358,7 +1358,7 @@ func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
 		},
 		"matrix_dense_arrays": {
 			specSections: []string{"Tables And Metatables", "Values And Types", "Implementation Requirements"},
-			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md"},
+			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/scientific/index.md"},
 		},
 		"classes_methods_oop": {
 			specSections: []string{"Grammar Appendix", "Declarations And Scope", "Expressions", "Statements"},
@@ -2009,7 +2009,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 			docTerms:   []string{"dense arrays", "matrices", "vectors", "SoA", "SQLite `db.frame`", "q/kdb+-style symbolic vectors"},
 			cliIDs:     []string{"repo-data-q_vector_basics", "repo-data-q_trade_analytics_project-main", "repo-data-db_q_frame_project-main", "repo-data_processing-data_oriented-soa_kernels", "repo-performance-execution_modes_matrix"},
 			featureIDs: []string{"matrix_dense_arrays", "q_analytics_dialect"},
-			docRefs:    []string{"docs/reference/data-oriented/index.md"},
+			docRefs:    []string{"docs/reference/data-oriented/index.md", "docs/reference/scientific/index.md"},
 		},
 		{
 			capability: "CLI tooling",
@@ -2264,6 +2264,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 			refs: []string{
 				"cmd/leia/main_examples_command_test.go",
 				"docs/reference/data-oriented/index.md",
+				"docs/reference/scientific/index.md",
 				"examples/data_processing/data_oriented/soa_kernels.leia",
 				"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 			},
@@ -2276,6 +2277,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 			},
 			docSnippets: map[string][]string{
 				"docs/reference/data-oriented/index.md": {"Leia includes data-oriented standard libraries", "## Structure Of Arrays"},
+				"docs/reference/scientific/index.md":   {"Leia keeps scientific code in ordinary Leia source", "## Default Numeric Imports", "## Primitive Composition"},
 			},
 		},
 	} {
