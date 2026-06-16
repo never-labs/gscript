@@ -280,6 +280,12 @@ func buildReportCapabilities() []cliReportCapability {
 		{Command: "leia test --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"total", "passed", "failed"}},
 		{Command: "leia test --list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"file_count"}, CollectionFields: []string{"files"}},
 		{Command: "leia version --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status"},
+		{Command: "scripts/install.sh --dry-run --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"install_count"}, CollectionFields: []string{"binaries", "install_paths"}},
+		{Command: "scripts/public_release_blockers_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"blocker_count"}, CollectionFields: []string{"blockers", "blocker_details"}},
+		{Command: "scripts/release_artifacts.sh --dry-run --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status"},
+		{Command: "scripts/release_artifacts_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"artifact_count"}, CollectionFields: []string{"artifact_files"}},
+		{Command: "scripts/release_distribution_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"workflow_count", "install_target_count"}, CollectionFields: []string{"workflow_files", "install_targets"}},
+		{Command: "scripts/release_notes_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"checked_file_count", "failure_count"}, CollectionFields: []string{"checked_files", "failures"}},
 	}
 }
 
