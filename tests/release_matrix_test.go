@@ -1124,6 +1124,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"bash scripts/public_release_blockers_check.sh --json",
 		"bash scripts/release_notes_check.sh --json --version vX.Y.Z",
 		"bash scripts/release_distribution_check.sh --json",
+		"bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json",
 		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 	} {
 		if !strings.Contains(release, snippet) {
@@ -1303,6 +1304,54 @@ func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 	for _, want := range []string{"leia_v1.2.3-rc.1_", "leia-lsp_v1.2.3-rc.1_", "metadata.txt", "leia_v1.2.3-rc.1_"} {
 		if !strings.Contains(report.Artifact+" "+report.LSPArtifact+" "+report.Metadata+" "+report.InstallArchive, want) {
 			t.Fatalf("release artifact JSON missing artifact fragment %q: %+v", want, report)
+		}
+	}
+}
+
+func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json")
+	var report struct {
+		SchemaVersion   int    `json:"schema_version"`
+		Status          string `json:"status"`
+		DryRun          bool   `json:"dry_run"`
+		OutputDir       string `json:"output_dir"`
+		Version         string `json:"version"`
+		Module          string `json:"module"`
+		GOOS            string `json:"goos"`
+		GOARCH          string `json:"goarch"`
+		Artifact        string `json:"artifact"`
+		LSPArtifact     string `json:"lsp_artifact"`
+		Metadata        string `json:"metadata"`
+		Checksums       string `json:"checksums"`
+		ArtifactPath    string `json:"artifact_path"`
+		LSPArtifactPath string `json:"lsp_artifact_path"`
+		MetadataPath    string `json:"metadata_path"`
+		ChecksumsPath   string `json:"checksums_path"`
+		GitCommit       string `json:"git_commit"`
+		GitShortCommit  string `json:"git_short_commit"`
+		GitBranch       string `json:"git_branch"`
+		GitDirty        bool   `json:"git_dirty"`
+		GoVersion       string `json:"go_version"`
+		BuildTimeUTC    string `json:"build_time_utc"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("release artifact plan JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || !report.DryRun || report.Version != "v1.2.3-rc.1" || report.Module != "github.com/never-labs/leia" {
+		t.Fatalf("release artifact plan JSON = %+v, want passing dry-run schema v1 report", report)
+	}
+	if report.OutputDir == "" || report.GOOS == "" || report.GOARCH == "" || report.GitCommit == "" || report.GitShortCommit == "" || report.GoVersion == "" || report.BuildTimeUTC == "" {
+		t.Fatalf("release artifact plan JSON missing environment metadata: %+v", report)
+	}
+	for _, want := range []string{"leia_v1.2.3-rc.1_", "leia-lsp_v1.2.3-rc.1_", "metadata.txt", "SHA256SUMS"} {
+		if !strings.Contains(report.Artifact+" "+report.LSPArtifact+" "+report.Metadata+" "+report.Checksums, want) {
+			t.Fatalf("release artifact plan JSON missing artifact fragment %q: %+v", want, report)
+		}
+	}
+	for _, path := range []string{report.ArtifactPath, report.LSPArtifactPath, report.MetadataPath, report.ChecksumsPath} {
+		if path == "" || !strings.HasPrefix(path, report.OutputDir) {
+			t.Fatalf("release artifact plan path %q must be under output dir %q: %+v", path, report.OutputDir, report)
 		}
 	}
 }

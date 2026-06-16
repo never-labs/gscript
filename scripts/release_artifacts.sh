@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/release_artifacts.sh [--output-dir DIR] [--version VERSION] [--dry-run]
+Usage: scripts/release_artifacts.sh [--output-dir DIR] [--version VERSION] [--dry-run] [--json]
 
 Build the current-platform Leia CLI and LSP release artifacts locally.
 
@@ -13,6 +13,7 @@ Options:
                         the exact tag or dev-<commit> default
       --dry-run         Print planned output files and metadata; do not build
                         or write any files
+      --json            Print a machine-readable artifact plan/report
   -h, --help            Show this help
 
 Outputs:
@@ -30,6 +31,7 @@ repo_root="$(cd "$script_dir/.." && pwd -P)"
 out_dir="$repo_root/dist"
 requested_version=""
 dry_run="false"
+json_out="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -55,6 +57,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run)
       dry_run="true"
+      shift
+      ;;
+    --json)
+      json_out="true"
       shift
       ;;
     -h|--help)
@@ -106,6 +112,16 @@ sha256_file() {
     echo "error: need sha256sum, shasum, or openssl to write SHA256SUMS" >&2
     exit 1
   fi
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
 }
 
 sanitize_component() {
@@ -178,7 +194,40 @@ write_metadata() {
   echo "build_time_utc=$build_time_utc"
 }
 
+print_json_report() {
+  printf '{\n'
+  printf '  "schema_version": 1,\n'
+  printf '  "status": "pass",\n'
+  printf '  "dry_run": %s,\n' "$dry_run"
+  printf '  "output_dir": "%s",\n' "$(json_escape "$out_dir")"
+  printf '  "version": "%s",\n' "$(json_escape "$version")"
+  printf '  "module": "%s",\n' "$(json_escape "$module_path")"
+  printf '  "goos": "%s",\n' "$(json_escape "$goos")"
+  printf '  "goarch": "%s",\n' "$(json_escape "$goarch")"
+  printf '  "artifact": "%s",\n' "$(json_escape "$binary_name")"
+  printf '  "lsp_artifact": "%s",\n' "$(json_escape "$lsp_binary_name")"
+  printf '  "metadata": "%s",\n' "$(json_escape "$metadata_name")"
+  printf '  "checksums": "SHA256SUMS",\n'
+  printf '  "artifact_path": "%s",\n' "$(json_escape "$binary_path")"
+  printf '  "lsp_artifact_path": "%s",\n' "$(json_escape "$lsp_binary_path")"
+  printf '  "metadata_path": "%s",\n' "$(json_escape "$metadata_path")"
+  printf '  "checksums_path": "%s",\n' "$(json_escape "$checksums_path")"
+  printf '  "git_commit": "%s",\n' "$(json_escape "$commit")"
+  printf '  "git_short_commit": "%s",\n' "$(json_escape "$short_commit")"
+  printf '  "git_branch": "%s",\n' "$(json_escape "$branch")"
+  printf '  "git_exact_tag": "%s",\n' "$(json_escape "$exact_tag")"
+  printf '  "git_describe": "%s",\n' "$(json_escape "$describe")"
+  printf '  "git_dirty": %s,\n' "$dirty"
+  printf '  "go_version": "%s",\n' "$(json_escape "$go_version")"
+  printf '  "build_time_utc": "%s"\n' "$(json_escape "$build_time_utc")"
+  printf '}\n'
+}
+
 if [[ "$dry_run" == "true" ]]; then
+  if [[ "$json_out" == "true" ]]; then
+    print_json_report
+    exit 0
+  fi
   echo "dry-run: would write $binary_path"
   echo "dry-run: would write $lsp_binary_path"
   echo "dry-run: would write $metadata_path"
@@ -189,9 +238,17 @@ if [[ "$dry_run" == "true" ]]; then
   exit 0
 fi
 
-echo "building $binary_name"
+if [[ "$json_out" == "true" ]]; then
+  echo "building $binary_name" >&2
+else
+  echo "building $binary_name"
+fi
 go build -trimpath -ldflags="$ldflags" -o "$binary_path" ./cmd/leia
-echo "building $lsp_binary_name"
+if [[ "$json_out" == "true" ]]; then
+  echo "building $lsp_binary_name" >&2
+else
+  echo "building $lsp_binary_name"
+fi
 go build -trimpath -ldflags="$ldflags" -o "$lsp_binary_path" ./cmd/leia-lsp
 
 write_metadata >"$metadata_path"
@@ -203,7 +260,11 @@ write_metadata >"$metadata_path"
   sha256_file "$metadata_name"
 ) >"$checksums_path"
 
-echo "wrote $binary_path"
-echo "wrote $lsp_binary_path"
-echo "wrote $metadata_path"
-echo "wrote $checksums_path"
+if [[ "$json_out" == "true" ]]; then
+  print_json_report
+else
+  echo "wrote $binary_path"
+  echo "wrote $lsp_binary_path"
+  echo "wrote $metadata_path"
+  echo "wrote $checksums_path"
+fi

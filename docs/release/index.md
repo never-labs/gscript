@@ -23,6 +23,7 @@ bash scripts/editor_check.sh --json
 bash scripts/public_release_blockers_check.sh --json
 bash scripts/release_notes_check.sh --json --version vX.Y.Z
 bash scripts/release_distribution_check.sh --json
+bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json
 bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
 ```
 
