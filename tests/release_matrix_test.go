@@ -1290,6 +1290,47 @@ func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z", "--list", "--json")
+	var report struct {
+		SchemaVersion     int `json:"schema_version"`
+		Mode              string
+		ReleaseProfile    bool   `json:"release_profile"`
+		ReleaseVersion    string `json:"release_version"`
+		ListOnly          bool   `json:"list_only"`
+		RunCount          int    `json:"run_count"`
+		SkipCount         int    `json:"skip_count"`
+		CriticalSkipCount int    `json:"critical_skip_count"`
+		RunnableChecks    []struct {
+			Name    string `json:"name"`
+			Command string `json:"command"`
+		} `json:"runnable_checks"`
+		SkippedChecks        []string `json:"skipped_checks"`
+		ReleaseCriticalSkips []string `json:"release_critical_skips"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("production plan JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) {
+		t.Fatalf("production plan JSON = %+v, want release profile schema v1 plan", report)
+	}
+	commands := map[string]string{}
+	for _, check := range report.RunnableChecks {
+		commands[check.Name] = check.Command
+	}
+	for name, want := range map[string]string{
+		"Public Release Blockers": "bash scripts/public_release_blockers_check.sh --require-resolved",
+		"Release Distribution":    "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
+		"Release Notes":           "bash scripts/release_notes_check.sh --require-ready --version \"vX.Y.Z\"",
+		"Release Artifacts":       "bash scripts/release_artifacts_check.sh",
+	} {
+		if !strings.Contains(commands[name], want) {
+			t.Fatalf("production plan JSON command %q = %q, want fragment %q", name, commands[name], want)
+		}
+	}
+}
+
 func TestReleaseMatrixGoreleaserTargetsMatchInstallDryRun(t *testing.T) {
 	root := findRepoRoot(t)
 	targets := readGoreleaserTargets(t, filepath.Join(root, ".goreleaser.yaml"))

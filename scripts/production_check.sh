@@ -11,6 +11,7 @@ LIST_ONLY=0
 OUT_DIR=""
 RELEASE_PROFILE=0
 RELEASE_VERSION=""
+JSON_OUT=0
 ARTIFACT_PLAN=""
 ARTIFACT_COMMAND_LOG=""
 SMOKE_SCRIPT="tests/smoke/01_basic.leia"
@@ -18,7 +19,7 @@ EXPECTED_MODULE_PATH="github.com/never-labs/leia"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/production_check.sh [--quick] [--full] [--release-profile] [--release-version VERSION] [--list] [--out-dir DIR] [--help]
+Usage: scripts/production_check.sh [--quick] [--full] [--release-profile] [--release-version VERSION] [--list] [--json] [--out-dir DIR] [--help]
 
 Runs the release-gate commands from docs/release/index.md.
 
@@ -36,6 +37,7 @@ Options:
             Validate release artifacts and notes for VERSION, such as v0.1.0,
             when --release-profile is enabled.
   --list    Print the commands that would run without executing them.
+  --json    With --list, print a machine-readable plan instead of text.
   --out-dir DIR
             Write the resolved plan and command logs to DIR. Defaults to no
             artifact output.
@@ -66,6 +68,9 @@ while [ "$#" -gt 0 ]; do
             ;;
         --list)
             LIST_ONLY=1
+            ;;
+        --json)
+            JSON_OUT=1
             ;;
         --out-dir)
             if [ "$#" -lt 2 ] || [ -z "$2" ]; then
@@ -147,6 +152,78 @@ have_cmd() {
 
 quote_cmd() {
     printf '%s' "$1"
+}
+
+json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    value="${value//$'\t'/\\t}"
+    printf '%s' "$value"
+}
+
+print_json_string_array() {
+    local indent="$1"
+    shift
+    local values=("$@")
+    printf '[\n'
+    local i=0
+    while [ "$i" -lt "${#values[@]}" ]; do
+        printf '%s  "%s"' "$indent" "$(json_escape "${values[$i]}")"
+        if [ "$i" -lt $((${#values[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        i=$((i + 1))
+    done
+    printf '%s]' "$indent"
+}
+
+print_plan_json() {
+    local critical=()
+    local reason
+    while IFS= read -r reason; do
+        [ -n "$reason" ] || continue
+        critical+=("$reason")
+    done < <(release_critical_skips)
+
+    printf '{\n'
+    printf '  "schema_version": 1,\n'
+    printf '  "mode": "%s",\n' "$(json_escape "$MODE")"
+    printf '  "release_profile": %s,\n' "$([ "$RELEASE_PROFILE" -eq 1 ] && echo true || echo false)"
+    printf '  "release_version": "%s",\n' "$(json_escape "$RELEASE_VERSION")"
+    printf '  "list_only": %s,\n' "$([ "$LIST_ONLY" -eq 1 ] && echo true || echo false)"
+    printf '  "run_count": %d,\n' "${#RUN_NAMES[@]}"
+    printf '  "skip_count": %d,\n' "${#SKIP_REASONS[@]}"
+    printf '  "critical_skip_count": %d,\n' "${#critical[@]}"
+    printf '  "runnable_checks": [\n'
+    local i=0
+    while [ "$i" -lt "${#RUN_NAMES[@]}" ]; do
+        printf '    {"name": "%s", "command": "%s"}' "$(json_escape "${RUN_NAMES[$i]}")" "$(json_escape "${RUN_CMDS[$i]}")"
+        if [ "$i" -lt $((${#RUN_NAMES[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        i=$((i + 1))
+    done
+    printf '  ],\n'
+    printf '  "skipped_checks": '
+    if [ "${#SKIP_REASONS[@]}" -eq 0 ]; then
+        printf '[]'
+    else
+        print_json_string_array "  " "${SKIP_REASONS[@]}"
+    fi
+    printf ',\n'
+    printf '  "release_critical_skips": '
+    if [ "${#critical[@]}" -eq 0 ]; then
+        printf '[]'
+    else
+        print_json_string_array "  " "${critical[@]}"
+    fi
+    printf '\n'
+    printf '}\n'
 }
 
 artifact_log() {
@@ -570,6 +647,12 @@ fi
 init_artifacts
 write_plan_artifact
 
+if [ "$LIST_ONLY" -eq 1 ] && [ "$JSON_OUT" -eq 1 ]; then
+    print_plan_json
+    artifact_log "list-only json mode; no commands executed"
+    exit 0
+fi
+
 echo "=== production_check.sh ($MODE) ==="
 if [ "$RELEASE_PROFILE" -eq 1 ]; then
     echo "Release profile: critical release tool skips are treated as failures."
@@ -610,6 +693,11 @@ fi
 if [ "$LIST_ONLY" -eq 1 ]; then
     artifact_log "list-only mode; no commands executed"
     exit 0
+fi
+
+if [ "$JSON_OUT" -eq 1 ]; then
+    echo "--json is only supported with --list for production_check.sh" >&2
+    exit 2
 fi
 
 if [ "$RELEASE_PROFILE" -eq 1 ]; then
