@@ -5,7 +5,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/release_artifacts_check.sh [--build] [--output-dir DIR] [--version VERSION] [--keep-output] [--require-clean] [--require-tag]
+Usage: scripts/release_artifacts_check.sh [--build] [--output-dir DIR] [--version VERSION] [--keep-output] [--require-clean] [--require-tag] [--json]
 
 Checks scripts/release_artifacts.sh without changing its implementation.
 
@@ -22,6 +22,7 @@ Options:
       --keep-output     Do not remove an auto-created temp output directory
       --require-clean   Fail unless the git worktree has no tracked or untracked changes
       --require-tag     Fail unless HEAD is exactly tagged with VERSION
+      --json            Print a machine-readable artifact check report
   -h, --help            Show this help
 USAGE
 }
@@ -39,6 +40,10 @@ version="smoke-check"
 keep_output="false"
 require_clean="false"
 require_tag="false"
+json_out="false"
+dry_run_verified="false"
+build_verified="false"
+install_archive_verified="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -74,6 +79,10 @@ while [[ $# -gt 0 ]]; do
       require_tag="true"
       shift
       ;;
+    --json)
+      json_out="true"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -87,6 +96,47 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+
+log_info() {
+  if [[ "$json_out" != "true" ]]; then
+    echo "$1"
+  fi
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+print_json_report() {
+  local report_out_dir="$out_dir"
+  if [[ "$build" != "true" ]]; then
+    report_out_dir=""
+  fi
+  printf '{\n'
+  printf '  "schema_version": 1,\n'
+  printf '  "status": "pass",\n'
+  printf '  "version": "%s",\n' "$(json_escape "$version")"
+  printf '  "build": %s,\n' "$build"
+  printf '  "require_clean": %s,\n' "$require_clean"
+  printf '  "require_tag": %s,\n' "$require_tag"
+  printf '  "goos": "%s",\n' "$(json_escape "$goos")"
+  printf '  "goarch": "%s",\n' "$(json_escape "$goarch")"
+  printf '  "artifact": "%s",\n' "$(json_escape "$binary_name")"
+  printf '  "lsp_artifact": "%s",\n' "$(json_escape "$lsp_binary_name")"
+  printf '  "metadata": "%s",\n' "$(json_escape "$metadata_name")"
+  printf '  "install_archive": "%s",\n' "$(json_escape "$install_archive_name")"
+  printf '  "dry_run_verified": %s,\n' "$dry_run_verified"
+  printf '  "build_verified": %s,\n' "$build_verified"
+  printf '  "install_archive_verified": %s,\n' "$install_archive_verified"
+  printf '  "output_dir": "%s"\n' "$(json_escape "$report_out_dir")"
+  printf '}\n'
+}
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -274,10 +324,15 @@ require_contains "$dry_run_log" "version=$version"
 require_contains "$dry_run_log" "goos=$goos"
 require_contains "$dry_run_log" "goarch=$goarch"
 
-echo "release_artifacts_check.sh: dry-run plan verified"
+dry_run_verified="true"
+log_info "release_artifacts_check.sh: dry-run plan verified"
 
 if [[ "$build" != "true" ]]; then
-  echo "release_artifacts_check.sh: pass"
+  if [[ "$json_out" == "true" ]]; then
+    print_json_report
+  else
+    echo "release_artifacts_check.sh: pass"
+  fi
   exit 0
 fi
 
@@ -297,7 +352,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$release_script" --version "$version" --output-dir "$out_dir"
+if [[ "$json_out" == "true" ]]; then
+  bash "$release_script" --version "$version" --output-dir "$out_dir" >/dev/null
+else
+  bash "$release_script" --version "$version" --output-dir "$out_dir"
+fi
 
 binary_path="$out_dir/$binary_name"
 lsp_binary_path="$out_dir/$lsp_binary_name"
@@ -339,6 +398,7 @@ if grep -Fq '"version": "dev"' <<<"$version_json"; then
 fi
 "$binary_path" "$smoke_script" >/dev/null
 "$lsp_binary_path" --help >/dev/null
+build_verified="true"
 
 release_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-install.XXXXXX")"
 install_bin_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-install-bin.XXXXXX")"
@@ -376,7 +436,12 @@ if ! grep -Fq "\"version\": \"$version\"" <<<"$installed_version_json"; then
   exit 1
 fi
 "$installed_lsp_binary" --help >/dev/null
+install_archive_verified="true"
 
-echo "release_artifacts_check.sh: build artifacts verified in $out_dir"
-echo "release_artifacts_check.sh: local install archive verified from $release_dir"
-echo "release_artifacts_check.sh: pass"
+if [[ "$json_out" == "true" ]]; then
+  print_json_report
+else
+  echo "release_artifacts_check.sh: build artifacts verified in $out_dir"
+  echo "release_artifacts_check.sh: local install archive verified from $release_dir"
+  echo "release_artifacts_check.sh: pass"
+fi
