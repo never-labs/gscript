@@ -154,6 +154,31 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if caps.Tooling.Config.FileName != "leia.toml" || !containsString(caps.Tooling.Config.Formats, "json") {
 		t.Fatalf("config capabilities = %+v, want leia.toml/json", caps.Tooling.Config)
 	}
+	for _, report := range caps.Tooling.Reports {
+		if report.Command == "" || report.SchemaVersion <= 0 || !containsString(report.Formats, "json") {
+			t.Fatalf("report capability = %+v, want command, json format, and schema version", report)
+		}
+	}
+	for _, want := range []string{
+		"leia capabilities --json",
+		"leia check --json",
+		"leia ci --list --json",
+		"leia config --json",
+		"leia doc generate --format=json",
+		"leia env --json",
+		"leia evaluate --json",
+		"leia examples check --json",
+		"leia examples list --json",
+		"leia fmt --json",
+		"leia inspect bytecode --json",
+		"leia test --json",
+		"leia test --list --json",
+		"leia version --json",
+	} {
+		if !capabilitiesHaveReport(caps.Tooling.Reports, want) {
+			t.Fatalf("report capabilities = %#v, want command %q", caps.Tooling.Reports, want)
+		}
+	}
 }
 
 func TestCapabilitiesDefaultImportsStaySyncedWithPrelude(t *testing.T) {
@@ -216,6 +241,15 @@ func TestCapabilitiesDialectsCoverFeatureMatrixBuiltinTags(t *testing.T) {
 func capabilitiesHaveStdlibLayer(layers []cliStdlibLayer, name string) bool {
 	for _, layer := range layers {
 		if layer.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func capabilitiesHaveReport(reports []cliReportCapability, command string) bool {
+	for _, report := range reports {
+		if report.Command == command {
 			return true
 		}
 	}

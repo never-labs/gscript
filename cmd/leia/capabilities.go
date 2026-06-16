@@ -81,6 +81,7 @@ type cliToolingCapability struct {
 	Linter    cliLinterCapability    `json:"linter"`
 	Test      cliTestCapability      `json:"test"`
 	Config    cliConfigCapability    `json:"config"`
+	Reports   []cliReportCapability  `json:"reports"`
 }
 
 type cliFormatterCapability struct {
@@ -104,6 +105,15 @@ type cliTestCapability struct {
 	List         bool     `json:"list"`
 	Reports      []string `json:"reports"`
 	SeedEnv      string   `json:"seed_env"`
+}
+
+type cliReportCapability struct {
+	Command          string   `json:"command"`
+	Formats          []string `json:"formats"`
+	SchemaVersion    int      `json:"schema_version"`
+	StatusField      string   `json:"status_field,omitempty"`
+	CountFields      []string `json:"count_fields,omitempty"`
+	CollectionFields []string `json:"collection_fields,omitempty"`
 }
 
 func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
@@ -237,7 +247,27 @@ func buildCapabilities() cliCapabilities {
 				},
 				Formats: []string{"text", "json"},
 			},
+			Reports: buildReportCapabilities(),
 		},
+	}
+}
+
+func buildReportCapabilities() []cliReportCapability {
+	return []cliReportCapability{
+		{Command: "leia capabilities --json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
+		{Command: "leia check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"step_count", "failed_count", "skipped_count"}},
+		{Command: "leia ci --list --json", Formats: []string{"json"}, SchemaVersion: 1, CountFields: []string{"command_count"}, CollectionFields: []string{"commands"}},
+		{Command: "leia config --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"diagnostic_count"}},
+		{Command: "leia doc generate --format=json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
+		{Command: "leia env --json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.dialects"}},
+		{Command: "leia evaluate --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"summary", "metrics[].count"}},
+		{Command: "leia examples check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"runnable", "skipped", "failed"}, CollectionFields: []string{"results"}},
+		{Command: "leia examples list --json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"examples"}},
+		{Command: "leia fmt --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"file_count", "changed_count", "diagnostic_count"}},
+		{Command: "leia inspect bytecode --json", Formats: []string{"json"}, SchemaVersion: 1, CountFields: []string{"proto.instruction_count", "proto.constant_count", "proto.upvalue_count", "proto.child_proto_count"}},
+		{Command: "leia test --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"total", "passed", "failed"}},
+		{Command: "leia test --list --json", Formats: []string{"json"}, SchemaVersion: 1, CountFields: []string{"file_count"}, CollectionFields: []string{"files"}},
+		{Command: "leia version --json", Formats: []string{"json"}, SchemaVersion: 1},
 	}
 }
 
