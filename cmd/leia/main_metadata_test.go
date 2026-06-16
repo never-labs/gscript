@@ -234,6 +234,22 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("mod graph report capability = %+v, want count field %q", modGraphReport, want)
 		}
 	}
+	for _, tc := range []struct {
+		command string
+		fields  []string
+	}{
+		{"leia mod capability --json", []string{"capability_count", "module_count", "diagnostic_count"}},
+		{"leia mod list --json", []string{"require_count", "replace_count", "collection_count", "diagnostic_count"}},
+		{"leia mod lock --json", []string{"entry_count", "diagnostic_count"}},
+		{"leia mod tidy --json", []string{"removed_count", "missing_count", "diagnostic_count"}},
+	} {
+		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
+		for _, want := range tc.fields {
+			if report == nil || !containsString(report.CountFields, want) {
+				t.Fatalf("%s report capability = %+v, want count field %q", tc.command, report, want)
+			}
+		}
+	}
 }
 
 func TestCapabilitiesDefaultImportsStaySyncedWithPrelude(t *testing.T) {

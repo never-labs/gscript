@@ -177,7 +177,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal(stdout.Bytes(), &list); err != nil {
 		t.Fatalf("stdout is not JSON list report: %v; stdout = %q", err, stdout.String())
 	}
-	if !list.OK || list.Module != "example.com/demo" || len(list.Requires) != 1 || list.Requires[0].Kind != "replace" {
+	if !list.OK || list.Module != "example.com/demo" || list.RequireCount != len(list.Requires) || list.ReplaceCount != len(list.Replaces) || list.CollectionCount != len(list.Collections) || list.DiagnosticCount != len(list.Diagnostics) || len(list.Requires) != 1 || list.Requires[0].Kind != "replace" {
 		t.Fatalf("list = %+v, want module and resolved replace require", list)
 	}
 }
@@ -256,7 +256,7 @@ cap fs.read, db.query
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON capability report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Modules) != 2 {
+	if !report.OK || report.ModuleCount != len(report.Modules) || report.CapabilityCount != len(report.Capabilities) || report.DiagnosticCount != len(report.Diagnostics) || len(report.Modules) != 2 {
 		t.Fatalf("capability report = %+v, want two modules", report)
 	}
 	if !report.Matrix["example.com/demo"]["net.client"] || report.Matrix["example.com/demo"]["fs.read"] {
@@ -354,7 +354,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON lock report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Entries) != 2 {
+	if !report.OK || report.EntryCount != len(report.Entries) || report.DiagnosticCount != len(report.Diagnostics) || len(report.Entries) != 2 {
 		t.Fatalf("lock report = %+v, want collection and replace sums", report)
 	}
 	sumData, err := os.ReadFile(filepath.Join(dir, "leia.sum"))
@@ -625,7 +625,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal(stdout.Bytes(), &tidy); err != nil {
 		t.Fatalf("stdout is not JSON tidy report: %v; stdout = %q", err, stdout.String())
 	}
-	if !tidy.OK || !containsString(tidy.Removed, "example.com/unused") || len(tidy.Missing) != 0 {
+	if !tidy.OK || tidy.RemovedCount != len(tidy.Removed) || tidy.MissingCount != len(tidy.Missing) || tidy.DiagnosticCount != len(tidy.Diagnostics) || !containsString(tidy.Removed, "example.com/unused") || len(tidy.Missing) != 0 {
 		t.Fatalf("tidy = %+v, want removed unused and no missing", tidy)
 	}
 	manifestBytes, err = os.ReadFile(filepath.Join(dir, "leia.mod"))
@@ -897,7 +897,7 @@ _ = lib
 	if err := json.Unmarshal(stdout.Bytes(), &tidy); err != nil {
 		t.Fatalf("stdout is not JSON tidy report: %v; stdout = %q", err, stdout.String())
 	}
-	if tidy.OK || !containsString(tidy.Missing, "example.com/lib/net") {
+	if tidy.OK || tidy.RemovedCount != len(tidy.Removed) || tidy.MissingCount != len(tidy.Missing) || tidy.DiagnosticCount != len(tidy.Diagnostics) || !containsString(tidy.Missing, "example.com/lib/net") {
 		t.Fatalf("tidy = %+v, want missing external require", tidy)
 	}
 }

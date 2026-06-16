@@ -2510,6 +2510,104 @@ func TestReleaseMatrixModuleGraphJSONReportsCounts(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixModuleMetadataReportsCountCollections(t *testing.T) {
+	root := findRepoRoot(t)
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "leia.mod"), []byte(`module github.com/example/project
+leia 0.1
+capability net.client
+require example.com/lib v1.0.0
+replace example.com/lib => ./lib
+collection vendor ./vendor
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmp, "lib"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "lib", "leia.mod"), []byte("module example.com/lib\nleia 0.1\ncapability fs.read\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmp, "vendor"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "main.leia"), []byte("require(\"example.com/lib\")\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	listOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "list", "--json", tmp)
+	var listReport struct {
+		SchemaVersion   int           `json:"schema_version"`
+		OK              bool          `json:"ok"`
+		RequireCount    int           `json:"require_count"`
+		ReplaceCount    int           `json:"replace_count"`
+		CollectionCount int           `json:"collection_count"`
+		DiagnosticCount int           `json:"diagnostic_count"`
+		Requires        []interface{} `json:"requires"`
+		Replaces        []interface{} `json:"replaces"`
+		Collections     []interface{} `json:"collections"`
+		Diagnostics     []interface{} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal([]byte(listOut), &listReport); err != nil {
+		t.Fatalf("mod list JSON failed to decode: %v\n%s", err, listOut)
+	}
+	if listReport.SchemaVersion != 1 || !listReport.OK || listReport.RequireCount != len(listReport.Requires) || listReport.RequireCount != 1 || listReport.ReplaceCount != len(listReport.Replaces) || listReport.ReplaceCount != 1 || listReport.CollectionCount != len(listReport.Collections) || listReport.CollectionCount != 1 || listReport.DiagnosticCount != len(listReport.Diagnostics) || listReport.DiagnosticCount != 0 {
+		t.Fatalf("mod list JSON = %+v, want counted module metadata", listReport)
+	}
+
+	capabilityOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "capability", "--json", tmp)
+	var capabilityReport struct {
+		SchemaVersion   int           `json:"schema_version"`
+		OK              bool          `json:"ok"`
+		CapabilityCount int           `json:"capability_count"`
+		ModuleCount     int           `json:"module_count"`
+		DiagnosticCount int           `json:"diagnostic_count"`
+		Capabilities    []string      `json:"capabilities"`
+		Modules         []interface{} `json:"modules"`
+		Diagnostics     []interface{} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal([]byte(capabilityOut), &capabilityReport); err != nil {
+		t.Fatalf("mod capability JSON failed to decode: %v\n%s", err, capabilityOut)
+	}
+	if capabilityReport.SchemaVersion != 1 || !capabilityReport.OK || capabilityReport.CapabilityCount != len(capabilityReport.Capabilities) || capabilityReport.CapabilityCount != 2 || capabilityReport.ModuleCount != len(capabilityReport.Modules) || capabilityReport.ModuleCount != 2 || capabilityReport.DiagnosticCount != len(capabilityReport.Diagnostics) || capabilityReport.DiagnosticCount != 0 {
+		t.Fatalf("mod capability JSON = %+v, want counted capability matrix", capabilityReport)
+	}
+
+	lockOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "lock", "--json", tmp)
+	var lockReport struct {
+		SchemaVersion   int           `json:"schema_version"`
+		OK              bool          `json:"ok"`
+		EntryCount      int           `json:"entry_count"`
+		DiagnosticCount int           `json:"diagnostic_count"`
+		Entries         []interface{} `json:"entries"`
+		Diagnostics     []interface{} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal([]byte(lockOut), &lockReport); err != nil {
+		t.Fatalf("mod lock JSON failed to decode: %v\n%s", err, lockOut)
+	}
+	if lockReport.SchemaVersion != 1 || !lockReport.OK || lockReport.EntryCount != len(lockReport.Entries) || lockReport.EntryCount == 0 || lockReport.DiagnosticCount != len(lockReport.Diagnostics) || lockReport.DiagnosticCount != 0 {
+		t.Fatalf("mod lock JSON = %+v, want counted lock entries", lockReport)
+	}
+
+	tidyOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "tidy", "--json", "--dir", tmp)
+	var tidyReport struct {
+		SchemaVersion   int           `json:"schema_version"`
+		OK              bool          `json:"ok"`
+		RemovedCount    int           `json:"removed_count"`
+		MissingCount    int           `json:"missing_count"`
+		DiagnosticCount int           `json:"diagnostic_count"`
+		Removed         []interface{} `json:"removed"`
+		Missing         []interface{} `json:"missing"`
+		Diagnostics     []interface{} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal([]byte(tidyOut), &tidyReport); err != nil {
+		t.Fatalf("mod tidy JSON failed to decode: %v\n%s", err, tidyOut)
+	}
+	if tidyReport.SchemaVersion != 1 || !tidyReport.OK || tidyReport.RemovedCount != len(tidyReport.Removed) || tidyReport.MissingCount != len(tidyReport.Missing) || tidyReport.DiagnosticCount != len(tidyReport.Diagnostics) || tidyReport.MissingCount != 0 || tidyReport.DiagnosticCount != 0 {
+		t.Fatalf("mod tidy JSON = %+v, want counted tidy result", tidyReport)
+	}
+}
+
 func TestReleaseMatrixSecurityDocsUseModuleScopedCapabilityCommand(t *testing.T) {
 	root := findRepoRoot(t)
 	security := readFileString(t, filepath.Join(root, "docs", "reference", "security", "index.md"))

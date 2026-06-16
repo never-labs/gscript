@@ -45,12 +45,15 @@ type VerifyReport struct {
 }
 
 type TidyReport struct {
-	SchemaVersion int          `json:"schema_version"`
-	OK            bool         `json:"ok"`
-	Manifest      string       `json:"manifest,omitempty"`
-	Removed       []string     `json:"removed,omitempty"`
-	Missing       []string     `json:"missing,omitempty"`
-	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+	SchemaVersion   int          `json:"schema_version"`
+	OK              bool         `json:"ok"`
+	Manifest        string       `json:"manifest,omitempty"`
+	RemovedCount    int          `json:"removed_count"`
+	MissingCount    int          `json:"missing_count"`
+	DiagnosticCount int          `json:"diagnostic_count"`
+	Removed         []string     `json:"removed,omitempty"`
+	Missing         []string     `json:"missing,omitempty"`
+	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type ExplainReport struct {
@@ -65,15 +68,19 @@ type ExplainReport struct {
 }
 
 type ListReport struct {
-	SchemaVersion int              `json:"schema_version"`
-	OK            bool             `json:"ok"`
-	Manifest      string           `json:"manifest,omitempty"`
-	Module        string           `json:"module,omitempty"`
-	Leia          string           `json:"leia,omitempty"`
-	Requires      []ListRequire    `json:"requires,omitempty"`
-	Replaces      []ListReplace    `json:"replaces,omitempty"`
-	Collections   []ListCollection `json:"collections,omitempty"`
-	Diagnostics   []Diagnostic     `json:"diagnostics,omitempty"`
+	SchemaVersion   int              `json:"schema_version"`
+	OK              bool             `json:"ok"`
+	Manifest        string           `json:"manifest,omitempty"`
+	Module          string           `json:"module,omitempty"`
+	Leia            string           `json:"leia,omitempty"`
+	RequireCount    int              `json:"require_count"`
+	ReplaceCount    int              `json:"replace_count"`
+	CollectionCount int              `json:"collection_count"`
+	DiagnosticCount int              `json:"diagnostic_count"`
+	Requires        []ListRequire    `json:"requires,omitempty"`
+	Replaces        []ListReplace    `json:"replaces,omitempty"`
+	Collections     []ListCollection `json:"collections,omitempty"`
+	Diagnostics     []Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type ListRequire struct {
@@ -99,13 +106,16 @@ type ListCollection struct {
 }
 
 type CapabilityReport struct {
-	SchemaVersion int                        `json:"schema_version"`
-	OK            bool                       `json:"ok"`
-	Manifest      string                     `json:"manifest,omitempty"`
-	Capabilities  []string                   `json:"capabilities,omitempty"`
-	Modules       []CapabilityModule         `json:"modules,omitempty"`
-	Matrix        map[string]map[string]bool `json:"matrix,omitempty"`
-	Diagnostics   []Diagnostic               `json:"diagnostics,omitempty"`
+	SchemaVersion   int                        `json:"schema_version"`
+	OK              bool                       `json:"ok"`
+	Manifest        string                     `json:"manifest,omitempty"`
+	CapabilityCount int                        `json:"capability_count"`
+	ModuleCount     int                        `json:"module_count"`
+	DiagnosticCount int                        `json:"diagnostic_count"`
+	Capabilities    []string                   `json:"capabilities,omitempty"`
+	Modules         []CapabilityModule         `json:"modules,omitempty"`
+	Matrix          map[string]map[string]bool `json:"matrix,omitempty"`
+	Diagnostics     []Diagnostic               `json:"diagnostics,omitempty"`
 }
 
 type GoModReport struct {
@@ -144,11 +154,13 @@ type VerifyOptions struct {
 }
 
 type SumReport struct {
-	SchemaVersion int          `json:"schema_version"`
-	OK            bool         `json:"ok"`
-	Sum           string       `json:"sum,omitempty"`
-	Entries       []SumEntry   `json:"entries,omitempty"`
-	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+	SchemaVersion   int          `json:"schema_version"`
+	OK              bool         `json:"ok"`
+	Sum             string       `json:"sum,omitempty"`
+	EntryCount      int          `json:"entry_count"`
+	DiagnosticCount int          `json:"diagnostic_count"`
+	Entries         []SumEntry   `json:"entries,omitempty"`
+	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type SumEntry struct {
@@ -512,9 +524,10 @@ func VerifyWithOptions(path string, opts VerifyOptions) VerifyReport {
 	return report
 }
 
-func Tidy(path string) TidyReport {
+func Tidy(path string) (report TidyReport) {
 	abs, err := filepath.Abs(path)
-	report := TidyReport{SchemaVersion: 1}
+	report = TidyReport{SchemaVersion: 1}
+	defer setTidyReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -557,6 +570,12 @@ func Tidy(path string) TidyReport {
 	return report
 }
 
+func setTidyReportCounts(report *TidyReport) {
+	report.RemovedCount = len(report.Removed)
+	report.MissingCount = len(report.Missing)
+	report.DiagnosticCount = len(report.Diagnostics)
+}
+
 func Explain(path, module string) ExplainReport {
 	abs, err := filepath.Abs(path)
 	report := ExplainReport{SchemaVersion: 1, Module: module}
@@ -587,9 +606,10 @@ func Explain(path, module string) ExplainReport {
 	return report
 }
 
-func List(path string) ListReport {
+func List(path string) (report ListReport) {
 	abs, err := filepath.Abs(path)
-	report := ListReport{SchemaVersion: 1}
+	report = ListReport{SchemaVersion: 1}
+	defer setListReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -646,9 +666,17 @@ func List(path string) ListReport {
 	return report
 }
 
-func Capability(path string) CapabilityReport {
+func setListReportCounts(report *ListReport) {
+	report.RequireCount = len(report.Requires)
+	report.ReplaceCount = len(report.Replaces)
+	report.CollectionCount = len(report.Collections)
+	report.DiagnosticCount = len(report.Diagnostics)
+}
+
+func Capability(path string) (report CapabilityReport) {
 	abs, err := filepath.Abs(path)
-	report := CapabilityReport{SchemaVersion: 1}
+	report = CapabilityReport{SchemaVersion: 1}
+	defer setCapabilityReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -701,6 +729,12 @@ func Capability(path string) CapabilityReport {
 	report.Matrix = capabilityMatrix(report.Modules, report.Capabilities)
 	report.OK = !hasErrorDiagnostic(report.Diagnostics)
 	return report
+}
+
+func setCapabilityReportCounts(report *CapabilityReport) {
+	report.CapabilityCount = len(report.Capabilities)
+	report.ModuleCount = len(report.Modules)
+	report.DiagnosticCount = len(report.Diagnostics)
 }
 
 func dependencyRoot(root string, manifest modfile.File, req modfile.Require) (string, string, bool) {
@@ -832,9 +866,10 @@ func listCacheModules(cacheDir string, manifest modfile.File) []modresolve.Cache
 	return modules
 }
 
-func Lock(path string) SumReport {
+func Lock(path string) (report SumReport) {
 	abs, err := filepath.Abs(path)
-	report := SumReport{SchemaVersion: 1}
+	report = SumReport{SchemaVersion: 1}
+	defer setSumReportCounts(&report)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
 		return report
@@ -855,6 +890,11 @@ func Lock(path string) SumReport {
 	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
+}
+
+func setSumReportCounts(report *SumReport) {
+	report.EntryCount = len(report.Entries)
+	report.DiagnosticCount = len(report.Diagnostics)
 }
 
 func VerifySum(path string) []Diagnostic {
