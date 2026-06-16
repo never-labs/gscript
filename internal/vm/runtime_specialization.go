@@ -588,6 +588,9 @@ func (vm *VM) tryRunCallSiteValueRuntimeSpecialization(cl *Closure, args []runti
 	if cl == nil || cl.Proto == nil {
 		return false, nil, nil
 	}
+	if vm.sharedProtoCaches {
+		return false, nil, nil
+	}
 	if !mayHaveCallSiteValueRuntimeSpecializationCandidate(cl.Proto, len(args), includeRecursiveTable) {
 		return false, nil, nil
 	}
@@ -616,6 +619,9 @@ func (vm *VM) tryRunCallSiteValueRuntimeSpecialization(cl *Closure, args []runti
 
 func (vm *VM) tryRunCallSiteNoResultRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if cl == nil || cl.Proto == nil {
+		return false, nil
+	}
+	if vm.sharedProtoCaches {
 		return false, nil
 	}
 	if !mayHaveCallSiteNoResultRuntimeSpecializationCandidate(cl.Proto, len(args)) {

@@ -52,6 +52,9 @@ func readStdlibContractRows(t *testing.T, root string) map[string]bool {
 	rowRE := regexp.MustCompile("^\\|\\s*`([^`]+)`\\s*\\|\\s*`([^`]+)`\\s*\\|")
 	rows := map[string]bool{}
 	for lineNo, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "## Default Imports" {
+			break
+		}
 		match := rowRE.FindStringSubmatch(line)
 		if match == nil {
 			continue

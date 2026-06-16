@@ -79,6 +79,7 @@ type VM struct {
 	readOnlyGlobals      map[string]bool
 	globalsMu            *sync.RWMutex  // protects globals for goroutine safety (shared across VMs)
 	noGlobalLock         bool           // skip globals mutex (single-threaded mode)
+	sharedProtoCaches    bool           // this VM may execute protos concurrently with sibling VMs
 	openUpvals           []*Upvalue     // list of open upvalues (sorted by regIdx descending)
 	top                  int            // top of used registers (for variable returns)
 	stringMeta           *runtime.Table // string metatable
@@ -1113,6 +1114,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 		globalOverrideFast: -1,
 		globalsMu:          &sync.RWMutex{},
 		noGlobalLock:       true, // own copy, fully lock-free
+		sharedProtoCaches:  true,
 		stringMeta:         parent.stringMeta,
 		coroutineStats:     parent.coroutineStats,
 		debugHook:          parent.debugHook,
@@ -1573,6 +1575,24 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 		case OP_GETGLOBAL:
 			a := DecodeA(inst)
 			bx := DecodeBx(inst)
+			if vm.sharedProtoCaches {
+				name := constants[bx].Str()
+				if vm.globalOverrides != nil {
+					if v, ok := vm.globalOverrides[name]; ok {
+						vm.regs[base+a] = v
+						break
+					}
+				}
+				if vm.noGlobalLock {
+					idx := vm.resolveGlobalIndex(name)
+					vm.regs[base+a] = vm.globalArray[idx]
+				} else {
+					vm.globalsMu.RLock()
+					vm.regs[base+a] = vm.globals[name]
+					vm.globalsMu.RUnlock()
+				}
+				break
+			}
 			// Lazy-init GlobalCache
 			proto := frame.closure.Proto
 			if proto.GlobalCache == nil {
@@ -1650,6 +1670,13 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			if vm.noGlobalLock {
 				// Single-threaded fast path
+				if vm.sharedProtoCaches {
+					idx := vm.resolveGlobalIndex(name)
+					vm.globalArray[idx] = val
+					vm.globals[name] = val
+					vm.bumpGlobalValueEpoch(idx)
+					break
+				}
 				proto := frame.closure.Proto
 				if proto.GlobalCache == nil {
 					proto.GlobalCache = make([]globalCacheEntry, len(proto.Constants))
@@ -1697,6 +1724,13 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				return nil, wrapLineErr(frame, fmt.Errorf("cannot redeclare readonly variable %q", name))
 			}
 			if vm.noGlobalLock {
+				if vm.sharedProtoCaches {
+					idx := vm.resolveGlobalIndex(name)
+					vm.globalArray[idx] = val
+					vm.globals[name] = val
+					vm.bumpGlobalValueEpoch(idx)
+					break
+				}
 				proto := frame.closure.Proto
 				if proto.GlobalCache == nil {
 					proto.GlobalCache = make([]globalCacheEntry, len(proto.Constants))
@@ -2010,6 +2044,23 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			if tableVal.IsTable() {
 				if tbl := tableVal.Table(); tbl.GetMetatable() == nil {
 					proto := frame.closure.Proto
+					if vm.sharedProtoCaches {
+						proto.FeedbackMu.Lock()
+						if proto.FieldCache == nil {
+							proto.FieldCache = make([]runtime.FieldCacheEntry, len(proto.Code))
+						}
+						pc := frame.pc - 1
+						vm.regs[base+a] = tbl.RawGetStringCached(constants[c].Str(), &proto.FieldCache[pc])
+						if proto.Feedback != nil {
+							fb := &proto.Feedback[pc]
+							fb.Result.Observe(vm.regs[base+a].Type())
+						}
+						if proto.FieldAccessFeedback != nil {
+							proto.FieldAccessFeedback[pc].ObserveFieldCache(proto.FieldCache[pc], vm.regs[base+a], 1)
+						}
+						proto.FeedbackMu.Unlock()
+						break
+					}
 					if proto.FieldCache == nil {
 						proto.FieldCache = make([]runtime.FieldCacheEntry, len(proto.Code))
 					}
@@ -2051,6 +2102,23 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			if tableVal.IsTable() {
 				if tbl := tableVal.Table(); tbl.GetMetatable() == nil {
 					proto := frame.closure.Proto
+					if vm.sharedProtoCaches {
+						proto.FeedbackMu.Lock()
+						if proto.FieldCache == nil {
+							proto.FieldCache = make([]runtime.FieldCacheEntry, len(proto.Code))
+						}
+						pc := frame.pc - 1
+						tbl.RawSetStringCached(constants[b].Str(), val, &proto.FieldCache[pc])
+						if proto.Feedback != nil {
+							fb := &proto.Feedback[pc]
+							fb.Result.Observe(val.Type())
+						}
+						if proto.FieldAccessFeedback != nil {
+							proto.FieldAccessFeedback[pc].ObserveFieldCache(proto.FieldCache[pc], val, 2)
+						}
+						proto.FeedbackMu.Unlock()
+						break
+					}
 					if proto.FieldCache == nil {
 						proto.FieldCache = make([]runtime.FieldCacheEntry, len(proto.Code))
 					}
@@ -4073,6 +4141,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				vm.noGlobalLock = false
 				vm.globalVer++
 			}
+			vm.sharedProtoCaches = true
 
 			a := DecodeA(inst)
 			b := DecodeB(inst)

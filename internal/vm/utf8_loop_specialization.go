@@ -42,6 +42,8 @@ func isUTF8CodepointSumLoopProto(proto *FuncProto, pc int, a int) bool {
 	if proto == nil {
 		return false
 	}
+	proto.RuntimeSpecs.mu.Lock()
+	defer proto.RuntimeSpecs.mu.Unlock()
 	switch proto.RuntimeSpecs.UTF8CodepointSumLoopShape {
 	case 1:
 		return true

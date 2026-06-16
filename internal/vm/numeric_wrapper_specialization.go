@@ -97,6 +97,8 @@ func isNumericToIntegerWrapperProto(proto *FuncProto) bool {
 	if proto == nil {
 		return false
 	}
+	proto.RuntimeSpecs.mu.Lock()
+	defer proto.RuntimeSpecs.mu.Unlock()
 	switch proto.RuntimeSpecs.NumericToIntegerWrapperShape {
 	case 1:
 		return true
