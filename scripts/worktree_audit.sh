@@ -7,10 +7,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 FAIL_ON_FINDINGS=0
+JSON_OUT=0
+FINDING_STATUS=()
+FINDING_PATH=()
+FINDING_BRANCH=()
+FINDING_DETAIL=()
 
 usage() {
     cat <<'EOF'
-Usage: scripts/worktree_audit.sh [--fail-on-findings] [--help]
+Usage: scripts/worktree_audit.sh [--fail-on-findings] [--json] [--help]
 
 Lists git worktrees that need attention:
   - prunable worktree records from `git worktree list --porcelain`;
@@ -20,6 +25,9 @@ Lists git worktrees that need attention:
 The script is read-only. It never runs `git worktree prune`, removes a
 worktree, or changes files. By default findings are reported with exit 0.
 Use --fail-on-findings to exit 1 when any finding is present.
+
+Options:
+  --json              Print a machine-readable worktree audit report.
 EOF
 }
 
@@ -27,6 +35,10 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --fail-on-findings)
             FAIL_ON_FINDINGS=1
+            shift
+            ;;
+        --json)
+            JSON_OUT=1
             shift
             ;;
         -h|--help)
@@ -43,7 +55,48 @@ done
 
 have_findings=0
 
+json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    value="${value//$'\t'/\\t}"
+    printf '%s' "$value"
+}
+
+print_json_report() {
+    local status="pass"
+    if [ "$have_findings" -ne 0 ]; then
+        status="findings"
+    fi
+    printf '{\n'
+    printf '  "schema_version": 1,\n'
+    printf '  "status": "%s",\n' "$status"
+    printf '  "fail_on_findings": %s,\n' "$(if [ "$FAIL_ON_FINDINGS" -eq 1 ]; then printf true; else printf false; fi)"
+    printf '  "finding_count": %d,\n' "${#FINDING_STATUS[@]}"
+    printf '  "findings": [\n'
+    local i=0
+    while [ "$i" -lt "${#FINDING_STATUS[@]}" ]; do
+        printf '    {"status": "%s", "path": "%s", "branch": "%s", "detail": "%s"}' \
+            "$(json_escape "${FINDING_STATUS[$i]}")" \
+            "$(json_escape "${FINDING_PATH[$i]}")" \
+            "$(json_escape "${FINDING_BRANCH[$i]}")" \
+            "$(json_escape "${FINDING_DETAIL[$i]}")"
+        if [ "$i" -lt $((${#FINDING_STATUS[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        i=$((i + 1))
+    done
+    printf '  ]\n'
+    printf '}\n'
+}
+
 print_header() {
+    if [ "$JSON_OUT" -eq 1 ]; then
+        return
+    fi
     printf '%-13s %-48s %-36s %s\n' "STATUS" "WORKTREE" "BRANCH" "DETAIL"
     printf '%-13s %-48s %-36s %s\n' "------" "--------" "------" "------"
 }
@@ -55,7 +108,13 @@ print_finding() {
     local detail="$4"
 
     have_findings=1
-    printf '%-13s %-48s %-36s %s\n' "$status" "$path" "$branch" "$detail"
+    FINDING_STATUS+=("$status")
+    FINDING_PATH+=("$path")
+    FINDING_BRANCH+=("$branch")
+    FINDING_DETAIL+=("$detail")
+    if [ "$JSON_OUT" -ne 1 ]; then
+        printf '%-13s %-48s %-36s %s\n' "$status" "$path" "$branch" "$detail"
+    fi
 }
 
 audit_accessible_worktree() {
@@ -144,7 +203,9 @@ while IFS= read -r line; do
 done < <(git worktree list --porcelain)
 flush_entry
 
-if [ "$have_findings" -eq 0 ]; then
+if [ "$JSON_OUT" -eq 1 ]; then
+    print_json_report
+elif [ "$have_findings" -eq 0 ]; then
     echo "No prunable, dirty, or ahead/behind worktrees found."
 fi
 

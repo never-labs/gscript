@@ -62,6 +62,7 @@ go run ./cmd/leia ci smoke --list
 go run ./cmd/leia ci pr --list
 go run ./cmd/leia ci release --list
 go run ./cmd/leia ci release --release-version vX.Y.Z --list
+bash scripts/worktree_audit.sh --json
 ```
 
 Run `smoke` before small changes, `pr` before review, and `release` only when

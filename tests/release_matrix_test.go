@@ -990,6 +990,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
 		"go run ./cmd/leia doc check",
 		"GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`",
+		"bash scripts/worktree_audit.sh --json",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json",
 		"go run ./cmd/leia playground --help",
@@ -1013,6 +1014,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		{path: "scripts/docs_check.sh", snippet: "docs_check.sh: checked"},
 		{path: "scripts/docs_check.sh", snippet: `"release_distribution_check": root / "scripts" / "release_distribution_check.sh"`},
 		{path: "scripts/diagnostics_bundle.sh", snippet: "Collects git revision/status"},
+		{path: "scripts/worktree_audit.sh", snippet: "--json"},
 		{path: "scripts/performance_gate.sh", snippet: "benchmarks/timing_compare.py"},
 		{path: "scripts/production_check.sh", snippet: "add_release_smoke"},
 		{path: "scripts/production_check.sh", snippet: "RELEASE_CRITICAL_SKIP_NAMES"},
@@ -1485,6 +1487,43 @@ func TestReleaseMatrixDiagnosticsBundleReportIsMachineReadable(t *testing.T) {
 	}
 	if report.Summary != "summary.md" || report.Manifest != "manifest.txt" {
 		t.Fatalf("diagnostics bundle JSON should report relative summary/manifest paths: %+v", report)
+	}
+}
+
+func TestReleaseMatrixWorktreeAuditReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 60*time.Second, "bash", "scripts/worktree_audit.sh", "--json")
+	var report struct {
+		SchemaVersion  int    `json:"schema_version"`
+		Status         string `json:"status"`
+		FailOnFindings bool   `json:"fail_on_findings"`
+		FindingCount   int    `json:"finding_count"`
+		Findings       []struct {
+			Status string `json:"status"`
+			Path   string `json:"path"`
+			Branch string `json:"branch"`
+			Detail string `json:"detail"`
+		} `json:"findings"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("worktree audit JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.FailOnFindings || report.FindingCount != len(report.Findings) {
+		t.Fatalf("worktree audit JSON = %+v, want schema v1 report with matching count", report)
+	}
+	if report.Status != "pass" && report.Status != "findings" {
+		t.Fatalf("worktree audit JSON status = %q, want pass or findings", report.Status)
+	}
+	if report.Status == "pass" && report.FindingCount != 0 {
+		t.Fatalf("worktree audit pass report must have no findings: %+v", report)
+	}
+	if report.Status == "findings" && report.FindingCount == 0 {
+		t.Fatalf("worktree audit findings report must include findings: %+v", report)
+	}
+	for _, finding := range report.Findings {
+		if finding.Status == "" || finding.Path == "" || finding.Branch == "" || finding.Detail == "" {
+			t.Fatalf("worktree audit finding must include status/path/branch/detail: %+v", finding)
+		}
 	}
 }
 
