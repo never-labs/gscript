@@ -5,10 +5,11 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 version=""
 require_ready="false"
+json_out="false"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/release_notes_check.sh [--version VERSION] [--require-ready] [--help]
+Usage: scripts/release_notes_check.sh [--version VERSION] [--require-ready] [--json] [--help]
 
 Checks release notes evidence.
 
@@ -19,6 +20,7 @@ or placeholder release notes fail the command.
 Options:
   --version VERSION   Release tag such as v0.1.0
   --require-ready     Fail when VERSION notes are missing or still templated
+  --json              Print a machine-readable release notes report
   -h, --help          Show this help
 USAGE
 }
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       require_ready="true"
       shift
       ;;
+    --json)
+      json_out="true"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -52,10 +58,50 @@ done
 
 cd "$repo_root"
 
+if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "error: release notes version must match vMAJOR.MINOR.PATCH or prerelease: $version" >&2
+  exit 2
+fi
+
 failures=()
 
 add_failure() {
   failures+=("$1")
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+print_json_report() {
+  local status="pass"
+  if [[ ${#failures[@]} -gt 0 ]]; then
+    status="issues"
+  fi
+  printf '{\n'
+  printf '  "schema_version": 1,\n'
+  printf '  "status": "%s",\n' "$status"
+  printf '  "require_ready": %s,\n' "$require_ready"
+  printf '  "version": "%s",\n' "$(json_escape "$version")"
+  printf '  "failure_count": %d,\n' "${#failures[@]}"
+  printf '  "failures": [\n'
+  local i=0
+  while [[ "$i" -lt ${#failures[@]} ]]; do
+    printf '    "%s"' "$(json_escape "${failures[$i]}")"
+    if [[ "$i" -lt $((${#failures[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '  ]\n'
+  printf '}\n'
 }
 
 require_contains() {
@@ -88,11 +134,6 @@ check_template() {
 }
 
 check_version() {
-  if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-    add_failure "release notes version must match vMAJOR.MINOR.PATCH or prerelease: $version"
-    return
-  fi
-
   local notes="docs/release/notes/$version.md"
   if [[ ! -f "$notes" ]]; then
     add_failure "missing release notes for $version: $notes"
@@ -131,10 +172,22 @@ if [[ -n "$version" ]]; then
 fi
 
 if [[ ${#failures[@]} -eq 0 ]]; then
+  if [[ "$json_out" == "true" ]]; then
+    print_json_report
+    exit 0
+  fi
   if [[ -n "$version" ]]; then
     echo "release_notes_check.sh: pass ($version)"
   else
     echo "release_notes_check.sh: pass"
+  fi
+  exit 0
+fi
+
+if [[ "$json_out" == "true" ]]; then
+  print_json_report
+  if [[ "$require_ready" == "true" ]]; then
+    exit 1
   fi
   exit 0
 fi
