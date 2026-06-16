@@ -1189,6 +1189,12 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 		Status          string   `json:"status"`
 		RequireResolved bool     `json:"require_resolved"`
 		BlockerCount    int      `json:"blocker_count"`
+		MissingFiles    int      `json:"missing_file_count"`
+		Decisions       int      `json:"release_decision_count"`
+		StaleText       int      `json:"stale_text_count"`
+		Unconfirmed     int      `json:"unconfirmed_policy_count"`
+		MissingGuidance int      `json:"missing_guidance_count"`
+		MissingDocs     int      `json:"missing_doc_snippet_count"`
 		Blockers        []string `json:"blockers"`
 		BlockerDetails  []struct {
 			Message        string `json:"message"`
@@ -1204,6 +1210,16 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 	}
 	if report.SchemaVersion != 1 || report.Status != "blocked" || report.RequireResolved || report.BlockerCount != len(report.Blockers) || report.BlockerCount != len(report.BlockerDetails) {
 		t.Fatalf("public release blocker JSON = %+v, want blocked schema v1 report", report)
+	}
+	kindCounts := map[string]int{}
+	for _, detail := range report.BlockerDetails {
+		kindCounts[detail.Kind]++
+	}
+	if report.MissingFiles != kindCounts["missing_file"] || report.Decisions != kindCounts["release_decision"] || report.StaleText != kindCounts["stale_text"] || report.Unconfirmed != kindCounts["unconfirmed_policy"] || report.MissingGuidance != kindCounts["missing_guidance"] || report.MissingDocs != kindCounts["missing_doc_snippet"] {
+		t.Fatalf("public release blocker kind counts = missing_file:%d/%d release_decision:%d/%d stale_text:%d/%d unconfirmed:%d/%d missing_guidance:%d/%d missing_doc:%d/%d", report.MissingFiles, kindCounts["missing_file"], report.Decisions, kindCounts["release_decision"], report.StaleText, kindCounts["stale_text"], report.Unconfirmed, kindCounts["unconfirmed_policy"], report.MissingGuidance, kindCounts["missing_guidance"], report.MissingDocs, kindCounts["missing_doc_snippet"])
+	}
+	if report.MissingFiles == 0 || report.Decisions == 0 {
+		t.Fatalf("public release blocker JSON = %+v, want current release blockers split by kind", report)
 	}
 	for _, snippet := range []string{
 		"missing root LICENSE file",

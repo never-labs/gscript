@@ -71,6 +71,19 @@ json_escape() {
   printf '%s' "$value"
 }
 
+count_blocker_kind() {
+  local kind="$1"
+  local count=0
+  local i=0
+  while [[ "$i" -lt ${#blocker_kinds[@]} ]]; do
+    if [[ "${blocker_kinds[$i]}" == "$kind" ]]; then
+      count=$((count + 1))
+    fi
+    i=$((i + 1))
+  done
+  printf '%d' "$count"
+}
+
 print_json_report() {
   local status="pass"
   if [[ ${#blockers[@]} -gt 0 ]]; then
@@ -81,6 +94,12 @@ print_json_report() {
   printf '  "status": "%s",\n' "$status"
   printf '  "require_resolved": %s,\n' "$require_resolved"
   printf '  "blocker_count": %d,\n' "${#blockers[@]}"
+  printf '  "missing_file_count": %d,\n' "$(count_blocker_kind "missing_file")"
+  printf '  "release_decision_count": %d,\n' "$(count_blocker_kind "release_decision")"
+  printf '  "stale_text_count": %d,\n' "$(count_blocker_kind "stale_text")"
+  printf '  "unconfirmed_policy_count": %d,\n' "$(count_blocker_kind "unconfirmed_policy")"
+  printf '  "missing_guidance_count": %d,\n' "$(count_blocker_kind "missing_guidance")"
+  printf '  "missing_doc_snippet_count": %d,\n' "$(count_blocker_kind "missing_doc_snippet")"
   printf '  "blockers": [\n'
   local i=0
   while [[ "$i" -lt ${#blockers[@]} ]]; do
