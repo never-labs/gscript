@@ -356,7 +356,7 @@ add_q_performance_gate() {
     # runtime-counter report check. Full mode only, like the other long
     # performance stages; --quick keeps it out of the plan.
     add_run "Q Performance Gate" \
-        "q_perf_out=\$(mktemp \"\${TMPDIR:-/tmp}/leia-q-perf-gate.XXXXXX\") && trap 'rm -f \"\$q_perf_out\"' EXIT && set -o pipefail && LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh | tee \"\$q_perf_out\" && python3 benchmarks/q_perf_report.py --from-output \"\$q_perf_out\" --check"
+        "q_perf_dir=\$(mktemp -d \"\${TMPDIR:-/tmp}/leia-q-perf-gate.XXXXXX\") && trap 'rm -rf \"\$q_perf_dir\"' EXIT && set -o pipefail && LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh | tee \"\$q_perf_dir/output.txt\" && python3 benchmarks/q_perf_report.py --from-output \"\$q_perf_dir/output.txt\" --check --json \"\$q_perf_dir/q_perf_report.json\" --markdown \"\$q_perf_dir/q_perf_report.md\" && echo \"q performance evidence: \$q_perf_dir/q_perf_report.json \$q_perf_dir/q_perf_report.md\""
 }
 
 add_documentation_references() {
