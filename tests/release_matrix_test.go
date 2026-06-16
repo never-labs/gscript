@@ -1222,6 +1222,30 @@ func TestReleaseMatrixArtifactVersionValidationIsExplicit(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixInstallInputValidationIsExplicit(t *testing.T) {
+	root := findRepoRoot(t)
+	badVersion := runCommandResult(root, 30*time.Second, "bash", "scripts/install.sh", "--dry-run", "--version", "bad version", "--os", "linux", "--arch", "amd64", "--bin-dir", "/tmp/leia-bin")
+	if badVersion.err == nil {
+		t.Fatalf("install.sh bad version unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", badVersion.stdout, badVersion.stderr)
+	}
+	if !strings.Contains(badVersion.stderr, "--version must match vMAJOR.MINOR.PATCH") {
+		t.Fatalf("install.sh bad version stderr = %q", badVersion.stderr)
+	}
+
+	badRepo := runCommandResult(root, 30*time.Second, "bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3", "--repo", "badrepo", "--os", "linux", "--arch", "amd64", "--bin-dir", "/tmp/leia-bin")
+	if badRepo.err == nil {
+		t.Fatalf("install.sh bad repo unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", badRepo.stdout, badRepo.stderr)
+	}
+	if !strings.Contains(badRepo.stderr, "--repo must be OWNER/REPO") {
+		t.Fatalf("install.sh bad repo stderr = %q", badRepo.stderr)
+	}
+
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--repo", "never-labs/leia", "--os", "linux", "--arch", "amd64", "--bin-dir", "/tmp/leia-bin")
+	if !strings.Contains(out, "asset=leia_v1.2.3-rc.1_linux_amd64.tar.gz") {
+		t.Fatalf("install.sh prerelease dry-run output = %q", out)
+	}
+}
+
 func TestReleaseMatrixDocsIndexCoversReferenceEntrypoints(t *testing.T) {
 	root := findRepoRoot(t)
 	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))

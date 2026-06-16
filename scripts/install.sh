@@ -202,6 +202,16 @@ validate_archive_entries() {
 goos="${goos:-$(detect_os)}"
 goarch="${goarch:-$(detect_arch)}"
 
+if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  echo "error: --repo must be OWNER/REPO: $repo" >&2
+  exit 2
+fi
+
+if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "error: --version must match vMAJOR.MINOR.PATCH or prerelease: $version" >&2
+  exit 2
+fi
+
 case "$goos" in
   darwin|linux|windows) ;;
   *) echo "error: unsupported GOOS: $goos" >&2; exit 1 ;;
