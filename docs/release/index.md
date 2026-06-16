@@ -71,6 +71,11 @@ Use [`decisions.md`](decisions.md) to record maintainer decisions that cannot
 be inferred from tests, local release evidence, or implementation defaults.
 `scripts/public_release_blockers_check.sh` reports each unresolved release
 decision with its area and the short action recorded in that table.
+Its JSON report includes `blocker_count` plus kind-specific counts:
+`missing_file_count`, `release_decision_count`, `stale_text_count`,
+`unconfirmed_policy_count`, `missing_guidance_count`, and
+`missing_doc_snippet_count`. Use `blocker_details[].kind` for dashboards that
+need to group the exact unresolved work.
 
 Distribution checks are split between local artifacts and hosted workflow
 presence. The local check validates GoReleaser metadata, the install script

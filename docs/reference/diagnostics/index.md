@@ -57,6 +57,12 @@ if errors.As(err, &budgetErr) {
 | `leia mod ... --json` | Module graph, list, verify, capability, and vendoring reports. |
 | `leia capabilities --json` | Binary feature, command, stdlib, default-import, builtin dialect, LLM, and tooling capabilities, including `tooling.report_count` and the `tooling.reports` JSON report registry. |
 
+Release scripts that emit JSON follow the same pattern: a `schema_version`,
+status field, top-level count fields, and collection fields. In particular,
+`scripts/public_release_blockers_check.sh --json` exposes `blocker_count` and
+kind counts for missing files, open release decisions, stale text, unconfirmed
+policies, missing guidance, and missing documentation snippets.
+
 Current lint codes:
 
 | Code | Meaning |
