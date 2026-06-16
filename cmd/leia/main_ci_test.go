@@ -86,6 +86,51 @@ func TestCICommandReleaseProfileAllowsPlaceholderVersionForList(t *testing.T) {
 	}
 }
 
+func TestCICommandListJSONReportsProfilePlan(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"release", "--release-version", "vX.Y.Z", "--list", "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+
+	var report ciPlanReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout.String())
+	}
+	if report.SchemaVersion != 1 || report.Profile != "release" || !report.ListOnly || report.NoLuaJIT || report.ReleaseVersion != "vX.Y.Z" || report.CommandCount != 1 || len(report.Commands) != 1 {
+		t.Fatalf("report = %+v, want release schema v1 plan", report)
+	}
+	command := report.Commands[0]
+	if command.Name != "Production check" {
+		t.Fatalf("command name = %q, want Production check", command.Name)
+	}
+	if got := command.Command; got != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+		t.Fatalf("command = %q, want versioned production check", got)
+	}
+	for _, want := range []string{"bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
+		if !containsString(command.Args, want) {
+			t.Fatalf("args = %#v, want %q", command.Args, want)
+		}
+	}
+}
+
+func TestCICommandRejectsJSONWithoutList(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"smoke", "--json"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runCICommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--json is only supported with --list") {
+		t.Fatalf("stderr = %q, want --json/--list error", stderr.String())
+	}
+}
+
 func TestCICommandReleaseProfileRejectsBadReleaseVersionWhenRunning(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runCICommand([]string{"release", "--release-version", "bad version"}, &stdout, &stderr)

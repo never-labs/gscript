@@ -20,7 +20,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "bench", Usage: "usage: leia bench [--manifest-check|--quick|--full|--guard|BENCH|compare [--quick]|strict|diagnose] [benchmark-harness-flags...]", Summary: "Run benchmark and benchmark-diagnostic harnesses.", Run: runBenchCommand},
 		{Name: "capabilities", Usage: "usage: leia capabilities [--json]", Summary: "Report binary capabilities, stdlib modules, and supported tooling formats.", Run: runCapabilitiesCommand},
 		{Name: "check", Usage: "usage: leia check [--json] [--quick|--full] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [--no-examples] [path-or-dir]", Summary: "Run formatter, linter, manifest, tests, docs, editor, and example checks as one local gate.", Run: runCheckCommand},
-		{Name: "ci", Usage: "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]", Summary: "Run canonical local CI profiles.", Run: runCICommand},
+		{Name: "ci", Usage: ciUsage, Summary: "Run canonical local CI profiles.", Run: runCICommand},
 		{Name: "config", Usage: "usage: leia config [--json] [path]", Summary: "Discover and validate project configuration.", Run: runConfigCommand},
 		{Name: "diag", Usage: "usage: leia diag [dump|bundle] [diagnostic-flags...]", Summary: "Run production diagnostic dump and bundle tools.", Run: runDiagCommand},
 		{Name: "diagnose", Usage: "usage: leia diagnose <benchmark> [diagnose-flags...]", Summary: "Collect benchmark timing, exit, and Tier 2 diagnostics.", Run: runDiagnoseCommand},

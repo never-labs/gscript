@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -22,26 +23,47 @@ type ciCommand struct {
 	Args []string `json:"args"`
 }
 
+type ciPlanReport struct {
+	SchemaVersion  int             `json:"schema_version"`
+	Profile        string          `json:"profile"`
+	ListOnly       bool            `json:"list_only"`
+	NoLuaJIT       bool            `json:"no_luajit"`
+	ReleaseVersion string          `json:"release_version,omitempty"`
+	CommandCount   int             `json:"command_count"`
+	Commands       []ciPlanCommand `json:"commands"`
+}
+
+type ciPlanCommand struct {
+	Name    string   `json:"name"`
+	Args    []string `json:"args"`
+	Command string   `json:"command"`
+}
+
 func runCICommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit] [--release-version VERSION]")
+		fmt.Fprintln(errw, ciUsage)
 		return 2
 	}
 	if args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
-		fmt.Fprintln(outw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit] [--release-version VERSION]")
+		fmt.Fprintln(outw, ciUsage)
 		return 0
 	}
 	profile := args[0]
 	fs := flag.NewFlagSet("ci "+profile, flag.ContinueOnError)
 	fs.SetOutput(errw)
 	listOnly := fs.Bool("list", false, "print commands without running them")
+	jsonOut := fs.Bool("json", false, "print command plan as JSON; valid with --list")
 	noLuaJIT := fs.Bool("no-luajit", false, "skip LuaJIT where supported")
 	releaseVersion := fs.String("release-version", "", "release tag to validate with the release profile")
 	if code, done := parseCLIFlags(fs, args[1:]); done {
 		return code
 	}
 	if len(fs.Args()) != 0 {
-		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit] [--release-version VERSION]")
+		fmt.Fprintln(errw, ciUsage)
+		return 2
+	}
+	if *jsonOut && !*listOnly {
+		fmt.Fprintln(errw, "leia ci: --json is only supported with --list")
 		return 2
 	}
 	if profile == "release" && *noLuaJIT {
@@ -62,6 +84,13 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 		return 2
 	}
 	if *listOnly {
+		if *jsonOut {
+			if err := json.NewEncoder(outw).Encode(ciPlan(profile, *noLuaJIT, *releaseVersion, commands)); err != nil {
+				fmt.Fprintf(errw, "leia ci: write JSON plan: %v\n", err)
+				return 1
+			}
+			return 0
+		}
 		for _, cmd := range commands {
 			fmt.Fprintln(outw, shellJoin(cmd.Args))
 		}
@@ -80,6 +109,28 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 		}
 	}
 	return 0
+}
+
+const ciUsage = "usage: leia ci [smoke|pr|perf|release] [--list] [--json] [--no-luajit] [--release-version VERSION]"
+
+func ciPlan(profile string, noLuaJIT bool, releaseVersion string, commands []ciCommand) ciPlanReport {
+	planCommands := make([]ciPlanCommand, 0, len(commands))
+	for _, cmd := range commands {
+		planCommands = append(planCommands, ciPlanCommand{
+			Name:    cmd.Name,
+			Args:    append([]string(nil), cmd.Args...),
+			Command: shellJoin(cmd.Args),
+		})
+	}
+	return ciPlanReport{
+		SchemaVersion:  1,
+		Profile:        profile,
+		ListOnly:       true,
+		NoLuaJIT:       noLuaJIT,
+		ReleaseVersion: releaseVersion,
+		CommandCount:   len(planCommands),
+		Commands:       planCommands,
+	}
 }
 
 func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]ciCommand, error) {

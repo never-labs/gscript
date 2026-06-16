@@ -7,7 +7,7 @@ Generated from the current `leia` binary capabilities.
 | `bench` | `usage: leia bench [--manifest-check|--quick|--full|--guard|BENCH|compare [--quick]|strict|diagnose] [benchmark-harness-flags...]` | Run benchmark and benchmark-diagnostic harnesses. |
 | `capabilities` | `usage: leia capabilities [--json]` | Report binary capabilities, stdlib modules, and supported tooling formats. |
 | `check` | `usage: leia check [--json] [--quick|--full] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [--no-examples] [path-or-dir]` | Run formatter, linter, manifest, tests, docs, editor, and example checks as one local gate. |
-| `ci` | `usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]` | Run canonical local CI profiles. |
+| `ci` | `usage: leia ci [smoke|pr|perf|release] [--list] [--json] [--no-luajit] [--release-version VERSION]` | Run canonical local CI profiles. |
 | `config` | `usage: leia config [--json] [path]` | Discover and validate project configuration. |
 | `diag` | `usage: leia diag [dump|bundle] [diagnostic-flags...]` | Run production diagnostic dump and bundle tools. |
 | `diagnose` | `usage: leia diagnose <benchmark> [diagnose-flags...]` | Collect benchmark timing, exit, and Tier 2 diagnostics. |

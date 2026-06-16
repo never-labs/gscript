@@ -996,6 +996,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
 		"bash scripts/production_check.sh --quick --list --json",
+		"go run ./cmd/leia ci release --release-version vX.Y.Z --list --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench none --json",
 		"bash scripts/editor_check.sh --json",
 		"bash scripts/release_distribution_check.sh --json",
@@ -1418,6 +1419,39 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	} {
 		if !strings.Contains(commands[name], want) {
 			t.Fatalf("production plan JSON command %q = %q, want fragment %q", name, commands[name], want)
+		}
+	}
+}
+
+func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json")
+	var report struct {
+		SchemaVersion  int    `json:"schema_version"`
+		Profile        string `json:"profile"`
+		ListOnly       bool   `json:"list_only"`
+		NoLuaJIT       bool   `json:"no_luajit"`
+		ReleaseVersion string `json:"release_version"`
+		CommandCount   int    `json:"command_count"`
+		Commands       []struct {
+			Name    string   `json:"name"`
+			Args    []string `json:"args"`
+			Command string   `json:"command"`
+		} `json:"commands"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("ci profile plan JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Profile != "release" || !report.ListOnly || report.NoLuaJIT || report.ReleaseVersion != "vX.Y.Z" || report.CommandCount != 1 || len(report.Commands) != 1 {
+		t.Fatalf("ci profile plan JSON = %+v, want release schema v1 plan", report)
+	}
+	command := report.Commands[0]
+	if command.Name != "Production check" || command.Command != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+		t.Fatalf("ci profile plan command = %+v, want versioned production check", command)
+	}
+	for _, want := range []string{"bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
+		if !stringSliceContains(command.Args, want) {
+			t.Fatalf("ci profile plan args = %#v, want %q", command.Args, want)
 		}
 	}
 }
