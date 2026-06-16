@@ -994,6 +994,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
 		"bash scripts/production_check.sh --quick --list --json",
+		"bash scripts/q_conformance_gate.sh --scope core --bench none --json",
 		"bash scripts/release_distribution_check.sh --json",
 		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 		"bash scripts/release_artifacts_check.sh",
@@ -1112,6 +1113,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"examples/README.md",
 		"docs/reference/platforms/index.md",
 		"bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json",
+		"bash scripts/q_conformance_gate.sh --scope core --bench smoke --json",
 		"bash scripts/public_release_blockers_check.sh --json",
 		"bash scripts/release_notes_check.sh --json --version vX.Y.Z",
 		"bash scripts/release_distribution_check.sh --json",
@@ -1359,6 +1361,45 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		if !strings.Contains(commands[name], want) {
 			t.Fatalf("production plan JSON command %q = %q, want fragment %q", name, commands[name], want)
 		}
+	}
+}
+
+func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 60*time.Second, "bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json")
+	var report struct {
+		SchemaVersion     int      `json:"schema_version"`
+		Status            string   `json:"status"`
+		Scope             string   `json:"scope"`
+		BenchMode         string   `json:"bench_mode"`
+		Jobs              int      `json:"jobs"`
+		TimeoutSeconds    int      `json:"timeout_seconds"`
+		LanguageCaseCount int      `json:"language_case_count"`
+		ExampleCaseCount  int      `json:"example_case_count"`
+		BenchmarkCount    int      `json:"benchmark_case_count"`
+		BenchmarkJSON     string   `json:"benchmark_json"`
+		BenchmarkMarkdown string   `json:"benchmark_markdown"`
+		LanguageCases     []string `json:"language_cases"`
+		ExampleCases      []string `json:"example_cases"`
+		BenchmarkCases    []string `json:"benchmark_cases"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("q conformance JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.Scope != "core" || report.BenchMode != "none" {
+		t.Fatalf("q conformance JSON = %+v, want passing core/no-bench schema v1 report", report)
+	}
+	if report.Jobs <= 0 || report.TimeoutSeconds <= 0 {
+		t.Fatalf("q conformance JSON missing execution parameters: %+v", report)
+	}
+	if report.LanguageCaseCount != len(report.LanguageCases) || report.ExampleCaseCount != len(report.ExampleCases) || report.BenchmarkCount != len(report.BenchmarkCases) {
+		t.Fatalf("q conformance JSON counts do not match arrays: %+v", report)
+	}
+	if report.LanguageCaseCount == 0 || report.ExampleCaseCount == 0 || report.BenchmarkCount == 0 {
+		t.Fatalf("q conformance JSON should report q tests, examples, and registered benchmarks: %+v", report)
+	}
+	if report.BenchmarkJSON != "" || report.BenchmarkMarkdown != "" {
+		t.Fatalf("q conformance no-bench JSON should not report benchmark artifacts: %+v", report)
 	}
 }
 

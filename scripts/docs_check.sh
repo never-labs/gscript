@@ -30,6 +30,7 @@ The repository-script mention check covers:
   scripts/diagnostics_bundle.sh
   scripts/docs_check.sh
   scripts/editor_check.sh
+  scripts/q_conformance_gate.sh
   scripts/public_release_blockers_check.sh
   scripts/release_notes_check.sh
   scripts/release_artifacts.sh
@@ -216,6 +217,7 @@ script_names = {
     "diagnostics_bundle": root / "scripts" / "diagnostics_bundle.sh",
     "docs_check": root / "scripts" / "docs_check.sh",
     "editor_check": root / "scripts" / "editor_check.sh",
+    "q_conformance_gate": root / "scripts" / "q_conformance_gate.sh",
     "public_release_blockers_check": root / "scripts" / "public_release_blockers_check.sh",
     "release_notes_check": root / "scripts" / "release_notes_check.sh",
     "release_artifacts": root / "scripts" / "release_artifacts.sh",

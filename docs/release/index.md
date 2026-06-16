@@ -16,6 +16,7 @@ Machine-readable release evidence:
 
 ```bash
 bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json
+bash scripts/q_conformance_gate.sh --scope core --bench smoke --json
 bash scripts/public_release_blockers_check.sh --json
 bash scripts/release_notes_check.sh --json --version vX.Y.Z
 bash scripts/release_distribution_check.sh --json
