@@ -280,6 +280,7 @@ func buildReportCapabilities() []cliReportCapability {
 		{Command: "leia examples list --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"example_count"}, CollectionFields: []string{"examples"}},
 		{Command: "leia fmt --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"file_count", "changed_count", "diagnostic_count"}},
 		{Command: "leia inspect bytecode --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"proto_count", "proto.instruction_count", "proto.constant_count", "proto.upvalue_count", "proto.child_proto_count"}},
+		{Command: "leia inspect directives --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"directive_count"}, CollectionFields: []string{"directives"}},
 		{Command: "leia lint --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"diagnostic_count", "error_count", "warning_count"}, CollectionFields: []string{"diagnostics"}},
 		{Command: "leia mod capability --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CollectionFields: []string{"capabilities", "modules", "matrix", "diagnostics"}},
 		{Command: "leia mod check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CollectionFields: []string{"graph.files", "diagnostics"}},

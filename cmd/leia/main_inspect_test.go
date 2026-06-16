@@ -167,14 +167,17 @@ print("ok")
 	if code != 0 {
 		t.Fatalf("runInspectCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	var directives []inspectFileDirective
-	if err := json.Unmarshal(stdout.Bytes(), &directives); err != nil {
+	var report inspectDirectivesReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON directives: %v; stdout = %q", err, stdout.String())
 	}
-	if len(directives) != 1 {
-		t.Fatalf("directives = %#v, want one", directives)
+	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.Source != path || report.DirectiveCount != len(report.Directives) {
+		t.Fatalf("directive report = %#v, want passing schema v1 report for %s", report, path)
 	}
-	if got := directives[0]; got.Kind != "cap" || got.Line != 1 || got.Column != 1 || len(got.Args) != 2 || got.Args[0] != "fs.read" || got.Args[1] != "net.client" {
+	if len(report.Directives) != 1 {
+		t.Fatalf("directives = %#v, want one", report.Directives)
+	}
+	if got := report.Directives[0]; got.Kind != "cap" || got.Line != 1 || got.Column != 1 || len(got.Args) != 2 || got.Args[0] != "fs.read" || got.Args[1] != "net.client" {
 		t.Fatalf("directive = %#v, want cap fs.read net.client at 1:1", got)
 	}
 }

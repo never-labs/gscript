@@ -184,6 +184,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		"leia examples list --json",
 		"leia fmt --json",
 		"leia inspect bytecode --json",
+		"leia inspect directives --json",
 		"leia lint --json",
 		"leia mod capability --json",
 		"leia mod check --json",

@@ -221,7 +221,15 @@ func runInspectDirectivesCommand(args []string, outw, errw io.Writer) int {
 	if *jsonOut {
 		enc := json.NewEncoder(outw)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(inspectDirectiveRows(directives)); err != nil {
+		rows := inspectDirectiveRows(directives)
+		if err := enc.Encode(inspectDirectivesReport{
+			SchemaVersion:  1,
+			OK:             true,
+			Status:         "pass",
+			Source:         paths[0],
+			DirectiveCount: len(rows),
+			Directives:     rows,
+		}); err != nil {
 			fmt.Fprintf(errw, "leia inspect directives: write json: %v\n", err)
 			return 1
 		}
@@ -235,6 +243,15 @@ func runInspectDirectivesCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(outw, "%d:%d %s %s\n", directive.P.Line, directive.P.Column, directive.Kind, directive.Text)
 	}
 	return 0
+}
+
+type inspectDirectivesReport struct {
+	SchemaVersion  int                    `json:"schema_version"`
+	OK             bool                   `json:"ok"`
+	Status         string                 `json:"status"`
+	Source         string                 `json:"source"`
+	DirectiveCount int                    `json:"directive_count"`
+	Directives     []inspectFileDirective `json:"directives"`
 }
 
 func inspectDirectiveRows(directives []ast.FileDirective) []inspectFileDirective {

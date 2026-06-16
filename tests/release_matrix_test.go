@@ -1292,6 +1292,43 @@ print(add(1, 2))
 	}
 }
 
+func TestReleaseMatrixInspectDirectivesJSONIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "directives.leia")
+	src := `//leia:cap fs.read, net.client
+print("ok")
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "inspect", "directives", "--json", path)
+	var report struct {
+		SchemaVersion  int    `json:"schema_version"`
+		OK             bool   `json:"ok"`
+		Status         string `json:"status"`
+		Source         string `json:"source"`
+		DirectiveCount int    `json:"directive_count"`
+		Directives     []struct {
+			Kind   string   `json:"kind"`
+			Args   []string `json:"args"`
+			Text   string   `json:"text"`
+			Line   int      `json:"line"`
+			Column int      `json:"column"`
+		} `json:"directives"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("inspect directives JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.Source != path || report.DirectiveCount != len(report.Directives) || report.DirectiveCount != 1 {
+		t.Fatalf("inspect directives JSON = %+v, want passing schema v1 report", report)
+	}
+	directive := report.Directives[0]
+	if directive.Kind != "cap" || directive.Line != 1 || directive.Column != 1 || len(directive.Args) != 2 || directive.Args[0] != "fs.read" || directive.Args[1] != "net.client" {
+		t.Fatalf("inspect directive = %+v, want cap fs.read/net.client at 1:1", directive)
+	}
+}
+
 func TestReleaseMatrixFmtCheckJSONIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	dir := t.TempDir()
