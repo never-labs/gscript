@@ -53,7 +53,7 @@ if errors.As(err, &budgetErr) {
 | `leia test --json` | Test run report with schema version, pass/fail counts, seed, golden mode, and per-file results. |
 | `leia test --list --json` | Test discovery report with schema version, list mode, file count, and selected files. |
 | `leia inspect bytecode --json` | Compiled bytecode metadata, disassembly text, nested proto summary, and JIT callable decisions. |
-| `leia inspect directives --json` | Parsed `//leia:` file directives. |
+| `leia inspect directives --json` | Versioned file-directive report with `schema_version`, `status`, `directive_count`, and parsed `//leia:` directives. |
 | `leia mod ... --json` | Module graph, list, verify, capability, and vendoring reports. |
 | `leia capabilities --json` | Binary feature, command, stdlib, default-import, builtin dialect, LLM, and tooling capabilities, including `tooling.report_count` and the `tooling.reports` JSON report registry. |
 
