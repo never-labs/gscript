@@ -41,13 +41,15 @@ func TestExamplesCommandListsJSON(t *testing.T) {
 	}
 	var payload struct {
 		SchemaVersion int          `json:"schema_version"`
+		Status        string       `json:"status"`
+		ExampleCount  int          `json:"example_count"`
 		Examples      []cliExample `json:"examples"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 		t.Fatalf("invalid examples JSON: %v\n%s", err, stdout.String())
 	}
-	if payload.SchemaVersion != 1 {
-		t.Fatalf("schema_version = %d, want 1", payload.SchemaVersion)
+	if payload.SchemaVersion != 1 || payload.Status != "pass" || payload.ExampleCount != len(payload.Examples) {
+		t.Fatalf("examples JSON = %+v, want schema v1 pass report with matching example_count", payload)
 	}
 	if len(payload.Examples) == 0 {
 		t.Fatal("examples JSON is empty")
@@ -667,6 +669,8 @@ func TestExamplesCommandDefaultCheckSkipsOnlyOptInExamples(t *testing.T) {
 	var payload struct {
 		SchemaVersion int                     `json:"schema_version"`
 		OK            bool                    `json:"ok"`
+		Status        string                  `json:"status"`
+		ResultCount   int                     `json:"result_count"`
 		Skipped       int                     `json:"skipped"`
 		Failed        int                     `json:"failed"`
 		Results       []cliExampleCheckResult `json:"results"`
@@ -674,7 +678,7 @@ func TestExamplesCommandDefaultCheckSkipsOnlyOptInExamples(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 		t.Fatalf("invalid examples check JSON: %v\n%s", err, stdout.String())
 	}
-	if payload.SchemaVersion != 1 || !payload.OK || payload.Failed != 0 {
+	if payload.SchemaVersion != 1 || !payload.OK || payload.Status != "pass" || payload.ResultCount != len(payload.Results) || payload.Failed != 0 {
 		t.Fatalf("unexpected examples check payload: %#v", payload)
 	}
 	allowed := map[string]string{
@@ -958,6 +962,8 @@ func TestExamplesCommandChecksSelectedExamplesJSON(t *testing.T) {
 	var payload struct {
 		SchemaVersion int                     `json:"schema_version"`
 		OK            bool                    `json:"ok"`
+		Status        string                  `json:"status"`
+		ResultCount   int                     `json:"result_count"`
 		Runnable      int                     `json:"runnable"`
 		Skipped       int                     `json:"skipped"`
 		Failed        int                     `json:"failed"`
@@ -966,7 +972,7 @@ func TestExamplesCommandChecksSelectedExamplesJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 		t.Fatalf("invalid examples check JSON: %v\n%s", err, stdout.String())
 	}
-	if payload.SchemaVersion != 1 || !payload.OK || payload.Runnable != 2 || payload.Skipped != 0 || payload.Failed != 0 {
+	if payload.SchemaVersion != 1 || !payload.OK || payload.Status != "pass" || payload.ResultCount != len(payload.Results) || payload.Runnable != 2 || payload.Skipped != 0 || payload.Failed != 0 {
 		t.Fatalf("unexpected examples check payload: %#v", payload)
 	}
 }

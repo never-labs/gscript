@@ -2825,12 +2825,18 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	playgroundGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_playground_test.go"))
 	examplesList := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "examples", "list", "--json")
 	var examplesPayload struct {
-		Examples []struct {
+		SchemaVersion int    `json:"schema_version"`
+		Status        string `json:"status"`
+		ExampleCount  int    `json:"example_count"`
+		Examples      []struct {
 			ID string `json:"id"`
 		} `json:"examples"`
 	}
 	if err := json.Unmarshal([]byte(examplesList), &examplesPayload); err != nil {
 		t.Fatalf("decode leia examples list --json: %v\n%s", err, examplesList)
+	}
+	if examplesPayload.SchemaVersion != 1 || examplesPayload.Status != "pass" || examplesPayload.ExampleCount != len(examplesPayload.Examples) {
+		t.Fatalf("leia examples list --json = %+v, want schema v1 pass report with matching example_count", examplesPayload)
 	}
 	exampleIDs := map[string]bool{}
 	for _, example := range examplesPayload.Examples {
@@ -2969,7 +2975,10 @@ func TestReleaseMatrixFeatureMatrixExampleRefsAreDiscoverable(t *testing.T) {
 	matrix := loadReleaseFeatureMatrix(t, root)
 	examplesList := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "examples", "list", "--json")
 	var examplesPayload struct {
-		Examples []struct {
+		SchemaVersion int    `json:"schema_version"`
+		Status        string `json:"status"`
+		ExampleCount  int    `json:"example_count"`
+		Examples      []struct {
 			Path      string `json:"path"`
 			Runnable  bool   `json:"runnable"`
 			Checkable bool   `json:"checkable"`
@@ -2978,6 +2987,9 @@ func TestReleaseMatrixFeatureMatrixExampleRefsAreDiscoverable(t *testing.T) {
 	}
 	if err := json.Unmarshal([]byte(examplesList), &examplesPayload); err != nil {
 		t.Fatalf("decode leia examples list --json: %v\n%s", err, examplesList)
+	}
+	if examplesPayload.SchemaVersion != 1 || examplesPayload.Status != "pass" || examplesPayload.ExampleCount != len(examplesPayload.Examples) {
+		t.Fatalf("leia examples list --json = %+v, want schema v1 pass report with matching example_count", examplesPayload)
 	}
 	discovered := map[string]struct {
 		runnable  bool

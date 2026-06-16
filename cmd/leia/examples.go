@@ -90,8 +90,10 @@ func runExamplesListCommand(args []string, outw, errw io.Writer) int {
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(struct {
 			SchemaVersion int          `json:"schema_version"`
+			Status        string       `json:"status"`
+			ExampleCount  int          `json:"example_count"`
 			Examples      []cliExample `json:"examples"`
-		}{SchemaVersion: 1, Examples: examples}); err != nil {
+		}{SchemaVersion: 1, Status: "pass", ExampleCount: len(examples), Examples: examples}); err != nil {
 			fmt.Fprintf(errw, "leia examples: write json: %v\n", err)
 			return 1
 		}
@@ -161,6 +163,8 @@ func runExamplesCheckCommand(args []string, outw, errw io.Writer) int {
 		if err := enc.Encode(struct {
 			SchemaVersion int                     `json:"schema_version"`
 			OK            bool                    `json:"ok"`
+			Status        string                  `json:"status"`
+			ResultCount   int                     `json:"result_count"`
 			Runnable      int                     `json:"runnable"`
 			Skipped       int                     `json:"skipped"`
 			Failed        int                     `json:"failed"`
@@ -168,6 +172,8 @@ func runExamplesCheckCommand(args []string, outw, errw io.Writer) int {
 		}{
 			SchemaVersion: 1,
 			OK:            failed == 0,
+			Status:        examplesCheckStatus(failed),
+			ResultCount:   len(results),
 			Runnable:      runnable,
 			Skipped:       skipped,
 			Failed:        failed,
@@ -193,6 +199,13 @@ func runExamplesCheckCommand(args []string, outw, errw io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func examplesCheckStatus(failed int) string {
+	if failed == 0 {
+		return "pass"
+	}
+	return "issues"
 }
 
 func runExamplesShowCommand(args []string, outw, errw io.Writer) int {
