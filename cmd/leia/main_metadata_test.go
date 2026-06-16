@@ -168,6 +168,9 @@ func TestCapabilitiesJSON(t *testing.T) {
 		if seenReports[report.Command] {
 			t.Fatalf("duplicate report capability command %q", report.Command)
 		}
+		if len(report.CollectionFields) > 0 && len(report.CountFields) == 0 {
+			t.Fatalf("report capability %q advertises collections %v without count fields", report.Command, report.CollectionFields)
+		}
 		seenReports[report.Command] = true
 	}
 	for _, want := range []string{
