@@ -1345,6 +1345,45 @@ func TestReleaseMatrixTestCommandJSONReportsAreMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixCheckJSONReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.leia")
+	if err := os.WriteFile(path, []byte("print(\"ok\")\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(path, ".leia")+".out", []byte("ok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "check", "--json", "--quick", dir)
+	var report struct {
+		SchemaVersion int `json:"schema_version"`
+		OK            bool
+		StepCount     int `json:"step_count"`
+		FailedCount   int `json:"failed_count"`
+		SkippedCount  int `json:"skipped_count"`
+		Steps         []struct {
+			Name     string `json:"name"`
+			OK       bool   `json:"ok"`
+			ExitCode int    `json:"exit_code"`
+			Skipped  bool   `json:"skipped"`
+		} `json:"steps"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("check JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || !report.OK || report.StepCount != 7 || report.FailedCount != 0 || report.SkippedCount != 4 || len(report.Steps) != 7 {
+		t.Fatalf("check JSON = %+v, want passing quick schema v1 report", report)
+	}
+	for i, step := range report.Steps {
+		wantSkipped := i >= 3
+		if step.Skipped != wantSkipped || !step.OK {
+			t.Fatalf("check step[%d] = %+v, want skipped=%t and ok", i, step, wantSkipped)
+		}
+	}
+}
+
 func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")

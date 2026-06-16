@@ -102,6 +102,7 @@ type cliTestCapability struct {
 	GoldenModes  []string `json:"golden_modes"`
 	Directory    bool     `json:"directory"`
 	List         bool     `json:"list"`
+	Reports      []string `json:"reports"`
 	SeedEnv      string   `json:"seed_env"`
 }
 
@@ -223,6 +224,7 @@ func buildCapabilities() cliCapabilities {
 				GoldenModes:  []string{"auto", "require", "ignore", "update"},
 				Directory:    true,
 				List:         true,
+				Reports:      []string{"json"},
 				SeedEnv:      "LEIA_TEST_SEED",
 			},
 			Config: cliConfigCapability{

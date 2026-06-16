@@ -15,8 +15,12 @@ import (
 var checkExecCommand = exec.Command
 
 type checkReport struct {
-	OK    bool              `json:"ok"`
-	Steps []checkStepReport `json:"steps"`
+	SchemaVersion int               `json:"schema_version"`
+	OK            bool              `json:"ok"`
+	StepCount     int               `json:"step_count"`
+	FailedCount   int               `json:"failed_count"`
+	SkippedCount  int               `json:"skipped_count"`
+	Steps         []checkStepReport `json:"steps"`
 }
 
 type checkStepReport struct {
@@ -63,20 +67,24 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 
 	path := paths[0]
 	toolPath := checkToolingPath(path)
-	report := checkReport{OK: true}
+	report := checkReport{SchemaVersion: 1, OK: true}
 	runStep := func(name string, skipped bool, fn func() int) {
 		step := checkStepReport{Name: name, Skipped: skipped}
 		if skipped {
 			step.OK = true
 			report.Steps = append(report.Steps, step)
+			report.StepCount++
+			report.SkippedCount++
 			return
 		}
 		step.ExitCode = fn()
 		step.OK = step.ExitCode == 0
 		if !step.OK {
 			report.OK = false
+			report.FailedCount++
 		}
 		report.Steps = append(report.Steps, step)
+		report.StepCount++
 	}
 
 	runStep("fmt", *noFmt, func() int {

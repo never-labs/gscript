@@ -148,8 +148,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !caps.Tooling.Formatter.Stdin || !caps.Tooling.Formatter.Check || !caps.Tooling.Formatter.Write || !containsString(caps.Tooling.Formatter.Formats, "source") || !containsString(caps.Tooling.Formatter.Reports, "json") {
 		t.Fatalf("formatter capabilities = %+v, want stdin/check/write source formatter with json reports", caps.Tooling.Formatter)
 	}
-	if !caps.Tooling.Test.GoldenStdout || !caps.Tooling.Test.Directory || !caps.Tooling.Test.List || caps.Tooling.Test.SeedEnv != "LEIA_TEST_SEED" || !containsString(caps.Tooling.Test.GoldenModes, "update") {
-		t.Fatalf("test capabilities = %+v, want golden stdout modes, directory, list, and seed env", caps.Tooling.Test)
+	if !caps.Tooling.Test.GoldenStdout || !caps.Tooling.Test.Directory || !caps.Tooling.Test.List || caps.Tooling.Test.SeedEnv != "LEIA_TEST_SEED" || !containsString(caps.Tooling.Test.GoldenModes, "update") || !containsString(caps.Tooling.Test.Reports, "json") {
+		t.Fatalf("test capabilities = %+v, want golden stdout modes, directory, list, json reports, and seed env", caps.Tooling.Test)
 	}
 	if caps.Tooling.Config.FileName != "leia.toml" || !containsString(caps.Tooling.Config.Formats, "json") {
 		t.Fatalf("config capabilities = %+v, want leia.toml/json", caps.Tooling.Config)

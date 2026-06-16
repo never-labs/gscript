@@ -276,7 +276,7 @@ func TestCheckCommandJSONRunsEnabledSteps(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Steps) != 7 {
+	if report.SchemaVersion != 1 || !report.OK || report.StepCount != 7 || report.FailedCount != 0 || report.SkippedCount != 0 || len(report.Steps) != 7 {
 		t.Fatalf("report = %+v, want seven passing steps", report)
 	}
 	for _, step := range report.Steps {
@@ -302,7 +302,7 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.OK || len(report.Steps) != 7 {
+	if report.SchemaVersion != 1 || report.OK || report.StepCount != 7 || report.FailedCount != 2 || report.SkippedCount != 5 || len(report.Steps) != 7 {
 		t.Fatalf("report = %+v, want failed report with seven steps", report)
 	}
 	if !report.Steps[2].Skipped || !report.Steps[2].OK {
@@ -341,7 +341,7 @@ func TestCheckCommandQuickSkipsSlowSteps(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Steps) != 7 {
+	if report.SchemaVersion != 1 || !report.OK || report.StepCount != 7 || report.FailedCount != 0 || report.SkippedCount != 4 || len(report.Steps) != 7 {
 		t.Fatalf("report = %+v, want seven passing steps", report)
 	}
 	for i, step := range report.Steps {
