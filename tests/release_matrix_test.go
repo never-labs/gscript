@@ -884,6 +884,10 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	if strings.TrimSpace(versionedReleaseOut) != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
 		t.Fatalf("ci release --release-version --list must delegate to versioned production release profile only; got:\n%s", versionedReleaseOut)
 	}
+	badReleaseVersion := runCommandResult(root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--release-version", "bad version")
+	if badReleaseVersion.err == nil || !strings.Contains(badReleaseVersion.stderr, "--release-version must match vMAJOR.MINOR.PATCH") {
+		t.Fatalf("ci release bad version should fail with a clear format error\nstdout:\n%s\nstderr:\n%s", badReleaseVersion.stdout, badReleaseVersion.stderr)
+	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
 	for _, want := range []string{"go test ./... -count=1", "python3 tests/manifest.py check tests benchmarks"} {

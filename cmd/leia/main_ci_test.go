@@ -75,6 +75,31 @@ func TestCICommandReleaseProfilePassesReleaseVersion(t *testing.T) {
 	}
 }
 
+func TestCICommandReleaseProfileAllowsPlaceholderVersionForList(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"release", "--release-version", "vX.Y.Z", "--list"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if got := strings.TrimSpace(stdout.String()); got != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+		t.Fatalf("stdout = %q, want placeholder versioned release production check", stdout.String())
+	}
+}
+
+func TestCICommandReleaseProfileRejectsBadReleaseVersionWhenRunning(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"release", "--release-version", "bad version"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runCICommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--release-version must match vMAJOR.MINOR.PATCH") {
+		t.Fatalf("stderr = %q, want release-version format error", stderr.String())
+	}
+}
+
 func TestCICommandRejectsReleaseVersionOutsideReleaseProfile(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runCICommand([]string{"pr", "--release-version", "v1.2.3", "--list"}, &stdout, &stderr)

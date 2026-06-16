@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
 var ciExecCommand = exec.Command
+var ciReleaseVersionRE = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
 
 const (
 	ciSmokeScriptPath    = "tests/smoke/01_basic.leia"
@@ -48,6 +50,10 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 	}
 	if profile != "release" && *releaseVersion != "" {
 		fmt.Fprintln(errw, "leia ci: --release-version is only valid with the release profile")
+		return 2
+	}
+	if profile == "release" && *releaseVersion != "" && !*listOnly && !ciReleaseVersionRE.MatchString(*releaseVersion) {
+		fmt.Fprintf(errw, "leia ci: --release-version must match vMAJOR.MINOR.PATCH or prerelease: %s\n", *releaseVersion)
 		return 2
 	}
 	commands, err := ciProfileCommands(profile, *noLuaJIT, *releaseVersion)
