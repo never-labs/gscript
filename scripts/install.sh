@@ -160,6 +160,8 @@ print_json_report() {
   printf '  "binary": "%s",\n' "$(json_escape "$binary_name")"
   printf '  "lsp_binary": "%s",\n' "$(json_escape "$lsp_binary_name")"
   printf '  "install_count": 2,\n'
+  printf '  "binary_count": 2,\n'
+  printf '  "install_path_count": 2,\n'
   printf '  "binaries": [\n'
   printf '    "%s",\n' "$(json_escape "$binary_name")"
   printf '    "%s"\n' "$(json_escape "$lsp_binary_name")"

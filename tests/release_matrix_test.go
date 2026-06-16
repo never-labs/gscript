@@ -2119,26 +2119,28 @@ func TestReleaseMatrixInstallDryRunReportIsMachineReadable(t *testing.T) {
 	} {
 		out := runCommand(t, root, 30*time.Second, "bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", tc.goos, "--arch", tc.goarch, "--bin-dir", "/tmp/leia-bin", "--json")
 		var report struct {
-			SchemaVersion  int      `json:"schema_version"`
-			Status         string   `json:"status"`
-			DryRun         bool     `json:"dry_run"`
-			Verify         bool     `json:"verify"`
-			Repo           string   `json:"repo"`
-			Version        string   `json:"version"`
-			GOOS           string   `json:"goos"`
-			GOARCH         string   `json:"goarch"`
-			ArchiveExt     string   `json:"archive_ext"`
-			Asset          string   `json:"asset"`
-			URL            string   `json:"url"`
-			Checksums      string   `json:"checksums"`
-			BinDir         string   `json:"bin_dir"`
-			Binary         string   `json:"binary"`
-			LSPBinary      string   `json:"lsp_binary"`
-			InstallCount   int      `json:"install_count"`
-			Binaries       []string `json:"binaries"`
-			InstallPaths   []string `json:"install_paths"`
-			InstallPath    string   `json:"install_path"`
-			LSPInstallPath string   `json:"lsp_install_path"`
+			SchemaVersion    int      `json:"schema_version"`
+			Status           string   `json:"status"`
+			DryRun           bool     `json:"dry_run"`
+			Verify           bool     `json:"verify"`
+			Repo             string   `json:"repo"`
+			Version          string   `json:"version"`
+			GOOS             string   `json:"goos"`
+			GOARCH           string   `json:"goarch"`
+			ArchiveExt       string   `json:"archive_ext"`
+			Asset            string   `json:"asset"`
+			URL              string   `json:"url"`
+			Checksums        string   `json:"checksums"`
+			BinDir           string   `json:"bin_dir"`
+			Binary           string   `json:"binary"`
+			LSPBinary        string   `json:"lsp_binary"`
+			InstallCount     int      `json:"install_count"`
+			BinaryCount      int      `json:"binary_count"`
+			InstallPathCount int      `json:"install_path_count"`
+			Binaries         []string `json:"binaries"`
+			InstallPaths     []string `json:"install_paths"`
+			InstallPath      string   `json:"install_path"`
+			LSPInstallPath   string   `json:"lsp_install_path"`
 		}
 		if err := json.Unmarshal([]byte(out), &report); err != nil {
 			t.Fatalf("install dry-run JSON failed to decode for %s/%s: %v\n%s", tc.goos, tc.goarch, err, out)
@@ -2149,8 +2151,8 @@ func TestReleaseMatrixInstallDryRunReportIsMachineReadable(t *testing.T) {
 		if report.GOOS != tc.goos || report.GOARCH != tc.goarch || report.ArchiveExt != tc.archiveExt || report.Binary != tc.binary || report.LSPBinary != tc.lspBinary {
 			t.Fatalf("install dry-run JSON has wrong platform fields for %s/%s: %+v", tc.goos, tc.goarch, report)
 		}
-		if report.InstallCount != 2 || len(report.Binaries) != report.InstallCount || len(report.InstallPaths) != report.InstallCount {
-			t.Fatalf("install dry-run JSON install counts = %d binaries=%d paths=%d", report.InstallCount, len(report.Binaries), len(report.InstallPaths))
+		if report.InstallCount != 2 || report.BinaryCount != 2 || report.InstallPathCount != 2 || len(report.Binaries) != report.BinaryCount || len(report.InstallPaths) != report.InstallPathCount {
+			t.Fatalf("install dry-run JSON install counts = install:%d binary:%d/%d path:%d/%d", report.InstallCount, report.BinaryCount, len(report.Binaries), report.InstallPathCount, len(report.InstallPaths))
 		}
 		if !stringSliceContains(report.Binaries, report.Binary) || !stringSliceContains(report.Binaries, report.LSPBinary) || !stringSliceContains(report.InstallPaths, report.InstallPath) || !stringSliceContains(report.InstallPaths, report.LSPInstallPath) {
 			t.Fatalf("install dry-run JSON collection fields do not match scalar fields for %s/%s: %+v", tc.goos, tc.goarch, report)
