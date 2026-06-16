@@ -48,6 +48,9 @@ format = "json"
 	if !report.Found || report.Root != root || report.Path != filepath.Join(root, "leia.toml") {
 		t.Fatalf("report location = %+v, want discovered root %s", report, root)
 	}
+	if !report.OK || report.DiagnosticCount != 0 || len(report.Diagnostics) != 0 {
+		t.Fatalf("report diagnostics = %+v, want ok config with no diagnostics", report)
+	}
 	if report.Config == nil {
 		t.Fatal("config is nil, want parsed config")
 	}
@@ -76,8 +79,36 @@ func TestConfigCommandReportsMissingConfig(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON config report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.Found || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "LEIA9001" {
+	if report.OK || report.Found || report.DiagnosticCount != 1 || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "LEIA9001" {
 		t.Fatalf("report = %+v, want not found diagnostic", report)
+	}
+}
+
+func TestConfigCommandJSONReportsWarningsWithoutFailing(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "leia.toml"), []byte("[project]\nname = \"demo\"\n\n[unknown]\nvalue = \"ok\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runConfigCommand([]string{"--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runConfigCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var report cliConfigReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON config report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || !report.Found || report.DiagnosticCount != 2 || len(report.Diagnostics) != 2 {
+		t.Fatalf("report = %+v, want ok config with two warnings", report)
+	}
+	for _, diag := range report.Diagnostics {
+		if diag.Severity != "warning" {
+			t.Fatalf("diagnostic = %+v, want warning", diag)
+		}
 	}
 }
 
@@ -97,5 +128,28 @@ func TestConfigCommandReportsParseErrors(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "LEIA9002") || !strings.Contains(stderr.String(), "tool.test.format") {
 		t.Fatalf("stderr = %q, want config parse diagnostic", stderr.String())
+	}
+}
+
+func TestConfigCommandJSONReportsParseErrors(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "leia.toml"), []byte("[tool.test]\nformat = \"xml\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runConfigCommand([]string{"--json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runConfigCommand code = %d, want 1", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty in JSON mode", stderr.String())
+	}
+	var report cliConfigReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON config report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.OK || !report.Found || report.DiagnosticCount != 1 || len(report.Diagnostics) != 1 || report.Diagnostics[0].Severity != "error" || report.Diagnostics[0].Code != "LEIA9002" {
+		t.Fatalf("report = %+v, want parse error diagnostic", report)
 	}
 }

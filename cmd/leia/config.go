@@ -21,12 +21,14 @@ type cliConfigCapability struct {
 }
 
 type cliConfigReport struct {
-	SchemaVersion int                   `json:"schema_version"`
-	Found         bool                  `json:"found"`
-	Path          string                `json:"path,omitempty"`
-	Root          string                `json:"root,omitempty"`
-	Config        *cliProjectConfig     `json:"config,omitempty"`
-	Diagnostics   []cliConfigDiagnostic `json:"diagnostics,omitempty"`
+	SchemaVersion   int                   `json:"schema_version"`
+	OK              bool                  `json:"ok"`
+	Found           bool                  `json:"found"`
+	Path            string                `json:"path,omitempty"`
+	Root            string                `json:"root,omitempty"`
+	Config          *cliProjectConfig     `json:"config,omitempty"`
+	DiagnosticCount int                   `json:"diagnostic_count"`
+	Diagnostics     []cliConfigDiagnostic `json:"diagnostics,omitempty"`
 }
 
 type cliProjectConfig struct {
@@ -122,23 +124,27 @@ func runConfigCommand(args []string, outw, errw io.Writer) int {
 }
 
 func loadCLIProjectConfig(start string) (cliConfigReport, error) {
-	report := cliConfigReport{SchemaVersion: 1}
+	report := cliConfigReport{SchemaVersion: 1, OK: true}
 	configPath, root, err := discoverCLIConfig(start)
 	if err != nil {
+		report.OK = false
 		report.Diagnostics = append(report.Diagnostics, cliConfigDiagnostic{
 			Severity: "error",
 			Code:     "LEIA9002",
 			Message:  err.Error(),
 		})
+		report.DiagnosticCount = len(report.Diagnostics)
 		return report, err
 	}
 	if configPath == "" {
 		err := errors.New("leia.toml not found")
+		report.OK = false
 		report.Diagnostics = append(report.Diagnostics, cliConfigDiagnostic{
 			Severity: "error",
 			Code:     "LEIA9001",
 			Message:  err.Error(),
 		})
+		report.DiagnosticCount = len(report.Diagnostics)
 		return report, err
 	}
 	report.Found = true
@@ -146,18 +152,22 @@ func loadCLIProjectConfig(start string) (cliConfigReport, error) {
 	report.Root = root
 	src, err := os.ReadFile(configPath)
 	if err != nil {
+		report.OK = false
 		report.Diagnostics = append(report.Diagnostics, cliConfigDiagnostic{
 			Severity: "error",
 			Code:     "LEIA9002",
 			Message:  err.Error(),
 		})
+		report.DiagnosticCount = len(report.Diagnostics)
 		return report, err
 	}
 	config, diags := parseCLIProjectConfig(src)
 	report.Config = &config
 	report.Diagnostics = diags
+	report.DiagnosticCount = len(diags)
 	for _, diag := range diags {
 		if diag.Severity == "error" {
+			report.OK = false
 			return report, errors.New(diag.Message)
 		}
 	}

@@ -48,6 +48,7 @@ if errors.As(err, &budgetErr) {
 | `leia lint --format=sarif` | SARIF 2.1.0 for code scanning integrations. |
 | `leia fmt --check --json` | Formatter check report with changed files and per-file errors. |
 | `leia check --json` | Aggregate check report with step status and exit codes. |
+| `leia config --json` | Resolved project configuration with `ok`, discovery status, and diagnostics. |
 | `leia inspect bytecode --json` | Compiled bytecode metadata, disassembly text, nested proto summary, and JIT callable decisions. |
 | `leia inspect directives --json` | Parsed `//leia:` file directives. |
 | `leia mod ... --json` | Module graph, list, verify, capability, and vendoring reports. |
