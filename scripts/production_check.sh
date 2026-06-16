@@ -136,6 +136,9 @@ is_release_critical_skip() {
 }
 
 release_critical_skips() {
+    if [ "${#SKIP_REASONS[@]}" -eq 0 ]; then
+        return
+    fi
     local reason
     local name
     for reason in "${SKIP_REASONS[@]}"; do
