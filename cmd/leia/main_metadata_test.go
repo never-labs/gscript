@@ -236,12 +236,23 @@ func TestCapabilitiesJSON(t *testing.T) {
 		collection string
 	}{
 		{"leia check --json", "steps"},
+		{"leia config --json", "diagnostics"},
+		{"leia evaluate --json", "cases"},
+		{"leia evaluate --json", "findings"},
+		{"leia evaluate --json", "inputs"},
+		{"leia evaluate --json", "notes"},
 		{"leia fmt --json", "files"},
 		{"leia test --json", "files"},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		if report == nil || !containsString(report.CollectionFields, tc.collection) {
 			t.Fatalf("%s report capability = %+v, want collection field %q", tc.command, report, tc.collection)
+		}
+	}
+	evaluateReport := capabilitiesReport(caps.Tooling.Reports, "leia evaluate --json")
+	for _, want := range []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos", "metrics[].count"} {
+		if evaluateReport == nil || !containsString(evaluateReport.CountFields, want) {
+			t.Fatalf("evaluate report capability = %+v, want count field %q", evaluateReport, want)
 		}
 	}
 	docGenerateReport := capabilitiesReport(caps.Tooling.Reports, "leia doc generate --format=json")
