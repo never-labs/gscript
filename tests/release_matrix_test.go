@@ -991,6 +991,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia doc check",
 		"GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
+		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json",
 		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
 		"bash scripts/production_check.sh --quick --list --json",
@@ -1449,6 +1450,41 @@ func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
 	}
 	if !stringSliceContains(report.SmokeTests, "tools/editor/smoke/editor_smoke.py") {
 		t.Fatalf("editor asset JSON missing smoke test: %+v", report.SmokeTests)
+	}
+}
+
+func TestReleaseMatrixDiagnosticsBundleReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	tmp := t.TempDir()
+	outDir := filepath.Join(tmp, "diag")
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "diag", "bundle", "--output", outDir, "--skip-go-tests", "--skip-benchmarks", "--json")
+	var report struct {
+		SchemaVersion int      `json:"schema_version"`
+		Status        string   `json:"status"`
+		OutputDir     string   `json:"output_dir"`
+		RunGoTests    bool     `json:"run_go_tests"`
+		RunBenchmarks bool     `json:"run_benchmarks"`
+		FailureCount  int      `json:"failure_count"`
+		Summary       string   `json:"summary"`
+		Manifest      string   `json:"manifest"`
+		Files         []string `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("diagnostics bundle JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.OutputDir != outDir || report.RunGoTests || report.RunBenchmarks || report.FailureCount != 0 {
+		t.Fatalf("diagnostics bundle JSON = %+v, want passing no-test/no-benchmark schema v1 report", report)
+	}
+	for _, want := range []string{"summary.md", "manifest.txt", "git_revision.txt", "git_status.txt", "git_diff_stat.txt", "go_version.txt", "go_env_summary.txt", "go_test_quick.skipped", "benchmarks.skipped"} {
+		if !stringSliceContains(report.Files, want) {
+			t.Fatalf("diagnostics bundle JSON missing file %q: %+v", want, report.Files)
+		}
+		if _, err := os.Stat(filepath.Join(outDir, want)); err != nil {
+			t.Fatalf("diagnostics bundle file %s missing on disk: %v", want, err)
+		}
+	}
+	if report.Summary != "summary.md" || report.Manifest != "manifest.txt" {
+		t.Fatalf("diagnostics bundle JSON should report relative summary/manifest paths: %+v", report)
 	}
 }
 

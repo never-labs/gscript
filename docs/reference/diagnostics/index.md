@@ -66,6 +66,7 @@ Current lint codes:
 ```bash
 leia diag dump
 leia diag bundle --output /tmp/leia-diag --skip-benchmarks
+leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
 ```
 
 Bundles are intended for compiler/runtime investigations. User-facing tooling

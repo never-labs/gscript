@@ -10,16 +10,20 @@ timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT_ARG="diagnostics/$timestamp"
 RUN_GO_TESTS=1
 RUN_BENCHMARKS=1
+JSON_OUT=0
 
 usage() {
     cat <<'EOF'
-Usage: scripts/diagnostics_bundle.sh [--output DIR] [DIR] [--skip-go-tests] [--skip-benchmarks] [--help]
+Usage: scripts/diagnostics_bundle.sh [--output DIR] [DIR] [--skip-go-tests] [--skip-benchmarks] [--json] [--help]
 
 Collects git revision/status, Go environment summary, quick Go test results,
 and quick benchmark guard summaries when the local tools are available.
 
 The default output directory is diagnostics/<timestamp>. Output inside the
 repository must be git-ignored; use /tmp/... for an untracked external bundle.
+
+Options:
+  --json              Print a machine-readable bundle report.
 EOF
 }
 
@@ -39,6 +43,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --skip-benchmarks)
             RUN_BENCHMARKS=0
+            shift
+            ;;
+        --json)
+            JSON_OUT=1
             shift
             ;;
         -h|--help)
@@ -93,6 +101,62 @@ have_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
+log_info() {
+    if [ "$JSON_OUT" -ne 1 ]; then
+        printf '%s\n' "$1"
+    fi
+}
+
+json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    value="${value//$'\t'/\\t}"
+    printf '%s' "$value"
+}
+
+print_json_string_array_from_file() {
+    local indent="$1"
+    local file="$2"
+    printf '[\n'
+    local first=1
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] || continue
+        if [ "$first" -ne 1 ]; then
+            printf ',\n'
+        fi
+        printf '%s  "%s"' "$indent" "$(json_escape "$line")"
+        first=0
+    done <"$file"
+    if [ "$first" -ne 1 ]; then
+        printf '\n'
+    fi
+    printf '%s]' "$indent"
+}
+
+print_json_report() {
+    local status="pass"
+    if [ "$failures" -gt 0 ]; then
+        status="fail"
+    fi
+    printf '{\n'
+    printf '  "schema_version": 1,\n'
+    printf '  "status": "%s",\n' "$status"
+    printf '  "output_dir": "%s",\n' "$(json_escape "$OUT_DIR")"
+    printf '  "run_go_tests": %s,\n' "$(if [ "$RUN_GO_TESTS" -eq 1 ]; then printf true; else printf false; fi)"
+    printf '  "run_benchmarks": %s,\n' "$(if [ "$RUN_BENCHMARKS" -eq 1 ]; then printf true; else printf false; fi)"
+    printf '  "failure_count": %d,\n' "$failures"
+    printf '  "summary": "%s",\n' "$(json_escape "${SUMMARY#$OUT_DIR/}")"
+    printf '  "manifest": "%s",\n' "$(json_escape "${MANIFEST#$OUT_DIR/}")"
+    printf '  "files": '
+    print_json_string_array_from_file "  " "$MANIFEST"
+    printf '\n'
+    printf '}\n'
+}
+
 run_logged() {
     local name="$1"
     local logfile="$2"
@@ -104,17 +168,17 @@ run_logged() {
         printf 'Command: `%s`\n\n' "$cmd"
     } >>"$SUMMARY"
 
-    printf '=== RUN %s ===\n' "$name"
+    log_info "=== RUN $name ==="
     if bash -lc "$cmd" >"$logfile" 2>&1; then
         printf '0\n' >"$status_file"
         printf 'Result: PASS\n\n' >>"$SUMMARY"
-        printf '=== PASS %s ===\n' "$name"
+        log_info "=== PASS $name ==="
         return 0
     else
         status=$?
         printf '%s\n' "$status" >"$status_file"
         printf 'Result: FAIL (exit %s)\n\n' "$status" >>"$SUMMARY"
-        printf '=== FAIL %s (exit %s) ===\n' "$name" "$status"
+        log_info "=== FAIL $name (exit $status) ==="
         return "$status"
     fi
 }
@@ -235,8 +299,14 @@ fi
     printf '\n'
 } >>"$SUMMARY"
 
-printf 'Diagnostics bundle written to %s\n' "$OUT_DIR"
+if [ "$JSON_OUT" -eq 1 ]; then
+    print_json_report
+else
+    printf 'Diagnostics bundle written to %s\n' "$OUT_DIR"
+fi
 if [ "$failures" -gt 0 ]; then
-    printf '%s check(s) failed; see %s\n' "$failures" "$SUMMARY" >&2
+    if [ "$JSON_OUT" -ne 1 ]; then
+        printf '%s check(s) failed; see %s\n' "$failures" "$SUMMARY" >&2
+    fi
     exit 1
 fi

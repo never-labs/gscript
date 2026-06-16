@@ -172,6 +172,7 @@ measured validation instead of report-only comparisons. See the
 
 ```bash
 go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks
+go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
 bash scripts/diag.sh table/table_array_access
 ```
 
