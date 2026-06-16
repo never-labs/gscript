@@ -159,6 +159,15 @@ print_json_report() {
   printf '  "bin_dir": "%s",\n' "$(json_escape "$bin_dir")"
   printf '  "binary": "%s",\n' "$(json_escape "$binary_name")"
   printf '  "lsp_binary": "%s",\n' "$(json_escape "$lsp_binary_name")"
+  printf '  "install_count": 2,\n'
+  printf '  "binaries": [\n'
+  printf '    "%s",\n' "$(json_escape "$binary_name")"
+  printf '    "%s"\n' "$(json_escape "$lsp_binary_name")"
+  printf '  ],\n'
+  printf '  "install_paths": [\n'
+  printf '    "%s",\n' "$(json_escape "$install_path")"
+  printf '    "%s"\n' "$(json_escape "$lsp_install_path")"
+  printf '  ],\n'
   printf '  "install_path": "%s",\n' "$(json_escape "$install_path")"
   printf '  "lsp_install_path": "%s"\n' "$(json_escape "$lsp_install_path")"
   printf '}\n'
