@@ -88,6 +88,7 @@ type cliFormatterCapability struct {
 	Check     bool     `json:"check"`
 	Write     bool     `json:"write"`
 	Formats   []string `json:"formats"`
+	Reports   []string `json:"reports"`
 	Stability string   `json:"stability"`
 }
 
@@ -210,6 +211,7 @@ func buildCapabilities() cliCapabilities {
 				Check:     true,
 				Write:     true,
 				Formats:   []string{"source"},
+				Reports:   []string{"json"},
 				Stability: "whitespace-normalizer",
 			},
 			Linter: cliLinterCapability{

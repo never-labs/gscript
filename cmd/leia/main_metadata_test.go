@@ -145,6 +145,9 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "LEIA1001") || !containsString(caps.Tooling.Linter.Codes, "LEIA2001") {
 		t.Fatalf("linter capabilities = %+v, want json, LEIA1001, and LEIA2001", caps.Tooling.Linter)
 	}
+	if !caps.Tooling.Formatter.Stdin || !caps.Tooling.Formatter.Check || !caps.Tooling.Formatter.Write || !containsString(caps.Tooling.Formatter.Formats, "source") || !containsString(caps.Tooling.Formatter.Reports, "json") {
+		t.Fatalf("formatter capabilities = %+v, want stdin/check/write source formatter with json reports", caps.Tooling.Formatter)
+	}
 	if !caps.Tooling.Test.GoldenStdout || !caps.Tooling.Test.Directory || !caps.Tooling.Test.List || caps.Tooling.Test.SeedEnv != "LEIA_TEST_SEED" || !containsString(caps.Tooling.Test.GoldenModes, "update") {
 		t.Fatalf("test capabilities = %+v, want golden stdout modes, directory, list, and seed env", caps.Tooling.Test)
 	}
