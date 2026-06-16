@@ -216,6 +216,12 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("report capabilities = %#v, want command %q", caps.Tooling.Reports, want)
 		}
 	}
+	envReport := capabilitiesReport(caps.Tooling.Reports, "leia env --json")
+	for _, want := range []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.dialect_count", "capabilities.tooling.report_count"} {
+		if envReport == nil || !containsString(envReport.CountFields, want) {
+			t.Fatalf("env report capability = %+v, want count field %q", envReport, want)
+		}
+	}
 }
 
 func TestCapabilitiesDefaultImportsStaySyncedWithPrelude(t *testing.T) {
@@ -285,12 +291,16 @@ func capabilitiesHaveStdlibLayer(layers []cliStdlibLayer, name string) bool {
 }
 
 func capabilitiesHaveReport(reports []cliReportCapability, command string) bool {
+	return capabilitiesReport(reports, command) != nil
+}
+
+func capabilitiesReport(reports []cliReportCapability, command string) *cliReportCapability {
 	for _, report := range reports {
 		if report.Command == command {
-			return true
+			return &report
 		}
 	}
-	return false
+	return nil
 }
 
 func capabilitiesHaveStdlibModule(layers []cliStdlibLayer, layerName, moduleName string) bool {
