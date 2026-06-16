@@ -275,6 +275,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 	}{
 		{"leia capabilities --json", []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}},
 		{"leia ci --list --json", []string{"command_count", "commands[].arg_count"}},
+		{"leia fmt --json", []string{"file_count", "changed_count", "error_count"}},
 		{"leia mod capability --json", []string{"capability_count", "module_count", "diagnostic_count"}},
 		{"leia mod download --json", []string{"module_count", "diagnostic_count"}},
 		{"leia mod explain --json", []string{"diagnostic_count"}},
