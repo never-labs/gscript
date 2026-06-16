@@ -1134,6 +1134,8 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 		"`blocker_count` plus kind-specific counts",
 		"`release_decision_count`",
+		"`count_fields`",
+		"`collection_fields`",
 	} {
 		if !strings.Contains(release, snippet) {
 			t.Fatalf("docs/release/index.md must mention %q", snippet)

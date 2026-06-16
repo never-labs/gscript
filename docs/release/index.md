@@ -31,7 +31,9 @@ bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
 ```
 
 `leia capabilities --json` includes `tooling.report_count` and
-`tooling.reports`, the registry of CLI and release-script JSON reports.
+`tooling.reports`, the registry of CLI and release-script JSON reports. Each
+entry advertises `count_fields` and `collection_fields` when the report exposes
+countable release evidence.
 
 `leia ci release` delegates to the same production release profile. That
 profile is the release validation source of truth: correctness, documentation,
