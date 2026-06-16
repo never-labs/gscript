@@ -1,6 +1,7 @@
 package leia_test
 
 import (
+	"strings"
 	"testing"
 
 	leia "github.com/never-labs/leia"
@@ -77,6 +78,7 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			assertSDKGlobalPresence(t, vm, "eye", false)
 			assertSDKGlobalPresence(t, vm, "matmul", false)
 			assertSDKGlobalPresence(t, vm, "mean", false)
+			assertSDKExecUndefined(t, vm, "x := mat([[1, 0], [0, 1]])", "mat")
 
 			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibLinalg|leia.LibStats))...)
 			assertSDKGlobalPresence(t, vm, "append", true)
@@ -88,6 +90,8 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			assertSDKGlobalPresence(t, vm, "mean", true)
 			assertSDKGlobalPresence(t, vm, "describe", true)
 			assertSDKGlobalPresence(t, vm, "randn", false)
+			assertSDKExecUndefined(t, vm, "x := sqrt(9)", "sqrt")
+			assertSDKExecUndefined(t, vm, "x := randn(3, 0, 1)", "randn")
 
 			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibRand))...)
 			assertSDKGlobalPresence(t, vm, "append", true)
@@ -95,6 +99,8 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			assertSDKGlobalPresence(t, vm, "sample", true)
 			assertSDKGlobalPresence(t, vm, "sqrt", false)
 			assertSDKGlobalPresence(t, vm, "eye", false)
+			assertSDKExecUndefined(t, vm, "x := sqrt(9)", "sqrt")
+			assertSDKExecUndefined(t, vm, "x := eye(2)", "eye")
 
 			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibTable))...)
 			assertSDKGlobalPresence(t, vm, "append", true)
@@ -104,6 +110,17 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			assertSDKGlobalPresence(t, vm, "append", true)
 			assertSDKGlobalPresence(t, vm, "table", false)
 		})
+	}
+}
+
+func assertSDKExecUndefined(t *testing.T, vm *leia.VM, source, name string) {
+	t.Helper()
+	err := vm.Exec(source)
+	if err == nil {
+		t.Fatalf("%s unexpectedly executed without error", source)
+	}
+	if !strings.Contains(err.Error(), "undefined variable: "+name) && !strings.Contains(err.Error(), "attempt to call a nil value") {
+		t.Fatalf("%s error = %v, want unavailable %s", source, err, name)
 	}
 }
 

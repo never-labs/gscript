@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	stdinstall "github.com/never-labs/leia/internal/stdlib/install"
 )
 
 func TestReadmeIntroStaysFocused(t *testing.T) {
@@ -222,6 +224,25 @@ func TestReferenceScientificNumericExampleStaysRunnable(t *testing.T) {
 	runLeiaDocSnippet(t, root, "scientific-reference.leia", blocks[0])
 }
 
+func TestReferenceScientificDefaultImportsStaySyncedWithPrelude(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "scientific", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := parseScientificDefaultImportTable(t, string(data))
+	want := map[string]map[string]bool{}
+	for _, alias := range stdinstall.DefaultAliases() {
+		if want[alias.Module] == nil {
+			want[alias.Module] = map[string]bool{}
+		}
+		want[alias.Module][alias.Name] = true
+	}
+	if !stringSetMapEqual(got, want) {
+		t.Fatalf("scientific default import table drifted\ngot  %#v\nwant %#v", got, want)
+	}
+}
+
 func TestReferenceConcurrencyExamplesStayRunnable(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "concurrency", "index.md"))
@@ -280,6 +301,68 @@ left <- 10
 			runLeiaDocSnippet(t, root, "concurrency-"+tc.name+".leia", tc.source)
 		})
 	}
+}
+
+func parseScientificDefaultImportTable(t *testing.T, markdown string) map[string]map[string]bool {
+	t.Helper()
+	imports := map[string]map[string]bool{}
+	inTable := false
+	for _, line := range strings.Split(markdown, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "| Source module | Default helpers |" {
+			inTable = true
+			continue
+		}
+		if !inTable {
+			continue
+		}
+		if line == "" {
+			break
+		}
+		if strings.HasPrefix(line, "|---") {
+			continue
+		}
+		parts := strings.Split(line, "|")
+		if len(parts) < 4 {
+			t.Fatalf("malformed default import row %q", line)
+		}
+		module := strings.Trim(strings.TrimSpace(parts[1]), "`")
+		if module == "" {
+			t.Fatalf("default import row missing module: %q", line)
+		}
+		if imports[module] == nil {
+			imports[module] = map[string]bool{}
+		}
+		for _, raw := range strings.Split(parts[2], ",") {
+			name := strings.Trim(strings.TrimSpace(raw), "`")
+			if name == "" {
+				continue
+			}
+			imports[module][name] = true
+		}
+	}
+	if !inTable {
+		t.Fatal("scientific reference missing default import table")
+	}
+	return imports
+}
+
+func stringSetMapEqual(got, want map[string]map[string]bool) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for module, wantNames := range want {
+		gotNames, ok := got[module]
+		if !ok || len(gotNames) != len(wantNames) {
+			return false
+		}
+		for name := range wantNames {
+			if !gotNames[name] {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func readmeFirstLeiaSnippet(readme string) string {

@@ -310,7 +310,7 @@ func generateDialectReferenceMarkdown() []byte {
 	fmt.Fprintln(&b, "| `cmd` | Argv-safe command result table with the same command result shape as `sh`. |")
 	fmt.Fprintln(&b, "| `glob` | Sorted path array. |")
 	fmt.Fprintln(&b, "| `sql` | `{query, args, names}` with named parameters lowered to positional placeholders. |")
-	fmt.Fprintln(&b, "| `q` | Symbolic q-style vectors, dictionaries, and tables. SoA rollups use `q.query(soa, plan_table)`. |")
+	fmt.Fprintln(&b, "| `q` | Tagged q source returns q-style vectors, dictionaries, and tables. Standard-library helpers such as `q.sql` and `q.query` are separate data/SoA module APIs. |")
 	fmt.Fprintln(&b, "| `xlsx` encode | Workbook byte string suitable for writing or decoding with `excel`. |")
 	fmt.Fprintln(&b, "| `excel` decode | Row array; with `{headers: true}`, rows are tables keyed by the first worksheet row. |")
 	fmt.Fprintln(&b, "| `serve` | Route server descriptor/loopback result as documented by runnable web examples. |")

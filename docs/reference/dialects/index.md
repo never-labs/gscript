@@ -122,7 +122,7 @@ summarizer := agent {
 | `cmd` | Argv-safe command result table with the same command result shape as `sh`. |
 | `glob` | Sorted path array. |
 | `sql` | `{query, args, names}` with named parameters lowered to positional placeholders. |
-| `q` | Symbolic q-style vectors, dictionaries, and tables. SoA rollups use `q.query(soa, plan_table)`. |
+| `q` | Tagged q source returns q-style vectors, dictionaries, and tables. Standard-library helpers such as `q.sql` and `q.query` are separate data/SoA module APIs. |
 | `xlsx` encode | Workbook byte string suitable for writing or decoding with `excel`. |
 | `excel` decode | Row array; with `{headers: true}`, rows are tables keyed by the first worksheet row. |
 | `serve` | Route server descriptor/loopback result as documented by runnable web examples. |

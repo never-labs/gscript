@@ -24,7 +24,8 @@ are also installed as globals:
 
 Globals are convenience bindings, not syntax. They follow `WithLibs`: disabling
 a module removes that module's default helpers while leaving ordinary language
-semantics unchanged.
+semantics unchanged. `append` is the core table convenience binding and remains
+available under the core table runtime contract.
 
 ## Primitive Composition
 
