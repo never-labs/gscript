@@ -208,3 +208,31 @@ func TestDocCheckDispatchesDocsScript(t *testing.T) {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())
 	}
 }
+
+func TestDocCheckJSONDispatchesDocsScriptWithJSON(t *testing.T) {
+	oldDocExecCommand := docExecCommand
+	t.Cleanup(func() { docExecCommand = oldDocExecCommand })
+	var gotName string
+	var gotArgs []string
+	docExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "doc")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"check", "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "bash" {
+		t.Fatalf("command = %q, want bash", gotName)
+	}
+	if len(gotArgs) != 2 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "docs_check.sh")) || gotArgs[1] != "--json" {
+		t.Fatalf("args = %#v, want scripts/docs_check.sh --json", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "doc helper ok") {
+		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	}
+}

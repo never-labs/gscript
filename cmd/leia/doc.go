@@ -167,6 +167,7 @@ type docReferenceBundle struct {
 func runDocCheckCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("doc check", flag.ContinueOnError)
 	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print documentation check results as JSON")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -174,7 +175,7 @@ func runDocCheckCommand(args []string, outw, errw io.Writer) int {
 		return 2
 	}
 	if len(fs.Args()) != 0 {
-		fmt.Fprintln(errw, "usage: leia doc check")
+		fmt.Fprintln(errw, "usage: leia doc check [--json]")
 		return 2
 	}
 	script, err := findScriptFromCWD(filepath.Join("scripts", "docs_check.sh"))
@@ -182,7 +183,11 @@ func runDocCheckCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia doc check: %v\n", err)
 		return 1
 	}
-	cmd := docExecCommand("bash", script)
+	cmdArgs := []string{script}
+	if *jsonOut {
+		cmdArgs = append(cmdArgs, "--json")
+	}
+	cmd := docExecCommand("bash", cmdArgs...)
 	cmd.Stdout = outw
 	cmd.Stderr = errw
 	cmd.Dir = filepath.Dir(filepath.Dir(script))

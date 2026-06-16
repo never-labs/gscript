@@ -258,6 +258,7 @@ func buildReportCapabilities() []cliReportCapability {
 		{Command: "leia check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"step_count", "failed_count", "skipped_count"}},
 		{Command: "leia ci --list --json", Formats: []string{"json"}, SchemaVersion: 1, CountFields: []string{"command_count"}, CollectionFields: []string{"commands"}},
 		{Command: "leia config --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "ok", CountFields: []string{"diagnostic_count"}},
+		{Command: "leia doc check --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, CollectionFields: []string{"failures"}},
 		{Command: "leia doc generate --format=json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
 		{Command: "leia env --json", Formats: []string{"json"}, SchemaVersion: 1, CollectionFields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.dialects"}},
 		{Command: "leia evaluate --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"summary", "metrics[].count"}},

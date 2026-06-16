@@ -164,6 +164,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		"leia check --json",
 		"leia ci --list --json",
 		"leia config --json",
+		"leia doc check --json",
 		"leia doc generate --format=json",
 		"leia env --json",
 		"leia evaluate --json",
