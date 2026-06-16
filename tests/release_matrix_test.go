@@ -1124,6 +1124,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"bash scripts/public_release_blockers_check.sh --json",
 		"bash scripts/release_notes_check.sh --json --version vX.Y.Z",
 		"bash scripts/release_distribution_check.sh --json",
+		"bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json",
 		"bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json",
 		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 	} {
@@ -1604,6 +1605,75 @@ func TestReleaseMatrixGoreleaserTargetsMatchInstallDryRun(t *testing.T) {
 			if !strings.Contains(out, want) {
 				t.Fatalf("install dry-run for %s missing %q:\n%s", target, want, out)
 			}
+		}
+	}
+}
+
+func TestReleaseMatrixInstallDryRunReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, tc := range []struct {
+		goos           string
+		goarch         string
+		archiveExt     string
+		binary         string
+		lspBinary      string
+		installPath    string
+		lspInstallPath string
+	}{
+		{
+			goos:           "linux",
+			goarch:         "amd64",
+			archiveExt:     "tar.gz",
+			binary:         "leia",
+			lspBinary:      "leia-lsp",
+			installPath:    "/tmp/leia-bin/leia",
+			lspInstallPath: "/tmp/leia-bin/leia-lsp",
+		},
+		{
+			goos:           "windows",
+			goarch:         "arm64",
+			archiveExt:     "zip",
+			binary:         "leia.exe",
+			lspBinary:      "leia-lsp.exe",
+			installPath:    "/tmp/leia-bin/leia.exe",
+			lspInstallPath: "/tmp/leia-bin/leia-lsp.exe",
+		},
+	} {
+		out := runCommand(t, root, 30*time.Second, "bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", tc.goos, "--arch", tc.goarch, "--bin-dir", "/tmp/leia-bin", "--json")
+		var report struct {
+			SchemaVersion  int    `json:"schema_version"`
+			Status         string `json:"status"`
+			DryRun         bool   `json:"dry_run"`
+			Verify         bool   `json:"verify"`
+			Repo           string `json:"repo"`
+			Version        string `json:"version"`
+			GOOS           string `json:"goos"`
+			GOARCH         string `json:"goarch"`
+			ArchiveExt     string `json:"archive_ext"`
+			Asset          string `json:"asset"`
+			URL            string `json:"url"`
+			Checksums      string `json:"checksums"`
+			BinDir         string `json:"bin_dir"`
+			Binary         string `json:"binary"`
+			LSPBinary      string `json:"lsp_binary"`
+			InstallPath    string `json:"install_path"`
+			LSPInstallPath string `json:"lsp_install_path"`
+		}
+		if err := json.Unmarshal([]byte(out), &report); err != nil {
+			t.Fatalf("install dry-run JSON failed to decode for %s/%s: %v\n%s", tc.goos, tc.goarch, err, out)
+		}
+		if report.SchemaVersion != 1 || report.Status != "pass" || !report.DryRun || !report.Verify || report.Repo != "never-labs/leia" || report.Version != "v1.2.3-rc.1" {
+			t.Fatalf("install dry-run JSON = %+v, want passing verified dry-run schema v1 report", report)
+		}
+		if report.GOOS != tc.goos || report.GOARCH != tc.goarch || report.ArchiveExt != tc.archiveExt || report.Binary != tc.binary || report.LSPBinary != tc.lspBinary {
+			t.Fatalf("install dry-run JSON has wrong platform fields for %s/%s: %+v", tc.goos, tc.goarch, report)
+		}
+		if report.InstallPath != tc.installPath || report.LSPInstallPath != tc.lspInstallPath || report.BinDir != "/tmp/leia-bin" {
+			t.Fatalf("install dry-run JSON has wrong install paths for %s/%s: %+v", tc.goos, tc.goarch, report)
+		}
+		wantAsset := "leia_v1.2.3-rc.1_" + tc.goos + "_" + tc.goarch + "." + tc.archiveExt
+		if report.Asset != wantAsset || !strings.Contains(report.URL, "/"+wantAsset) || !strings.HasSuffix(report.Checksums, "/SHA256SUMS") {
+			t.Fatalf("install dry-run JSON has wrong release URLs for %s/%s: %+v", tc.goos, tc.goarch, report)
 		}
 	}
 }

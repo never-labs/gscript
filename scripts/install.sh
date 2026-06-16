@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/install.sh [--version VERSION] [--bin-dir DIR] [--repo OWNER/REPO] [--base-url URL] [--dry-run]
+Usage: scripts/install.sh [--version VERSION] [--bin-dir DIR] [--repo OWNER/REPO] [--base-url URL] [--dry-run] [--json]
 
 Install the Leia CLI and LSP from GitHub release artifacts.
 
@@ -18,6 +18,7 @@ Options:
       --arch GOARCH      Override detected arch for validation.
       --dry-run          Print the planned download and install paths only.
       --no-verify        Skip SHA256SUMS verification.
+      --json             Print a machine-readable install plan/report.
   -h, --help             Show this help.
 
 Environment:
@@ -36,6 +37,7 @@ goos=""
 goarch=""
 dry_run="false"
 verify="true"
+json_out="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -71,6 +73,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run)
       dry_run="true"
+      shift
+      ;;
+    --json)
+      json_out="true"
       shift
       ;;
     --no-verify)
@@ -124,6 +130,38 @@ sha256_file() {
     echo "error: need sha256sum, shasum, or openssl for checksum verification" >&2
     exit 1
   fi
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+print_json_report() {
+  printf '{\n'
+  printf '  "schema_version": 1,\n'
+  printf '  "status": "pass",\n'
+  printf '  "dry_run": %s,\n' "$dry_run"
+  printf '  "verify": %s,\n' "$verify"
+  printf '  "repo": "%s",\n' "$(json_escape "$repo")"
+  printf '  "version": "%s",\n' "$(json_escape "$version")"
+  printf '  "goos": "%s",\n' "$(json_escape "$goos")"
+  printf '  "goarch": "%s",\n' "$(json_escape "$goarch")"
+  printf '  "archive_ext": "%s",\n' "$(json_escape "$archive_ext")"
+  printf '  "asset": "%s",\n' "$(json_escape "$asset")"
+  printf '  "url": "%s",\n' "$(json_escape "$asset_url")"
+  printf '  "checksums": "%s",\n' "$(json_escape "$checksums_url")"
+  printf '  "bin_dir": "%s",\n' "$(json_escape "$bin_dir")"
+  printf '  "binary": "%s",\n' "$(json_escape "$binary_name")"
+  printf '  "lsp_binary": "%s",\n' "$(json_escape "$lsp_binary_name")"
+  printf '  "install_path": "%s",\n' "$(json_escape "$install_path")"
+  printf '  "lsp_install_path": "%s"\n' "$(json_escape "$lsp_install_path")"
+  printf '}\n'
 }
 
 latest_version() {
@@ -256,6 +294,10 @@ install_path="${bin_dir}/${binary_name}"
 lsp_install_path="${bin_dir}/${lsp_binary_name}"
 
 if [[ "$dry_run" == "true" ]]; then
+  if [[ "$json_out" == "true" ]]; then
+    print_json_report
+    exit 0
+  fi
   echo "version=$version"
   echo "goos=$goos"
   echo "goarch=$goarch"
@@ -322,5 +364,9 @@ fi
 mkdir -p "$bin_dir"
 install -m 0755 "$extract_dir/$binary_name" "$install_path"
 install -m 0755 "$extract_dir/$lsp_binary_name" "$lsp_install_path"
-echo "installed $install_path"
-echo "installed $lsp_install_path"
+if [[ "$json_out" == "true" ]]; then
+  print_json_report
+else
+  echo "installed $install_path"
+  echo "installed $lsp_install_path"
+fi
