@@ -12,6 +12,16 @@ go run ./cmd/leia ci release --release-version vX.Y.Z --list
 bash scripts/performance_gate.sh --full
 ```
 
+Machine-readable release evidence:
+
+```bash
+bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json
+bash scripts/public_release_blockers_check.sh --json
+bash scripts/release_notes_check.sh --json --version vX.Y.Z
+bash scripts/release_distribution_check.sh --json
+bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
+```
+
 `leia ci release` delegates to the same production release profile. That
 profile is the release validation source of truth: correctness, documentation,
 performance, q conformance, language conformance, public blockers,

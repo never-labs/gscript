@@ -182,7 +182,10 @@ collect environment, docs/test status, and optional benchmark summaries.
 
 ```bash
 bash scripts/production_check.sh --quick
+bash scripts/production_check.sh --quick --list --json
 go test ./tests -run 'TestReleaseMatrix' -count=1
+bash scripts/release_distribution_check.sh --json
+bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
 bash scripts/release_artifacts_check.sh --build
 ```
 

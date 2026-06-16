@@ -993,6 +993,9 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
 		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
+		"bash scripts/production_check.sh --quick --list --json",
+		"bash scripts/release_distribution_check.sh --json",
+		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 		"bash scripts/release_artifacts_check.sh",
 	} {
 		if !strings.Contains(toolingGuide, snippet) {
@@ -1108,6 +1111,11 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"complete the release decisions recorded in `docs/release/decisions.md`",
 		"examples/README.md",
 		"docs/reference/platforms/index.md",
+		"bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json",
+		"bash scripts/public_release_blockers_check.sh --json",
+		"bash scripts/release_notes_check.sh --json --version vX.Y.Z",
+		"bash scripts/release_distribution_check.sh --json",
+		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 	} {
 		if !strings.Contains(release, snippet) {
 			t.Fatalf("docs/release/index.md must mention %q", snippet)
