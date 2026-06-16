@@ -231,6 +231,19 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("diag bundle report capability = %+v, want count field %q", diagBundleReport, want)
 		}
 	}
+	for _, tc := range []struct {
+		command    string
+		collection string
+	}{
+		{"leia check --json", "steps"},
+		{"leia fmt --json", "files"},
+		{"leia test --json", "files"},
+	} {
+		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
+		if report == nil || !containsString(report.CollectionFields, tc.collection) {
+			t.Fatalf("%s report capability = %+v, want collection field %q", tc.command, report, tc.collection)
+		}
+	}
 	docGenerateReport := capabilitiesReport(caps.Tooling.Reports, "leia doc generate --format=json")
 	for _, want := range []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"} {
 		if docGenerateReport == nil || !containsString(docGenerateReport.CountFields, want) {
