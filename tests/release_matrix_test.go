@@ -2253,6 +2253,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		Status            string `json:"status"`
 		Mode              string
 		ReleaseProfile    bool `json:"release_profile"`
+		OutputDir         string `json:"output_dir"`
 		ListOnly          bool `json:"list_only"`
 		RunCount          int  `json:"run_count"`
 		SkipCount         int  `json:"skip_count"`
@@ -2269,7 +2270,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(quickOut), &quickReport); err != nil {
 		t.Fatalf("quick production plan JSON failed to decode: %v\n%s", err, quickOut)
 	}
-	if quickReport.SchemaVersion != 1 || quickReport.Status != "pass" || quickReport.Mode != "quick" || quickReport.ReleaseProfile || !quickReport.ListOnly || quickReport.RunCount != len(quickReport.RunnableChecks) || quickReport.SkipCount != len(quickReport.SkippedChecks) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkips) || quickReport.CriticalNameCount != len(quickReport.ReleaseCriticalNames) {
+	if quickReport.SchemaVersion != 1 || quickReport.Status != "pass" || quickReport.Mode != "quick" || quickReport.ReleaseProfile || quickReport.OutputDir != "" || !quickReport.ListOnly || quickReport.RunCount != len(quickReport.RunnableChecks) || quickReport.SkipCount != len(quickReport.SkippedChecks) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkips) || quickReport.CriticalNameCount != len(quickReport.ReleaseCriticalNames) {
 		t.Fatalf("quick production plan JSON = %+v, want quick schema v1 plan", quickReport)
 	}
 	planDir := t.TempDir()
@@ -2284,6 +2285,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		SchemaVersion int    `json:"schema_version"`
 		Status        string `json:"status"`
 		Mode          string `json:"mode"`
+		OutputDir     string `json:"output_dir"`
 		RunCount      int    `json:"run_count"`
 		Runnable      []struct {
 			Name    string `json:"name"`
@@ -2293,7 +2295,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(planJSON), &planArtifact); err != nil {
 		t.Fatalf("production plan artifact JSON failed to decode: %v\n%s", err, planJSON)
 	}
-	if planArtifact.SchemaVersion != 1 || planArtifact.Status != "pass" || planArtifact.Mode != "quick" || planArtifact.RunCount != len(planArtifact.Runnable) || planArtifact.RunCount == 0 {
+	if planArtifact.SchemaVersion != 1 || planArtifact.Status != "pass" || planArtifact.Mode != "quick" || planArtifact.OutputDir != planDir || planArtifact.RunCount != len(planArtifact.Runnable) || planArtifact.RunCount == 0 {
 		t.Fatalf("production plan artifact JSON = %+v, want quick schema v1 plan artifact", planArtifact)
 	}
 
@@ -2304,6 +2306,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		Mode              string
 		ReleaseProfile    bool   `json:"release_profile"`
 		ReleaseVersion    string `json:"release_version"`
+		OutputDir         string `json:"output_dir"`
 		ListOnly          bool   `json:"list_only"`
 		RunCount          int    `json:"run_count"`
 		SkipCount         int    `json:"skip_count"`
@@ -2320,7 +2323,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("production plan JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Status != "pass" || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) || report.CriticalNameCount != len(report.ReleaseCriticalNames) {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || report.OutputDir != "" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) || report.CriticalNameCount != len(report.ReleaseCriticalNames) {
 		t.Fatalf("production plan JSON = %+v, want release profile schema v1 plan", report)
 	}
 	for _, want := range []string{"Correctness", "Performance Gate", "Public Release Blockers", "Release Smoke", "Release Distribution", "Release Notes", "Release Artifacts"} {

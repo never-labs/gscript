@@ -39,7 +39,8 @@ the report exposes machine-readable release evidence. Nested fields use dotted
 JSON paths; `[]` marks per-item array paths.
 `scripts/production_check.sh --out-dir DIR` writes `plan.txt`, `plan.json`,
 and `commands.log` so the resolved release plan can be archived with both
-human-readable and machine-readable evidence.
+human-readable and machine-readable evidence. The JSON plan includes
+`output_dir` when an artifact directory is requested.
 
 `leia ci release` delegates to the same production release profile. That
 profile is the release validation source of truth: correctness, documentation,

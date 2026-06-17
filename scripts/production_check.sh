@@ -204,6 +204,7 @@ print_plan_json() {
     printf '  "mode": "%s",\n' "$(json_escape "$MODE")"
     printf '  "release_profile": %s,\n' "$([ "$RELEASE_PROFILE" -eq 1 ] && echo true || echo false)"
     printf '  "release_version": "%s",\n' "$(json_escape "$RELEASE_VERSION")"
+    printf '  "output_dir": "%s",\n' "$(json_escape "$OUT_DIR")"
     printf '  "list_only": %s,\n' "$([ "$LIST_ONLY" -eq 1 ] && echo true || echo false)"
     printf '  "run_count": %d,\n' "${#RUN_NAMES[@]}"
     printf '  "skip_count": %d,\n' "${#SKIP_REASONS[@]}"
