@@ -71,6 +71,13 @@ json_escape() {
   printf '%s' "$value"
 }
 
+normalize_decision_status() {
+  local value="$1"
+  value="${value%"${value##*[![:space:]]}"}"
+  value="${value%"${value##*[!.:;]}"}"
+  printf '%s' "$value"
+}
+
 count_blocker_kind() {
   local kind="$1"
   local count=0
@@ -173,13 +180,14 @@ if [[ -f docs/release/decisions.md ]]; then
     area="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2 }' <<<"$line")"
     decision_needed="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3 }' <<<"$line")"
     status="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $4); print $4 }' <<<"$line")"
+    normalized_status="$(normalize_decision_status "$status")"
     [[ -n "$area" && -n "$status" ]] || continue
     [[ "$area" != "Area" && "$area" != "---" ]] || continue
     if ! grep -Eq '^(Resolved|Accepted|N/A)([:.]|$)' <<<"$status"; then
       if [[ -n "$decision_needed" && "$decision_needed" != "---" ]]; then
-        add_blocker "unresolved release decision: $area: $decision_needed ($status)" "release_decision" "$area" "$decision_needed" "$status" "docs/release/decisions.md"
+        add_blocker "unresolved release decision: $area: $decision_needed ($status)" "release_decision" "$area" "$decision_needed" "$normalized_status" "docs/release/decisions.md"
       else
-        add_blocker "unresolved release decision: $area ($status)" "release_decision" "$area" "" "$status" "docs/release/decisions.md"
+        add_blocker "unresolved release decision: $area ($status)" "release_decision" "$area" "" "$normalized_status" "docs/release/decisions.md"
       fi
     fi
   done < docs/release/decisions.md

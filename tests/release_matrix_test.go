@@ -1258,7 +1258,7 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 		}
 		if detail.Area == "License" && detail.Kind == "release_decision" {
 			foundLicenseDecision = true
-			if detail.Action != "Choose the repository license and whether a `NOTICE` file is required." || detail.DecisionStatus != "Open." || detail.Path != "docs/release/decisions.md" {
+			if detail.Action != "Choose the repository license and whether a `NOTICE` file is required." || detail.DecisionStatus != "Open" || detail.Path != "docs/release/decisions.md" {
 				t.Fatalf("license decision detail = %+v, want actionable release decision metadata", detail)
 			}
 		}
