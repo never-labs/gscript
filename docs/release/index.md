@@ -102,6 +102,29 @@ tags. Candidate notes live under [`notes/`](notes/) as `vX.Y.Z.md` so
 compatibility, security, performance, validation, and artifact evidence are
 recorded consistently and can be passed to GoReleaser.
 
+## Release-Critical Gates
+
+`scripts/production_check.sh --full --release-profile` treats these gates as
+release-critical:
+
+| Gate | Evidence |
+|---|---|
+| Correctness | Go tests, release matrix, spec examples, and stdlib contracts. |
+| Manifest Coverage | Test and benchmark manifest coverage. |
+| Module Path Gate | Published module path validation. |
+| Documentation References | Markdown links, spec HTML, generated references, and runnable examples. |
+| Editor Assets | TextMate, tree-sitter, VS Code, and editor smoke checks. |
+| Performance Gate | LuaJIT-class timing and strict performance evidence. |
+| Q Performance Gate | q benchmark report generation and threshold checks. |
+| Language Conformance Surface | Language conformance inventory. |
+| Q Conformance Gate | q language, example, and benchmark conformance. |
+| Release Smoke | Release-profile smoke checks. |
+| CLI Experience | CLI examples and user-facing command checks. |
+| Public Release Blockers | License, security, platform, channel, signing, and compatibility decisions. |
+| Release Distribution | GoReleaser config, workflows, install targets, and local install fixtures. |
+| Release Notes | Candidate notes for the tag, including all archive targets and checksums. |
+| Release Artifacts | Local artifact build, tag, cleanliness, and install archive checks. |
+
 ## Release Compatibility Checklist
 
 Every public tag must have release notes. The notes must identify:

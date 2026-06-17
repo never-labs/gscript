@@ -1161,9 +1161,31 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"`status_field`",
 		"`count_fields`",
 		"`collection_fields`",
+		"## Release-Critical Gates",
 	} {
 		if !strings.Contains(release, snippet) {
 			t.Fatalf("docs/release/index.md must mention %q", snippet)
+		}
+	}
+	for _, gate := range []string{
+		"Correctness",
+		"Manifest Coverage",
+		"Module Path Gate",
+		"Documentation References",
+		"Editor Assets",
+		"Performance Gate",
+		"Q Performance Gate",
+		"Language Conformance Surface",
+		"Q Conformance Gate",
+		"Release Smoke",
+		"CLI Experience",
+		"Public Release Blockers",
+		"Release Distribution",
+		"Release Notes",
+		"Release Artifacts",
+	} {
+		if !strings.Contains(release, "| "+gate+" |") {
+			t.Fatalf("docs/release/index.md must document release-critical gate %q", gate)
 		}
 	}
 
