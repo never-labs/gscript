@@ -138,6 +138,25 @@ require_not_matching() {
   fi
 }
 
+release_archive_names() {
+  local archive_version="$1"
+  printf 'leia_%s_darwin_amd64.tar.gz\n' "$archive_version"
+  printf 'leia_%s_darwin_arm64.tar.gz\n' "$archive_version"
+  printf 'leia_%s_linux_amd64.tar.gz\n' "$archive_version"
+  printf 'leia_%s_linux_arm64.tar.gz\n' "$archive_version"
+  printf 'leia_%s_windows_amd64.zip\n' "$archive_version"
+  printf 'leia_%s_windows_arm64.zip\n' "$archive_version"
+}
+
+require_release_archive_names() {
+  local file="$1"
+  local archive_version="$2"
+  local archive
+  while IFS= read -r archive; do
+    require_contains "$file" "$archive"
+  done < <(release_archive_names "$archive_version")
+}
+
 check_template() {
   local template="docs/release/notes-template.md"
   add_checked_file "$template"
@@ -149,6 +168,8 @@ check_template() {
   require_contains "$template" "List known issues, or write \`None known\` after release validation."
   require_contains "$template" "## Checksums And Artifacts"
   require_contains "$template" "## Release Decisions"
+  require_release_archive_names "$template" "vX.Y.Z"
+  require_contains "$template" "Each archive includes \`leia\` and \`leia-lsp\`."
 }
 
 check_version() {
@@ -164,8 +185,8 @@ check_version() {
   done
   require_contains "$notes" "$version"
   require_contains "$notes" "bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version $version"
-  require_contains "$notes" "leia_${version}_"
   require_contains "$notes" "leia-lsp"
+  require_release_archive_names "$notes" "$version"
 
   if ! grep -Eq '[[:xdigit:]]{64}' "$notes"; then
     add_failure "$notes must include at least one 64-hex SHA256 checksum"
