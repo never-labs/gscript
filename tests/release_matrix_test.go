@@ -1504,6 +1504,70 @@ func TestReleaseMatrixCheckJSONReportIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing.T) {
+	root := findRepoRoot(t)
+	registry := releaseReportRegistry(t, root)
+
+	configDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(configDir, "leia.toml"), []byte("[project]\nname = \"demo\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	testDir := t.TempDir()
+	testPath := filepath.Join(testDir, "ok.leia")
+	if err := os.WriteFile(testPath, []byte("print(\"ok\")\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(testPath, ".leia")+".out", []byte("ok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	inspectDir := t.TempDir()
+	inspectPath := filepath.Join(inspectDir, "fn.leia")
+	if err := os.WriteFile(inspectPath, []byte("func add(a, b) { return a + b }\nprint(add(1, 2))\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	modDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(modDir, "leia.mod"), []byte("module github.com/example/project\nleia 0.1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "main.leia"), []byte("print(\"ok\")\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		reportCommand string
+		args          []string
+		fields        []string
+	}{
+		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, fields: []string{"diagnostics"}},
+		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/basic_assert.leia"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
+		{reportCommand: "leia examples list --json", args: []string{"go", "run", "./cmd/leia", "examples", "list", "--json"}, fields: []string{"examples"}},
+		{reportCommand: "leia fmt --json", args: []string{"go", "run", "./cmd/leia", "fmt", "--check", "--json", testPath}, fields: []string{"files"}},
+		{reportCommand: "leia inspect bytecode --json", args: []string{"go", "run", "./cmd/leia", "inspect", "bytecode", "--json", "--proto", "add", inspectPath}, fields: []string{"proto.children"}},
+		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, fields: []string{"files", "diagnostics"}},
+		{reportCommand: "leia test --json", args: []string{"go", "run", "./cmd/leia", "test", "--json", testDir}, fields: []string{"files"}},
+		{reportCommand: "leia test --list --json", args: []string{"go", "run", "./cmd/leia", "test", "--list", "--json", testDir}, fields: []string{"files"}},
+	} {
+		t.Run(tc.reportCommand, func(t *testing.T) {
+			declared, ok := registry[tc.reportCommand]
+			if !ok {
+				t.Fatalf("capabilities report registry missing %q", tc.reportCommand)
+			}
+			for _, field := range tc.fields {
+				if !stringSliceContains(declared, field) {
+					t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared, field)
+				}
+			}
+			out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+			for _, field := range tc.fields {
+				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
+			}
+		})
+	}
+}
+
 func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")
@@ -3917,6 +3981,27 @@ func assertNestedJSONFieldPresentAndNonNull(t *testing.T, data, label string, pa
 		}
 		current = value
 	}
+}
+
+func releaseReportRegistry(t *testing.T, root string) map[string][]string {
+	t.Helper()
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "capabilities", "--json")
+	var payload struct {
+		Tooling struct {
+			Reports []struct {
+				Command          string   `json:"command"`
+				CollectionFields []string `json:"collection_fields"`
+			} `json:"reports"`
+		} `json:"tooling"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("capabilities JSON failed to decode: %v\n%s", err, out)
+	}
+	registry := map[string][]string{}
+	for _, report := range payload.Tooling.Reports {
+		registry[report.Command] = report.CollectionFields
+	}
+	return registry
 }
 
 func stringSliceContains(values []string, want string) bool {
