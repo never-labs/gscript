@@ -1,9 +1,13 @@
 package tests_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1642,6 +1646,25 @@ collection vendor ./vendor
 		t.Fatal(err)
 	}
 	diagOutDir := filepath.Join(t.TempDir(), "bundle")
+	remoteModDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(remoteModDir, "leia.mod"), []byte(`module example.com/remote-demo
+leia 0.1
+require github.com/acme/toolkit v1.2.3
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	remoteArchive := releaseMatrixZip(t, map[string]string{
+		"toolkit-1.2.3/leia.mod":  "module github.com/acme/toolkit\nleia 0.1\n",
+		"toolkit-1.2.3/main.leia": "print(\"ok\")\n",
+	})
+	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acme/toolkit/archive/refs/tags/v1.2.3.zip" {
+			t.Fatalf("unexpected module download path = %q", r.URL.Path)
+		}
+		_, _ = w.Write(remoteArchive)
+	}))
+	defer remoteServer.Close()
+	remoteCache := filepath.Join(remoteModDir, "cache")
 
 	for _, tc := range []struct {
 		reportCommand string
@@ -1655,6 +1678,7 @@ collection vendor ./vendor
 		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count", "commands[].arg_count"}, fields: []string{"commands", "commands[].args"}, matches: []releaseReportCountMatch{{"command_count", "commands"}, {"commands[].arg_count", "commands[].args"}}},
 		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia diag bundle --json", args: []string{"go", "run", "./cmd/leia", "diag", "bundle", "--output", diagOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, counts: []string{"failure_count", "file_count"}, fields: []string{"files"}, matches: []releaseReportCountMatch{{"file_count", "files"}}},
+		{reportCommand: "leia doc check --json", args: []string{"go", "run", "./cmd/leia", "doc", "check", "--json"}, counts: []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}}},
 		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, counts: []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}, matches: []releaseReportCountMatch{{"cli.command_count", "cli.commands"}, {"stdlib.layer_count", "stdlib.layers"}, {"stdlib.default_import_count", "stdlib.default_imports"}, {"dialects.dialect_count", "dialects.dialects"}}},
 		{reportCommand: "leia env --json", args: []string{"go", "run", "./cmd/leia", "env", "--json"}, counts: []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.stdlib_layer_count", "capabilities.default_import_count", "capabilities.dialect_count", "capabilities.tooling.report_count"}, fields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}, matches: []releaseReportCountMatch{{"capabilities.command_count", "capabilities.commands"}, {"capabilities.stdlib_module_count", "capabilities.stdlib_modules"}, {"capabilities.stdlib_layer_count", "capabilities.stdlib_layers"}, {"capabilities.default_import_count", "capabilities.default_imports"}, {"capabilities.dialect_count", "capabilities.dialects"}, {"capabilities.tooling.report_count", "capabilities.tooling.reports"}}},
 		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/corpus_metrics.leia"}, counts: []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos", "metrics[].count"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
@@ -1666,12 +1690,14 @@ collection vendor ./vendor
 		{reportCommand: "leia lint --json", args: []string{"go", "run", "./cmd/leia", "lint", "--json", lintPath}, counts: []string{"diagnostic_count", "error_count", "warning_count"}, fields: []string{"diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod capability --json", args: []string{"go", "run", "./cmd/leia", "mod", "capability", "--json", richModDir}, counts: []string{"capability_count", "module_count", "diagnostic_count"}, fields: []string{"capabilities", "modules", "matrix", "diagnostics"}, matches: []releaseReportCountMatch{{"capability_count", "capabilities"}, {"module_count", "modules"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod check --json", args: []string{"go", "run", "./cmd/leia", "mod", "check", "--json", richModDir}, counts: []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}, fields: []string{"graph.files", "diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}, {"graph.file_count", "graph.files"}}},
+		{reportCommand: "leia mod download --json", args: []string{"go", "run", "./cmd/leia", "mod", "download", "--json", "--cache", remoteCache, "--github-base", remoteServer.URL, remoteModDir}, counts: []string{"module_count", "diagnostic_count"}, fields: []string{"modules", "diagnostics"}, matches: []releaseReportCountMatch{{"module_count", "modules"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod explain --json", args: []string{"go", "run", "./cmd/leia", "mod", "explain", "--json", "--dir", richModDir, "example.com/lib"}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod gomod --json", args: []string{"go", "run", "./cmd/leia", "mod", "gomod", "--json", richModDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, counts: []string{"file_count", "diagnostic_count"}, fields: []string{"files", "diagnostics"}, matches: []releaseReportCountMatch{{"file_count", "files"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod list --json", args: []string{"go", "run", "./cmd/leia", "mod", "list", "--json", modDir}, counts: []string{"require_count", "replace_count", "collection_count", "diagnostic_count"}, fields: []string{"requires", "replaces", "collections", "diagnostics"}, matches: []releaseReportCountMatch{{"require_count", "requires"}, {"replace_count", "replaces"}, {"collection_count", "collections"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod lock --json", args: []string{"go", "run", "./cmd/leia", "mod", "lock", "--json", richModDir}, counts: []string{"entry_count", "diagnostic_count"}, fields: []string{"entries", "diagnostics"}, matches: []releaseReportCountMatch{{"entry_count", "entries"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod tidy --json", args: []string{"go", "run", "./cmd/leia", "mod", "tidy", "--json", "--dir", richModDir}, counts: []string{"removed_count", "missing_count", "diagnostic_count"}, fields: []string{"removed", "missing", "diagnostics"}, matches: []releaseReportCountMatch{{"removed_count", "removed"}, {"missing_count", "missing"}, {"diagnostic_count", "diagnostics"}}},
+		{reportCommand: "leia mod vendor --json", args: []string{"go", "run", "./cmd/leia", "mod", "vendor", "--json", "--cache", remoteCache, remoteModDir}, counts: []string{"module_count", "diagnostic_count"}, fields: []string{"modules", "diagnostics"}, matches: []releaseReportCountMatch{{"module_count", "modules"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod verify --json", args: []string{"go", "run", "./cmd/leia", "mod", "verify", "--json", modDir}, counts: []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}, fields: []string{"graph.files", "diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}, {"graph.file_count", "graph.files"}}},
 		{reportCommand: "leia test --json", args: []string{"go", "run", "./cmd/leia", "test", "--json", testDir}, counts: []string{"total", "passed", "failed"}, fields: []string{"files"}},
 		{reportCommand: "leia test --list --json", args: []string{"go", "run", "./cmd/leia", "test", "--list", "--json", testDir}, counts: []string{"file_count"}, fields: []string{"files"}, matches: []releaseReportCountMatch{{"file_count", "files"}}},
@@ -4294,6 +4320,25 @@ func readFileString(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(data)
+}
+
+func releaseMatrixZip(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, data := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(data)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
 
 func assertJSONFieldsPresentAndNonNull(t *testing.T, data, label string, fields ...string) {
