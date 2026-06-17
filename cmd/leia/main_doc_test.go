@@ -150,7 +150,7 @@ func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &bundle); err != nil {
 		t.Fatalf("decode combined json: %v", err)
 	}
-	if bundle.SchemaVersion != 1 || bundle.CLI.CommandCount != len(bundle.CLI.Commands) || len(bundle.CLI.Commands) == 0 || bundle.Stdlib.LayerCount != len(bundle.Stdlib.Layers) || bundle.Stdlib.DefaultCount != len(bundle.Stdlib.DefaultImports) || len(bundle.Stdlib.Layers) == 0 || !docDefaultImportsContain(bundle.Stdlib.DefaultImports, "sqrt", "math", "sqrt") || bundle.Dialects.DialectCount != len(bundle.Dialects.Dialects) || len(bundle.Dialects.Dialects) == 0 {
+	if bundle.SchemaVersion != 1 || bundle.Status != "pass" || bundle.CLI.CommandCount != len(bundle.CLI.Commands) || len(bundle.CLI.Commands) == 0 || bundle.Stdlib.LayerCount != len(bundle.Stdlib.Layers) || bundle.Stdlib.DefaultCount != len(bundle.Stdlib.DefaultImports) || len(bundle.Stdlib.Layers) == 0 || !docDefaultImportsContain(bundle.Stdlib.DefaultImports, "sqrt", "math", "sqrt") || bundle.Dialects.DialectCount != len(bundle.Dialects.Dialects) || len(bundle.Dialects.Dialects) == 0 {
 		t.Fatalf("bundle = %#v, want CLI and stdlib references", bundle)
 	}
 }

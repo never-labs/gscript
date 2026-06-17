@@ -1977,7 +1977,8 @@ func TestReleaseMatrixDocGenerateReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "doc", "generate", "--format=json")
 	var report struct {
-		SchemaVersion int `json:"schema_version"`
+		SchemaVersion int    `json:"schema_version"`
+		Status        string `json:"status"`
 		CLI           struct {
 			SchemaVersion int `json:"schema_version"`
 			CommandCount  int `json:"command_count"`
@@ -2011,7 +2012,7 @@ func TestReleaseMatrixDocGenerateReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("doc generate JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.CLI.SchemaVersion != 1 || report.Stdlib.SchemaVersion != 1 || report.Dialects.SchemaVersion != 1 {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.CLI.SchemaVersion != 1 || report.Stdlib.SchemaVersion != 1 || report.Dialects.SchemaVersion != 1 {
 		t.Fatalf("doc generate JSON schema versions = %+v, want schema v1 bundle", report)
 	}
 	if report.CLI.CommandCount != len(report.CLI.Commands) || report.CLI.CommandCount == 0 {

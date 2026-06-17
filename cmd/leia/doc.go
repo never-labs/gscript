@@ -163,6 +163,7 @@ type docDialectReference struct {
 
 type docReferenceBundle struct {
 	SchemaVersion int                 `json:"schema_version"`
+	Status        string              `json:"status"`
 	CLI           docCLIReference     `json:"cli"`
 	Stdlib        docStdlibInventory  `json:"stdlib"`
 	Dialects      docDialectReference `json:"dialects"`
@@ -367,6 +368,7 @@ func generateCombinedReferenceJSON() []byte {
 	dialects := buildDialectCapabilities()
 	return marshalGeneratedDoc(docReferenceBundle{
 		SchemaVersion: 1,
+		Status:        "pass",
 		CLI: docCLIReference{
 			SchemaVersion: 1,
 			CommandCount:  len(commands),
