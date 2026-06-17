@@ -16,6 +16,7 @@ Machine-readable release evidence:
 
 ```bash
 go run ./cmd/leia capabilities --json
+bash scripts/diagnostics_bundle.sh --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
 bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
 bash scripts/q_conformance_gate.sh --scope core --bench smoke --json

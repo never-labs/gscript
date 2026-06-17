@@ -67,8 +67,9 @@ kind counts for missing files, open release decisions, stale text, unconfirmed
 policies, missing guidance, missing documentation snippets, plus
 `decision_area_count` and `decision_areas` for the required maintainer decision
 domains.
-`leia diag bundle --json` exposes `file_count` for the generated bundle files
-listed in `files`.
+`leia diag bundle --json` and
+`scripts/diagnostics_bundle.sh --json` expose `file_count` for the generated
+bundle files listed in `files`.
 `scripts/performance_gate.sh --validate-only FILE --json` exposes
 `output_line_count` for captured validation output.
 
@@ -88,6 +89,7 @@ Current lint codes:
 leia diag dump
 leia diag bundle --output /tmp/leia-diag --skip-benchmarks
 leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
+bash scripts/diagnostics_bundle.sh --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
 ```
 
 Bundles are intended for compiler/runtime investigations. User-facing tooling
