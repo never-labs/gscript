@@ -1587,6 +1587,9 @@ func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing
 				}
 			}
 			out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+			if declared.StatusField != "" {
+				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(declared.StatusField, ".")...)
+			}
 			for _, count := range tc.counts {
 				assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
 			}
@@ -1634,6 +1637,9 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 				}
 			}
 			out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+			if declared.StatusField != "" {
+				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(declared.StatusField, ".")...)
+			}
 			for _, count := range tc.counts {
 				assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
 			}
@@ -4095,6 +4101,7 @@ func nestedJSONField(t *testing.T, data, label string, path ...string) json.RawM
 }
 
 type releaseReportRegistryEntry struct {
+	StatusField      string
 	CountFields      []string
 	CollectionFields []string
 }
@@ -4106,6 +4113,7 @@ func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRe
 		Tooling struct {
 			Reports []struct {
 				Command          string   `json:"command"`
+				StatusField      string   `json:"status_field"`
 				CountFields      []string `json:"count_fields"`
 				CollectionFields []string `json:"collection_fields"`
 			} `json:"reports"`
@@ -4117,6 +4125,7 @@ func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRe
 	registry := map[string]releaseReportRegistryEntry{}
 	for _, report := range payload.Tooling.Reports {
 		registry[report.Command] = releaseReportRegistryEntry{
+			StatusField:      report.StatusField,
 			CountFields:      report.CountFields,
 			CollectionFields: report.CollectionFields,
 		}
