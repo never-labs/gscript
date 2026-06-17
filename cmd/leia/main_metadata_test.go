@@ -246,8 +246,13 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia evaluate --json", "notes"},
 		{"leia fmt --json", "files"},
 		{"leia inspect bytecode --json", "proto.children"},
+		{"leia mod download --json", "modules"},
+		{"leia mod download --json", "diagnostics"},
+		{"leia mod vendor --json", "modules"},
+		{"leia mod vendor --json", "diagnostics"},
 		{"leia test --json", "files"},
 		{"scripts/production_check.sh --list --json", "release_critical_skip_names"},
+		{"scripts/worktree_audit.sh --json", "findings"},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		if report == nil || !containsString(report.CollectionFields, tc.collection) {
