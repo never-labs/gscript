@@ -1597,6 +1597,53 @@ func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing
 	}
 }
 
+func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) {
+	root := findRepoRoot(t)
+	registry := releaseReportRegistry(t, root)
+	installBinDir := filepath.Join(t.TempDir(), "bin")
+
+	for _, tc := range []struct {
+		reportCommand string
+		args          []string
+		counts        []string
+		fields        []string
+	}{
+		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, counts: []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}},
+		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}},
+		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, counts: []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "release_critical_skip_names", "release_critical_skips"}},
+		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count"}, fields: []string{"blockers", "blocker_details"}},
+		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, counts: []string{"language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"language_cases", "example_cases", "benchmark_cases"}},
+		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, counts: []string{"artifact_count"}, fields: []string{"artifact_files"}},
+		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, counts: []string{"artifact_count"}, fields: []string{"artifact_files"}},
+		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, counts: []string{"workflow_count", "install_target_count"}, fields: []string{"workflow_files", "install_targets"}},
+		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, counts: []string{"checked_file_count", "failure_count"}, fields: []string{"checked_files", "failures"}},
+	} {
+		t.Run(tc.reportCommand, func(t *testing.T) {
+			declared, ok := registry[tc.reportCommand]
+			if !ok {
+				t.Fatalf("capabilities report registry missing %q", tc.reportCommand)
+			}
+			for _, count := range tc.counts {
+				if !stringSliceContains(declared.CountFields, count) {
+					t.Fatalf("capabilities report %q count_fields = %#v, want %q", tc.reportCommand, declared.CountFields, count)
+				}
+			}
+			for _, field := range tc.fields {
+				if !stringSliceContains(declared.CollectionFields, field) {
+					t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared.CollectionFields, field)
+				}
+			}
+			out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+			for _, count := range tc.counts {
+				assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
+			}
+			for _, field := range tc.fields {
+				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
+			}
+		})
+	}
+}
+
 func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")
