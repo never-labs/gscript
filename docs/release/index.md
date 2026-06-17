@@ -34,9 +34,9 @@ bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
 
 `leia capabilities --json` includes `tooling.report_count` and
 `tooling.reports`, the registry of CLI and release-script JSON reports. Each
-entry advertises `status_field`, `count_fields`, and `collection_fields` when
-the report exposes machine-readable release evidence. Nested fields use dotted
-JSON paths; `[]` marks per-item array paths.
+entry advertises `status_field`, `scalar_fields`, `count_fields`, and
+`collection_fields` when the report exposes machine-readable release evidence.
+Nested fields use dotted JSON paths; `[]` marks per-item array paths.
 `scripts/production_check.sh --out-dir DIR` writes `plan.txt`, `plan.json`,
 and `commands.log` so the resolved release plan can be archived with both
 human-readable and machine-readable evidence. The JSON plan includes

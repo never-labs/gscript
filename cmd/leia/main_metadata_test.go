@@ -237,6 +237,22 @@ func TestCapabilitiesJSON(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
+		command string
+		scalars []string
+	}{
+		{"scripts/diagnostics_bundle.sh --json", []string{"output_dir"}},
+		{"scripts/production_check.sh --list --json", []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}},
+		{"scripts/release_artifacts.sh --dry-run --json", []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}},
+		{"scripts/release_artifacts_check.sh --json", []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}},
+	} {
+		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
+		for _, want := range tc.scalars {
+			if report == nil || !containsString(report.ScalarFields, want) {
+				t.Fatalf("%s report capability = %+v, want scalar field %q", tc.command, report, want)
+			}
+		}
+	}
+	for _, tc := range []struct {
 		command    string
 		collection string
 	}{
