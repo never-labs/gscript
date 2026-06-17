@@ -157,6 +157,24 @@ require_release_archive_names() {
   done < <(release_archive_names "$archive_version")
 }
 
+require_archive_checksum() {
+  local file="$1"
+  local artifact="$2"
+  if ! grep -E "\\|[[:space:]]*\`?${artifact}\`?[[:space:]]*\\|[[:space:]]*[[:xdigit:]]{64}[[:space:]]*\\|" "$file" >/dev/null; then
+    add_failure "$file must include a 64-hex SHA256 checksum for $artifact"
+  fi
+}
+
+require_release_archive_checksums() {
+  local file="$1"
+  local archive_version="$2"
+  local archive
+  while IFS= read -r archive; do
+    require_archive_checksum "$file" "$archive"
+  done < <(release_archive_names "$archive_version")
+  require_archive_checksum "$file" "SHA256SUMS"
+}
+
 check_template() {
   local template="docs/release/notes-template.md"
   add_checked_file "$template"
@@ -191,6 +209,7 @@ check_version() {
   if ! grep -Eq '[[:xdigit:]]{64}' "$notes"; then
     add_failure "$notes must include at least one 64-hex SHA256 checksum"
   fi
+  require_release_archive_checksums "$notes" "$version"
 
   for placeholder in \
     "vX.Y.Z" \

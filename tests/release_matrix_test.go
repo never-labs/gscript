@@ -1852,6 +1852,66 @@ Each archive includes leia and leia-lsp.
 	if incompleteReport.Status != "issues" || incompleteReport.Version != incompleteVersion || !stringSliceContains(incompleteReport.Failures, "docs/release/notes/"+incompleteVersion+".md still contains template placeholder: - Platform support:") {
 		t.Fatalf("incomplete release notes report = %+v, want Platform support placeholder failure", incompleteReport)
 	}
+
+	badChecksumVersion := "v9.9.7"
+	badChecksumNotes := filepath.Join(root, "docs", "release", "notes", badChecksumVersion+".md")
+	badChecksumContent := fmt.Sprintf(`# Leia %[1]s
+
+## Validation
+
+bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version %[1]s
+
+## Known Issues
+
+None known
+
+## Checksums And Artifacts
+
+| Artifact | SHA256 |
+|---|---|
+| leia_%[1]s_darwin_amd64.tar.gz | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
+| leia_%[1]s_darwin_arm64.tar.gz | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
+| leia_%[1]s_linux_amd64.tar.gz | missing |
+| leia_%[1]s_linux_arm64.tar.gz | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
+| leia_%[1]s_windows_amd64.zip | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
+| leia_%[1]s_windows_arm64.zip | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
+| SHA256SUMS | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
+
+Each archive includes leia and leia-lsp.
+
+## Release Decisions
+
+- License: pending project decision
+- Security reporting: pending project decision
+- Platform support: pending project decision
+- Release channels: pending project decision
+- Artifact signing: pending project decision
+- Compatibility policy: pending project decision
+`, badChecksumVersion)
+	if err := os.WriteFile(badChecksumNotes, []byte(badChecksumContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Remove(badChecksumNotes); err != nil && !os.IsNotExist(err) {
+			t.Fatalf("remove temporary checksum release notes: %v", err)
+		}
+	}()
+	badChecksumOut := runCommandResult(root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json", "--require-ready", "--version", badChecksumVersion)
+	if badChecksumOut.err == nil {
+		t.Fatalf("release notes with missing archive checksum unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", badChecksumOut.stdout, badChecksumOut.stderr)
+	}
+	var badChecksumReport struct {
+		Status   string   `json:"status"`
+		Version  string   `json:"version"`
+		Failures []string `json:"failures"`
+	}
+	if err := json.Unmarshal([]byte(badChecksumOut.stdout), &badChecksumReport); err != nil {
+		t.Fatalf("bad-checksum release notes JSON failed to decode: %v\n%s", err, badChecksumOut.stdout)
+	}
+	wantChecksumFailure := "docs/release/notes/" + badChecksumVersion + ".md must include a 64-hex SHA256 checksum for leia_" + badChecksumVersion + "_linux_amd64.tar.gz"
+	if badChecksumReport.Status != "issues" || badChecksumReport.Version != badChecksumVersion || !stringSliceContains(badChecksumReport.Failures, wantChecksumFailure) {
+		t.Fatalf("bad-checksum release notes report = %+v, want %q", badChecksumReport, wantChecksumFailure)
+	}
 }
 
 func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
