@@ -2224,7 +2224,18 @@ func TestReleaseMatrixDiagnosticsBundleReportIsMachineReadable(t *testing.T) {
 
 func TestReleaseMatrixWorktreeAuditReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
+	registry := releaseReportRegistry(t, root)
+	declared, ok := registry["scripts/worktree_audit.sh --json"]
+	if !ok {
+		t.Fatal("capabilities report registry missing scripts/worktree_audit.sh --json")
+	}
+	if !stringSliceContains(declared.CountFields, "finding_count") || !stringSliceContains(declared.CollectionFields, "findings") {
+		t.Fatalf("worktree audit registry = %+v, want finding_count and findings", declared)
+	}
 	out := runCommand(t, root, 60*time.Second, "bash", "scripts/worktree_audit.sh", "--json")
+	assertReleaseReportSchemaVersion(t, out, "scripts/worktree_audit.sh --json", declared.SchemaVersion)
+	assertReleaseReportStatusField(t, out, "scripts/worktree_audit.sh --json", declared.StatusField)
+	assertNestedJSONCountMatchesCollection(t, out, "scripts/worktree_audit.sh --json", []string{"finding_count"}, []string{"findings"})
 	var report struct {
 		SchemaVersion  int    `json:"schema_version"`
 		Status         string `json:"status"`
