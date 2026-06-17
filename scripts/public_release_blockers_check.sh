@@ -51,6 +51,7 @@ blocker_areas=()
 blocker_actions=()
 blocker_statuses=()
 blocker_paths=()
+decision_areas=()
 
 add_blocker() {
   blockers+=("$1")
@@ -91,6 +92,36 @@ count_blocker_kind() {
   printf '%d' "$count"
 }
 
+record_decision_area() {
+  local area="$1"
+  local existing
+  if [[ "${#decision_areas[@]}" -gt 0 ]]; then
+    for existing in "${decision_areas[@]}"; do
+      if [[ "$existing" == "$area" ]]; then
+        return
+      fi
+    done
+  fi
+  decision_areas+=("$area")
+}
+
+print_json_string_array() {
+  local indent="$1"
+  shift
+  local values=("$@")
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#values[@]}" ]]; do
+    printf '%s  "%s"' "$indent" "$(json_escape "${values[$i]}")"
+    if [[ "$i" -lt $((${#values[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
 print_json_report() {
   local status="pass"
   if [[ ${#blockers[@]} -gt 0 ]]; then
@@ -107,6 +138,10 @@ print_json_report() {
   printf '  "unconfirmed_policy_count": %d,\n' "$(count_blocker_kind "unconfirmed_policy")"
   printf '  "missing_guidance_count": %d,\n' "$(count_blocker_kind "missing_guidance")"
   printf '  "missing_doc_snippet_count": %d,\n' "$(count_blocker_kind "missing_doc_snippet")"
+  printf '  "decision_area_count": %d,\n' "${#decision_areas[@]}"
+  printf '  "decision_areas": '
+  print_json_string_array "  " "${decision_areas[@]}"
+  printf ',\n'
   printf '  "blockers": [\n'
   local i=0
   while [[ "$i" -lt ${#blockers[@]} ]]; do
@@ -183,6 +218,7 @@ if [[ -f docs/release/decisions.md ]]; then
     normalized_status="$(normalize_decision_status "$status")"
     [[ -n "$area" && -n "$status" ]] || continue
     [[ "$area" != "Area" && "$area" != "---" ]] || continue
+    record_decision_area "$area"
     if ! grep -Eq '^(Resolved|Accepted|N/A)([:.]|$)' <<<"$status"; then
       if [[ -n "$decision_needed" && "$decision_needed" != "---" ]]; then
         add_blocker "unresolved release decision: $area: $decision_needed ($status)" "release_decision" "$area" "$decision_needed" "$normalized_status" "docs/release/decisions.md"

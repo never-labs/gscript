@@ -64,7 +64,9 @@ Nested report fields use dotted JSON paths, and `[]` marks per-item array paths.
 In particular,
 `scripts/public_release_blockers_check.sh --json` exposes `blocker_count` and
 kind counts for missing files, open release decisions, stale text, unconfirmed
-policies, missing guidance, and missing documentation snippets.
+policies, missing guidance, missing documentation snippets, plus
+`decision_area_count` and `decision_areas` for the required maintainer decision
+domains.
 `leia diag bundle --json` exposes `file_count` for the generated bundle files
 listed in `files`.
 `scripts/performance_gate.sh --validate-only FILE --json` exposes
