@@ -1546,6 +1546,29 @@ func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing
 		t.Fatal(err)
 	}
 
+	richModDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(richModDir, "leia.mod"), []byte(`module github.com/example/project
+leia 0.1
+capability net.client
+require example.com/lib v1.0.0
+replace example.com/lib => ./lib
+collection vendor ./vendor
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(richModDir, "lib"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(richModDir, "lib", "leia.mod"), []byte("module example.com/lib\nleia 0.1\ncapability fs.read\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(richModDir, "vendor"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(richModDir, "main.leia"), []byte("require(\"example.com/lib\")\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, tc := range []struct {
 		reportCommand string
 		args          []string
@@ -1565,11 +1588,16 @@ func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing
 		{reportCommand: "leia inspect bytecode --json", args: []string{"go", "run", "./cmd/leia", "inspect", "bytecode", "--json", "--proto", "add", inspectPath}, counts: []string{"proto_count", "proto.instruction_count", "proto.constant_count", "proto.upvalue_count", "proto.child_proto_count"}, fields: []string{"proto.children"}},
 		{reportCommand: "leia inspect directives --json", args: []string{"go", "run", "./cmd/leia", "inspect", "directives", "--json", directivePath}, counts: []string{"directive_count"}, fields: []string{"directives"}},
 		{reportCommand: "leia lint --json", args: []string{"go", "run", "./cmd/leia", "lint", "--json", lintPath}, counts: []string{"diagnostic_count", "error_count", "warning_count"}, fields: []string{"diagnostics"}},
+		{reportCommand: "leia mod capability --json", args: []string{"go", "run", "./cmd/leia", "mod", "capability", "--json", richModDir}, counts: []string{"capability_count", "module_count", "diagnostic_count"}, fields: []string{"capabilities", "modules", "matrix", "diagnostics"}},
+		{reportCommand: "leia mod check --json", args: []string{"go", "run", "./cmd/leia", "mod", "check", "--json", richModDir}, counts: []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}, fields: []string{"graph.files", "diagnostics"}},
 		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, counts: []string{"file_count", "diagnostic_count"}, fields: []string{"files", "diagnostics"}},
 		{reportCommand: "leia mod list --json", args: []string{"go", "run", "./cmd/leia", "mod", "list", "--json", modDir}, counts: []string{"require_count", "replace_count", "collection_count", "diagnostic_count"}, fields: []string{"requires", "replaces", "collections", "diagnostics"}},
+		{reportCommand: "leia mod lock --json", args: []string{"go", "run", "./cmd/leia", "mod", "lock", "--json", richModDir}, counts: []string{"entry_count", "diagnostic_count"}, fields: []string{"entries", "diagnostics"}},
+		{reportCommand: "leia mod tidy --json", args: []string{"go", "run", "./cmd/leia", "mod", "tidy", "--json", "--dir", richModDir}, counts: []string{"removed_count", "missing_count", "diagnostic_count"}, fields: []string{"removed", "missing", "diagnostics"}},
 		{reportCommand: "leia mod verify --json", args: []string{"go", "run", "./cmd/leia", "mod", "verify", "--json", modDir}, counts: []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}, fields: []string{"graph.files", "diagnostics"}},
 		{reportCommand: "leia test --json", args: []string{"go", "run", "./cmd/leia", "test", "--json", testDir}, counts: []string{"total", "passed", "failed"}, fields: []string{"files"}},
 		{reportCommand: "leia test --list --json", args: []string{"go", "run", "./cmd/leia", "test", "--list", "--json", testDir}, counts: []string{"file_count"}, fields: []string{"files"}},
+		{reportCommand: "leia version --json", args: []string{"go", "run", "./cmd/leia", "version", "--json"}},
 	} {
 		t.Run(tc.reportCommand, func(t *testing.T) {
 			declared, ok := registry[tc.reportCommand]
