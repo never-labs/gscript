@@ -2057,7 +2057,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	if report.SchemaVersion != 1 || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) || report.CriticalNameCount != len(report.ReleaseCriticalNames) {
 		t.Fatalf("production plan JSON = %+v, want release profile schema v1 plan", report)
 	}
-	for _, want := range []string{"Correctness", "Performance Gate", "Public Release Blockers", "Release Smoke"} {
+	for _, want := range []string{"Correctness", "Performance Gate", "Public Release Blockers", "Release Smoke", "Release Distribution", "Release Notes", "Release Artifacts"} {
 		if !stringSliceContains(report.ReleaseCriticalNames, want) {
 			t.Fatalf("production plan JSON release critical names missing %q: %+v", want, report.ReleaseCriticalNames)
 		}
