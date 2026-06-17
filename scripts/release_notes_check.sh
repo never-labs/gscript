@@ -204,6 +204,10 @@ check_version() {
   done
   require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*License:[[:space:]]*$' "- License:"
   require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*Security reporting:[[:space:]]*$' "- Security reporting:"
+  require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*Platform support:[[:space:]]*$' "- Platform support:"
+  require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*Release channels:[[:space:]]*$' "- Release channels:"
+  require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*Artifact signing:[[:space:]]*$' "- Artifact signing:"
+  require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*Compatibility policy:[[:space:]]*$' "- Compatibility policy:"
 }
 
 check_template
