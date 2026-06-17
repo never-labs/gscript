@@ -1703,6 +1703,38 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 	}
 }
 
+func TestReleaseMatrixCoversEveryAdvertisedReportRegistryEntry(t *testing.T) {
+	root := findRepoRoot(t)
+	releaseMatrix := readFileString(t, filepath.Join(root, "tests", "release_matrix_test.go"))
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "capabilities", "--json")
+	var payload struct {
+		Tooling struct {
+			ReportCount int `json:"report_count"`
+			Reports     []struct {
+				Command string `json:"command"`
+			} `json:"reports"`
+		} `json:"tooling"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("capabilities JSON failed to decode: %v\n%s", err, out)
+	}
+	if payload.Tooling.ReportCount != len(payload.Tooling.Reports) {
+		t.Fatalf("capabilities tooling.report_count = %d, want %d reports", payload.Tooling.ReportCount, len(payload.Tooling.Reports))
+	}
+	var missing []string
+	for _, report := range payload.Tooling.Reports {
+		if report.Command == "" {
+			t.Fatal("capabilities report registry contains an empty command")
+		}
+		if !strings.Contains(releaseMatrix, report.Command) {
+			missing = append(missing, report.Command)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("tests/release_matrix_test.go must keep smoke or schema evidence for every capabilities report registry entry; missing: %s", strings.Join(missing, ", "))
+	}
+}
+
 func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")
