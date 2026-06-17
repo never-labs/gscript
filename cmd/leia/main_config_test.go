@@ -45,6 +45,7 @@ format = "json"
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON config report: %v; stdout = %q", err, stdout.String())
 	}
+	assertConfigJSONFieldsPresentAndNonNull(t, stdout.String(), "diagnostics")
 	if !report.Found || report.Root != root || report.Path != filepath.Join(root, "leia.toml") {
 		t.Fatalf("report location = %+v, want discovered root %s", report, root)
 	}
@@ -62,6 +63,23 @@ format = "json"
 	}
 	if report.Config.Tool.Lint.Format != "sarif" || report.Config.Tool.Test.Format != "json" {
 		t.Fatalf("tool config = %+v, want sarif/json", report.Config.Tool)
+	}
+}
+
+func assertConfigJSONFieldsPresentAndNonNull(t *testing.T, data string, fields ...string) {
+	t.Helper()
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(data), &raw); err != nil {
+		t.Fatalf("config JSON failed to decode as raw object: %v\n%s", err, data)
+	}
+	for _, field := range fields {
+		value, ok := raw[field]
+		if !ok {
+			t.Fatalf("config JSON missing field %q in %s", field, data)
+		}
+		if strings.TrimSpace(string(value)) == "null" {
+			t.Fatalf("config JSON field %q is null in %s", field, data)
+		}
 	}
 }
 

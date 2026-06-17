@@ -28,7 +28,7 @@ type cliConfigReport struct {
 	Root            string                `json:"root,omitempty"`
 	Config          *cliProjectConfig     `json:"config,omitempty"`
 	DiagnosticCount int                   `json:"diagnostic_count"`
-	Diagnostics     []cliConfigDiagnostic `json:"diagnostics,omitempty"`
+	Diagnostics     []cliConfigDiagnostic `json:"diagnostics"`
 }
 
 type cliProjectConfig struct {
@@ -133,8 +133,7 @@ func loadCLIProjectConfig(start string) (cliConfigReport, error) {
 			Code:     "LEIA9002",
 			Message:  err.Error(),
 		})
-		report.DiagnosticCount = len(report.Diagnostics)
-		return report, err
+		return finishCLIConfigReport(report), err
 	}
 	if configPath == "" {
 		err := errors.New("leia.toml not found")
@@ -144,8 +143,7 @@ func loadCLIProjectConfig(start string) (cliConfigReport, error) {
 			Code:     "LEIA9001",
 			Message:  err.Error(),
 		})
-		report.DiagnosticCount = len(report.Diagnostics)
-		return report, err
+		return finishCLIConfigReport(report), err
 	}
 	report.Found = true
 	report.Path = configPath
@@ -158,20 +156,26 @@ func loadCLIProjectConfig(start string) (cliConfigReport, error) {
 			Code:     "LEIA9002",
 			Message:  err.Error(),
 		})
-		report.DiagnosticCount = len(report.Diagnostics)
-		return report, err
+		return finishCLIConfigReport(report), err
 	}
 	config, diags := parseCLIProjectConfig(src)
 	report.Config = &config
 	report.Diagnostics = diags
-	report.DiagnosticCount = len(diags)
 	for _, diag := range diags {
 		if diag.Severity == "error" {
 			report.OK = false
-			return report, errors.New(diag.Message)
+			return finishCLIConfigReport(report), errors.New(diag.Message)
 		}
 	}
-	return report, nil
+	return finishCLIConfigReport(report), nil
+}
+
+func finishCLIConfigReport(report cliConfigReport) cliConfigReport {
+	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Diagnostics == nil {
+		report.Diagnostics = []cliConfigDiagnostic{}
+	}
+	return report
 }
 
 func loadOptionalCLIProjectConfig(start string) (*cliProjectConfig, []cliConfigDiagnostic, error) {
