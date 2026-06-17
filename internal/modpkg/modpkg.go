@@ -24,6 +24,7 @@ const SumFileName = "leia.sum"
 
 type GraphReport struct {
 	SchemaVersion   int          `json:"schema_version"`
+	OK              bool         `json:"ok"`
 	Root            string       `json:"root"`
 	FileCount       int          `json:"file_count"`
 	DiagnosticCount int          `json:"diagnostic_count"`
@@ -271,6 +272,7 @@ func Graph(path string) (GraphReport, error) {
 func setGraphReportCounts(report *GraphReport) {
 	report.FileCount = len(report.Files)
 	report.DiagnosticCount = len(report.Diagnostics)
+	report.OK = report.DiagnosticCount == 0
 	if report.Files == nil {
 		report.Files = []GraphFile{}
 	}

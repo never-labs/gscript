@@ -2957,9 +2957,10 @@ func TestReleaseMatrixModuleGraphJSONReportsCounts(t *testing.T) {
 	}
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "graph", "--json", tmp)
 	var report struct {
-		SchemaVersion   int `json:"schema_version"`
-		FileCount       int `json:"file_count"`
-		DiagnosticCount int `json:"diagnostic_count"`
+		SchemaVersion   int  `json:"schema_version"`
+		OK              bool `json:"ok"`
+		FileCount       int  `json:"file_count"`
+		DiagnosticCount int  `json:"diagnostic_count"`
 		Files           []struct {
 			File     string   `json:"file"`
 			Requires []string `json:"requires"`
@@ -2972,7 +2973,7 @@ func TestReleaseMatrixModuleGraphJSONReportsCounts(t *testing.T) {
 		t.Fatalf("mod graph JSON failed to decode: %v\n%s", err, out)
 	}
 	assertJSONFieldsPresentAndNonNull(t, out, "mod graph JSON", "files", "diagnostics")
-	if report.SchemaVersion != 1 || report.FileCount != len(report.Files) || report.FileCount != 1 || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 {
+	if report.SchemaVersion != 1 || !report.OK || report.FileCount != len(report.Files) || report.FileCount != 1 || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 {
 		t.Fatalf("mod graph JSON = %+v, want counted schema v1 graph", report)
 	}
 	if report.Files[0].File != "main.leia" || !stringSliceContains(report.Files[0].Requires, "json") {

@@ -54,7 +54,7 @@ _ = jsonMod
 	if err := json.Unmarshal(stdout.Bytes(), &graph); err != nil {
 		t.Fatalf("stdout is not JSON graph: %v; stdout = %q", err, stdout.String())
 	}
-	if graph.FileCount != len(graph.Files) || graph.DiagnosticCount != len(graph.Diagnostics) || len(graph.Files) != 1 || !containsString(graph.Files[0].Requires, "pkg.helper") || !containsString(graph.Files[0].Requires, "json") {
+	if !graph.OK || graph.FileCount != len(graph.Files) || graph.DiagnosticCount != len(graph.Diagnostics) || len(graph.Files) != 1 || !containsString(graph.Files[0].Requires, "pkg.helper") || !containsString(graph.Files[0].Requires, "json") {
 		t.Fatalf("graph = %+v, want static requires", graph)
 	}
 
@@ -691,7 +691,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal(stdout.Bytes(), &graph); err != nil {
 		t.Fatalf("stdout is not JSON graph: %v; stdout = %q", err, stdout.String())
 	}
-	if graph.FileCount != len(graph.Files) || graph.DiagnosticCount != len(graph.Diagnostics) || len(graph.Files) != 1 ||
+	if !graph.OK || graph.FileCount != len(graph.Files) || graph.DiagnosticCount != len(graph.Diagnostics) || len(graph.Files) != 1 ||
 		!containsString(graph.Files[0].Requires, "example.com/lib/net") ||
 		!containsString(graph.Files[0].Requires, "json") ||
 		!containsString(graph.Files[0].Requires, "pkg.helper") ||
@@ -777,7 +777,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal(stdout.Bytes(), &graph); err != nil {
 		t.Fatalf("stdout is not JSON graph: %v; stdout = %q", err, stdout.String())
 	}
-	if graph.FileCount != len(graph.Files) || graph.DiagnosticCount != len(graph.Diagnostics) || len(graph.Files) != 1 ||
+	if !graph.OK || graph.FileCount != len(graph.Files) || graph.DiagnosticCount != len(graph.Diagnostics) || len(graph.Files) != 1 ||
 		!containsString(graph.Files[0].Requires, "example.com/lib/net") ||
 		!containsString(graph.Files[0].Requires, "example.com/plugin/adapter") ||
 		!containsString(graph.Files[0].Requires, "example.com/plugin/nested") ||
