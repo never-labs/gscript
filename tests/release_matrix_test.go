@@ -1751,6 +1751,7 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 
 func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
+	platformDocs := readFileString(t, filepath.Join(root, "docs", "reference", "platforms", "index.md"))
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_distribution_check.sh", "--json")
 	var report struct {
 		SchemaVersion       int      `json:"schema_version"`
@@ -1776,6 +1777,9 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 	for _, target := range []string{"darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64"} {
 		if !stringSliceContains(report.InstallTargets, target) {
 			t.Fatalf("release distribution JSON missing install target %q: %+v", target, report.InstallTargets)
+		}
+		if !strings.Contains(platformDocs, "`"+target+"`") {
+			t.Fatalf("platform reference must document release distribution target %q", target)
 		}
 	}
 	for _, workflow := range []string{".github/workflows/release.yml", ".github/workflows/distribution-check.yml", ".github/workflows/pages.yml"} {

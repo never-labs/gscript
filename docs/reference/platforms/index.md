@@ -70,6 +70,22 @@ JIT-sensitive changes need correctness tests and performance evidence. See
 | Available | The project can build or run there, but the release does not include full evidence. |
 | Unknown | No current release evidence exists. |
 
+## Distribution Targets
+
+The release distribution profile verifies install metadata for:
+
+| Target | Archive |
+|---|---|
+| `darwin/amd64` | `tar.gz` |
+| `darwin/arm64` | `tar.gz` |
+| `linux/amd64` | `tar.gz` |
+| `linux/arm64` | `tar.gz` |
+| `windows/amd64` | `zip` |
+| `windows/arm64` | `zip` |
+
+These are packaging targets, not full support claims. A target is only
+`Tested` when the release notes include run evidence for that target.
+
 ARM64 JIT support is only claimed when `leia capabilities --json` and the
 release notes both show it enabled for that build. Otherwise the interpreter and
 VM remain the semantic baseline.
