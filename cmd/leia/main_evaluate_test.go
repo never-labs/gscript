@@ -158,19 +158,41 @@ evaluate "shipping flow" {
 			Name   string `json:"name"`
 			Status string `json:"status"`
 		} `json:"cases"`
-		Notes []string `json:"notes"`
+		Metrics []struct{} `json:"metrics"`
+		Notes   []string   `json:"notes"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON evaluate report: %v; stdout = %q", err, stdout.String())
 	}
+	assertEvaluateJSONFieldsPresentAndNonNull(t, stdout.String(), "inputs", "cases", "metrics", "findings", "notes")
 	if report.Status != "ok" || report.Summary.EvaluateBlocks != 2 || report.Summary.CasesSelected != 1 || report.Summary.CasesListed != 1 || report.Summary.CasesSkipped != 1 || report.Summary.CasesFailed != 0 {
 		t.Fatalf("summary = %+v, want one listed case and one skipped case with no execution failures", report.Summary)
+	}
+	if len(report.Metrics) != 0 {
+		t.Fatalf("metrics = %+v, want stable empty metrics in list mode", report.Metrics)
 	}
 	if len(report.Cases) != 1 || report.Cases[0].Name != "refund flow" || report.Cases[0].Status != "listed" {
 		t.Fatalf("cases = %+v, want only refund flow listed", report.Cases)
 	}
 	if !containsEvaluateString(report.Notes, "filter: refund") || !containsEvaluateString(report.Notes, "list mode: evaluate cases are discovered but not executed") {
 		t.Fatalf("notes = %#v, want filter and list mode notes", report.Notes)
+	}
+}
+
+func assertEvaluateJSONFieldsPresentAndNonNull(t *testing.T, data string, fields ...string) {
+	t.Helper()
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(data), &raw); err != nil {
+		t.Fatalf("evaluate JSON failed to decode as raw object: %v\n%s", err, data)
+	}
+	for _, field := range fields {
+		value, ok := raw[field]
+		if !ok {
+			t.Fatalf("evaluate JSON missing field %q in %s", field, data)
+		}
+		if strings.TrimSpace(string(value)) == "null" {
+			t.Fatalf("evaluate JSON field %q is null in %s", field, data)
+		}
 	}
 }
 

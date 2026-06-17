@@ -240,6 +240,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia evaluate --json", "cases"},
 		{"leia evaluate --json", "findings"},
 		{"leia evaluate --json", "inputs"},
+		{"leia evaluate --json", "metrics"},
 		{"leia evaluate --json", "notes"},
 		{"leia fmt --json", "files"},
 		{"leia inspect bytecode --json", "proto.children"},

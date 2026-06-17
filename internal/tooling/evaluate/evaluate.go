@@ -51,7 +51,7 @@ type Report struct {
 	LLM           *LLMRun         `json:"llm,omitempty"`
 	Inputs        []Input         `json:"inputs"`
 	Cases         []Case          `json:"cases"`
-	Metrics       []MetricSummary `json:"metrics,omitempty"`
+	Metrics       []MetricSummary `json:"metrics"`
 	Comparison    *Comparison     `json:"comparison,omitempty"`
 	Findings      []Finding       `json:"findings"`
 	Notes         []string        `json:"notes"`
@@ -314,6 +314,7 @@ func Run(opts Options) (Report, error) {
 		Runtime:       runtimeInfo(),
 		Inputs:        []Input{},
 		Cases:         []Case{},
+		Metrics:       []MetricSummary{},
 		Findings:      []Finding{},
 		Notes: []string{
 			"evaluate runs each evaluate block body as ordinary Leia code; provider scoring and workflow orchestration are reserved for later phases.",
@@ -581,6 +582,9 @@ func finalizeSummary(report *Report) {
 		report.Summary.PassRate = float64(report.Summary.CasesPassed) / float64(executable)
 	}
 	report.Metrics = aggregateMetricSummaries(report.Cases)
+	if report.Metrics == nil {
+		report.Metrics = []MetricSummary{}
+	}
 }
 
 func finalizeLLMSummary(report *Report) {
