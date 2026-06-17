@@ -101,6 +101,7 @@ RELEASE_CRITICAL_SKIP_NAMES=(
     "Correctness"
     "Manifest Coverage"
     "Module Path Gate"
+    "Shell Script Syntax"
     "Documentation References"
     "Editor Assets"
     "Performance Gate"
@@ -517,6 +518,10 @@ add_module_path_gate() {
     add_run "Module Path Gate" "test \"\$(go list -m)\" = \"$EXPECTED_MODULE_PATH\""
 }
 
+add_shell_script_syntax_gate() {
+    add_run "Shell Script Syntax" "for f in scripts/*.sh benchmarks/*.sh; do bash -n \"\$f\"; done"
+}
+
 add_release_smoke() {
     if ! have_cmd go; then
         add_skip "Release Smoke" "missing go"
@@ -610,6 +615,7 @@ build_quick_plan() {
         "go test ./tests -run TestStdlibContract -count=1"
     add_manifest_coverage
     add_module_path_gate
+    add_shell_script_syntax_gate
     add_performance_smoke
     add_documentation_references
     add_editor_assets
@@ -628,6 +634,7 @@ build_full_plan() {
     fi
     add_manifest_coverage
     add_module_path_gate
+    add_shell_script_syntax_gate
     add_documentation_references
     add_editor_assets
     add_performance_gate

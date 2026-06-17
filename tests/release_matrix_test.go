@@ -309,6 +309,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	productionFullCmd := "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z"
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
+	shellSyntaxCmd := "for f in scripts/*.sh benchmarks/*.sh; do bash -n \"$f\"; done"
 	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
 	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
 	releaseNotesCmd := "bash scripts/release_notes_check.sh --require-ready --version vX.Y.Z"
@@ -403,6 +404,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 		internalReleaseMatrixCmd,
 		specExamplesCmd,
 		docsCheckCmd,
+		shellSyntaxCmd,
 		performanceSmokeCmd,
 	} {
 		if !strings.Contains(productionOut, snippet) {
@@ -415,6 +417,9 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	fullOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--release-profile", "--list")
 	if !strings.Contains(fullOut, fullPerfGateCmd) {
 		t.Fatalf("production_check.sh --full --list must keep full LuaJIT performance gate %q; got:\n%s", fullPerfGateCmd, fullOut)
+	}
+	if !strings.Contains(fullOut, shellSyntaxCmd) {
+		t.Fatalf("production_check.sh --full --list must keep shell syntax gate %q; got:\n%s", shellSyntaxCmd, fullOut)
 	}
 	if strings.Contains(fullOut, "--no-luajit") {
 		t.Fatalf("production_check.sh --full --list must not weaken release performance gates with --no-luajit; got:\n%s", fullOut)
@@ -433,6 +438,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	for _, critical := range []string{
 		`"Language Conformance Surface"`,
 		`"Q Conformance Gate"`,
+		`"Shell Script Syntax"`,
 		`"Public Release Blockers"`,
 		`"Release Distribution"`,
 		`"Release Notes"`,
