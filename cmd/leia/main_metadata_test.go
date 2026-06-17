@@ -206,6 +206,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		"leia test --json",
 		"leia test --list --json",
 		"leia version --json",
+		"scripts/docs_check.sh --json",
 		"scripts/editor_check.sh --json",
 		"scripts/install.sh --dry-run --json",
 		"scripts/performance_gate.sh --json",
@@ -254,6 +255,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod vendor --json", "modules"},
 		{"leia mod vendor --json", "diagnostics"},
 		{"leia test --json", "files"},
+		{"scripts/docs_check.sh --json", "failures"},
 		{"scripts/production_check.sh --list --json", "release_critical_skip_names"},
 		{"scripts/worktree_audit.sh --json", "findings"},
 	} {
@@ -297,6 +299,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod tidy --json", []string{"removed_count", "missing_count", "diagnostic_count"}},
 		{"leia mod vendor --json", []string{"module_count", "diagnostic_count"}},
 		{"leia mod verify --json", []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}},
+		{"scripts/docs_check.sh --json", []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}},
 		{"scripts/editor_check.sh --json", []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}},
 		{"scripts/install.sh --dry-run --json", []string{"install_count", "binary_count", "install_path_count"}},
 		{"scripts/performance_gate.sh --json", []string{"failure_count", "output_line_count"}},
