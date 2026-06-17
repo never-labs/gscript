@@ -4212,7 +4212,7 @@ func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[st
 		}
 		out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
 		if declared.StatusField != "" {
-			assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(declared.StatusField, ".")...)
+			assertReleaseReportStatusField(t, out, tc.reportCommand, declared.StatusField)
 		}
 		for _, count := range tc.counts {
 			assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
@@ -4221,6 +4221,29 @@ func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[st
 			assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
 		}
 	})
+}
+
+func assertReleaseReportStatusField(t *testing.T, data, label, field string) {
+	t.Helper()
+	path := strings.Split(field, ".")
+	value := nestedJSONField(t, data, label, path...)
+	switch field {
+	case "ok":
+		var ok bool
+		if err := json.Unmarshal(value, &ok); err != nil {
+			t.Fatalf("%s status_field %q must be a JSON bool: %v\n%s", label, field, err, data)
+		}
+	case "status":
+		var status string
+		if err := json.Unmarshal(value, &status); err != nil {
+			t.Fatalf("%s status_field %q must be a JSON string: %v\n%s", label, field, err, data)
+		}
+		if strings.TrimSpace(status) == "" {
+			t.Fatalf("%s status_field %q must be non-empty in %s", label, field, data)
+		}
+	default:
+		assertNestedJSONFieldPresentAndNonNull(t, data, label, path...)
+	}
 }
 
 func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRegistryEntry {
