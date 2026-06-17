@@ -1549,38 +1549,47 @@ func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing
 	for _, tc := range []struct {
 		reportCommand string
 		args          []string
+		counts        []string
 		fields        []string
 	}{
-		{reportCommand: "leia capabilities --json", args: []string{"go", "run", "./cmd/leia", "capabilities", "--json"}, fields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
-		{reportCommand: "leia check --json", args: []string{"go", "run", "./cmd/leia", "check", "--json", "--quick", testDir}, fields: []string{"steps"}},
-		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, fields: []string{"commands"}},
-		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, fields: []string{"diagnostics"}},
-		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
-		{reportCommand: "leia env --json", args: []string{"go", "run", "./cmd/leia", "env", "--json"}, fields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}},
-		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/basic_assert.leia"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
-		{reportCommand: "leia examples check --json", args: []string{"go", "run", "./cmd/leia", "examples", "check", "--json", "--jobs=1", "repo-evaluate-basic_assert"}, fields: []string{"results"}},
-		{reportCommand: "leia examples list --json", args: []string{"go", "run", "./cmd/leia", "examples", "list", "--json"}, fields: []string{"examples"}},
-		{reportCommand: "leia fmt --json", args: []string{"go", "run", "./cmd/leia", "fmt", "--check", "--json", testPath}, fields: []string{"files"}},
-		{reportCommand: "leia inspect bytecode --json", args: []string{"go", "run", "./cmd/leia", "inspect", "bytecode", "--json", "--proto", "add", inspectPath}, fields: []string{"proto.children"}},
-		{reportCommand: "leia inspect directives --json", args: []string{"go", "run", "./cmd/leia", "inspect", "directives", "--json", directivePath}, fields: []string{"directives"}},
-		{reportCommand: "leia lint --json", args: []string{"go", "run", "./cmd/leia", "lint", "--json", lintPath}, fields: []string{"diagnostics"}},
-		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, fields: []string{"files", "diagnostics"}},
-		{reportCommand: "leia mod list --json", args: []string{"go", "run", "./cmd/leia", "mod", "list", "--json", modDir}, fields: []string{"requires", "replaces", "collections", "diagnostics"}},
-		{reportCommand: "leia mod verify --json", args: []string{"go", "run", "./cmd/leia", "mod", "verify", "--json", modDir}, fields: []string{"graph.files", "diagnostics"}},
-		{reportCommand: "leia test --json", args: []string{"go", "run", "./cmd/leia", "test", "--json", testDir}, fields: []string{"files"}},
-		{reportCommand: "leia test --list --json", args: []string{"go", "run", "./cmd/leia", "test", "--list", "--json", testDir}, fields: []string{"files"}},
+		{reportCommand: "leia capabilities --json", args: []string{"go", "run", "./cmd/leia", "capabilities", "--json"}, counts: []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}, fields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
+		{reportCommand: "leia check --json", args: []string{"go", "run", "./cmd/leia", "check", "--json", "--quick", testDir}, counts: []string{"step_count", "failed_count", "skipped_count"}, fields: []string{"steps"}},
+		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count"}, fields: []string{"commands"}},
+		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}},
+		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, counts: []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
+		{reportCommand: "leia env --json", args: []string{"go", "run", "./cmd/leia", "env", "--json"}, counts: []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.stdlib_layer_count", "capabilities.default_import_count", "capabilities.dialect_count", "capabilities.tooling.report_count"}, fields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}},
+		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/basic_assert.leia"}, counts: []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
+		{reportCommand: "leia examples check --json", args: []string{"go", "run", "./cmd/leia", "examples", "check", "--json", "--jobs=1", "repo-evaluate-basic_assert"}, counts: []string{"result_count", "runnable", "skipped", "failed"}, fields: []string{"results"}},
+		{reportCommand: "leia examples list --json", args: []string{"go", "run", "./cmd/leia", "examples", "list", "--json"}, counts: []string{"example_count"}, fields: []string{"examples"}},
+		{reportCommand: "leia fmt --json", args: []string{"go", "run", "./cmd/leia", "fmt", "--check", "--json", testPath}, counts: []string{"file_count", "changed_count", "error_count"}, fields: []string{"files"}},
+		{reportCommand: "leia inspect bytecode --json", args: []string{"go", "run", "./cmd/leia", "inspect", "bytecode", "--json", "--proto", "add", inspectPath}, counts: []string{"proto_count", "proto.instruction_count", "proto.constant_count", "proto.upvalue_count", "proto.child_proto_count"}, fields: []string{"proto.children"}},
+		{reportCommand: "leia inspect directives --json", args: []string{"go", "run", "./cmd/leia", "inspect", "directives", "--json", directivePath}, counts: []string{"directive_count"}, fields: []string{"directives"}},
+		{reportCommand: "leia lint --json", args: []string{"go", "run", "./cmd/leia", "lint", "--json", lintPath}, counts: []string{"diagnostic_count", "error_count", "warning_count"}, fields: []string{"diagnostics"}},
+		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, counts: []string{"file_count", "diagnostic_count"}, fields: []string{"files", "diagnostics"}},
+		{reportCommand: "leia mod list --json", args: []string{"go", "run", "./cmd/leia", "mod", "list", "--json", modDir}, counts: []string{"require_count", "replace_count", "collection_count", "diagnostic_count"}, fields: []string{"requires", "replaces", "collections", "diagnostics"}},
+		{reportCommand: "leia mod verify --json", args: []string{"go", "run", "./cmd/leia", "mod", "verify", "--json", modDir}, counts: []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}, fields: []string{"graph.files", "diagnostics"}},
+		{reportCommand: "leia test --json", args: []string{"go", "run", "./cmd/leia", "test", "--json", testDir}, counts: []string{"total", "passed", "failed"}, fields: []string{"files"}},
+		{reportCommand: "leia test --list --json", args: []string{"go", "run", "./cmd/leia", "test", "--list", "--json", testDir}, counts: []string{"file_count"}, fields: []string{"files"}},
 	} {
 		t.Run(tc.reportCommand, func(t *testing.T) {
 			declared, ok := registry[tc.reportCommand]
 			if !ok {
 				t.Fatalf("capabilities report registry missing %q", tc.reportCommand)
 			}
+			for _, count := range tc.counts {
+				if !stringSliceContains(declared.CountFields, count) {
+					t.Fatalf("capabilities report %q count_fields = %#v, want %q", tc.reportCommand, declared.CountFields, count)
+				}
+			}
 			for _, field := range tc.fields {
-				if !stringSliceContains(declared, field) {
-					t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared, field)
+				if !stringSliceContains(declared.CollectionFields, field) {
+					t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared.CollectionFields, field)
 				}
 			}
 			out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+			for _, count := range tc.counts {
+				assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
+			}
 			for _, field := range tc.fields {
 				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
 			}
@@ -4003,13 +4012,54 @@ func assertNestedJSONFieldPresentAndNonNull(t *testing.T, data, label string, pa
 	}
 }
 
-func releaseReportRegistry(t *testing.T, root string) map[string][]string {
+func assertNestedJSONNumberFieldPresent(t *testing.T, data, label string, path ...string) {
+	t.Helper()
+	value := nestedJSONField(t, data, label, path...)
+	var number json.Number
+	if err := json.Unmarshal(value, &number); err != nil {
+		t.Fatalf("%s field %s must be a JSON number: %v\n%s", label, strings.Join(path, "."), err, data)
+	}
+	if _, err := number.Int64(); err != nil {
+		t.Fatalf("%s field %s must be an integer JSON number: %v\n%s", label, strings.Join(path, "."), err, data)
+	}
+}
+
+func nestedJSONField(t *testing.T, data, label string, path ...string) json.RawMessage {
+	t.Helper()
+	if len(path) == 0 {
+		t.Fatalf("%s nested JSON assertion needs a path", label)
+	}
+	var current json.RawMessage = []byte(data)
+	for _, field := range path {
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(current, &raw); err != nil {
+			t.Fatalf("%s failed to decode object while checking %s: %v\n%s", label, strings.Join(path, "."), err, data)
+		}
+		value, ok := raw[field]
+		if !ok {
+			t.Fatalf("%s missing JSON field %q while checking %s in %s", label, field, strings.Join(path, "."), data)
+		}
+		if strings.TrimSpace(string(value)) == "null" {
+			t.Fatalf("%s field %q is null while checking %s in %s", label, field, strings.Join(path, "."), data)
+		}
+		current = value
+	}
+	return current
+}
+
+type releaseReportRegistryEntry struct {
+	CountFields      []string
+	CollectionFields []string
+}
+
+func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRegistryEntry {
 	t.Helper()
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "capabilities", "--json")
 	var payload struct {
 		Tooling struct {
 			Reports []struct {
 				Command          string   `json:"command"`
+				CountFields      []string `json:"count_fields"`
 				CollectionFields []string `json:"collection_fields"`
 			} `json:"reports"`
 		} `json:"tooling"`
@@ -4017,9 +4067,12 @@ func releaseReportRegistry(t *testing.T, root string) map[string][]string {
 	if err := json.Unmarshal([]byte(out), &payload); err != nil {
 		t.Fatalf("capabilities JSON failed to decode: %v\n%s", err, out)
 	}
-	registry := map[string][]string{}
+	registry := map[string]releaseReportRegistryEntry{}
 	for _, report := range payload.Tooling.Reports {
-		registry[report.Command] = report.CollectionFields
+		registry[report.Command] = releaseReportRegistryEntry{
+			CountFields:      report.CountFields,
+			CollectionFields: report.CollectionFields,
+		}
 	}
 	return registry
 }
