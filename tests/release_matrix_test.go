@@ -4182,6 +4182,7 @@ func nestedJSONFields(t *testing.T, data, label string, path ...string) []json.R
 
 type releaseReportRegistryEntry struct {
 	StatusField      string
+	SchemaVersion    int
 	CountFields      []string
 	CollectionFields []string
 }
@@ -4211,6 +4212,7 @@ func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[st
 			}
 		}
 		out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+		assertReleaseReportSchemaVersion(t, out, tc.reportCommand, declared.SchemaVersion)
 		if declared.StatusField != "" {
 			assertReleaseReportStatusField(t, out, tc.reportCommand, declared.StatusField)
 		}
@@ -4221,6 +4223,21 @@ func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[st
 			assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
 		}
 	})
+}
+
+func assertReleaseReportSchemaVersion(t *testing.T, data, label string, want int) {
+	t.Helper()
+	if want <= 0 {
+		t.Fatalf("%s capabilities report registry must advertise positive schema_version, got %d", label, want)
+	}
+	value := nestedJSONField(t, data, label, "schema_version")
+	var got int
+	if err := json.Unmarshal(value, &got); err != nil {
+		t.Fatalf("%s schema_version must be a JSON integer: %v\n%s", label, err, data)
+	}
+	if got != want {
+		t.Fatalf("%s schema_version = %d, want registry schema_version %d\n%s", label, got, want, data)
+	}
 }
 
 func assertReleaseReportStatusField(t *testing.T, data, label, field string) {
@@ -4254,6 +4271,7 @@ func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRe
 			Reports []struct {
 				Command          string   `json:"command"`
 				StatusField      string   `json:"status_field"`
+				SchemaVersion    int      `json:"schema_version"`
 				CountFields      []string `json:"count_fields"`
 				CollectionFields []string `json:"collection_fields"`
 			} `json:"reports"`
@@ -4266,6 +4284,7 @@ func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRe
 	for _, report := range payload.Tooling.Reports {
 		registry[report.Command] = releaseReportRegistryEntry{
 			StatusField:      report.StatusField,
+			SchemaVersion:    report.SchemaVersion,
 			CountFields:      report.CountFields,
 			CollectionFields: report.CollectionFields,
 		}
