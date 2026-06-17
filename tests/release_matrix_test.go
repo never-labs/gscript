@@ -1620,32 +1620,7 @@ collection vendor ./vendor
 		{reportCommand: "leia test --list --json", args: []string{"go", "run", "./cmd/leia", "test", "--list", "--json", testDir}, counts: []string{"file_count"}, fields: []string{"files"}},
 		{reportCommand: "leia version --json", args: []string{"go", "run", "./cmd/leia", "version", "--json"}},
 	} {
-		t.Run(tc.reportCommand, func(t *testing.T) {
-			declared, ok := registry[tc.reportCommand]
-			if !ok {
-				t.Fatalf("capabilities report registry missing %q", tc.reportCommand)
-			}
-			for _, count := range tc.counts {
-				if !stringSliceContains(declared.CountFields, count) {
-					t.Fatalf("capabilities report %q count_fields = %#v, want %q", tc.reportCommand, declared.CountFields, count)
-				}
-			}
-			for _, field := range tc.fields {
-				if !stringSliceContains(declared.CollectionFields, field) {
-					t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared.CollectionFields, field)
-				}
-			}
-			out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
-			if declared.StatusField != "" {
-				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(declared.StatusField, ".")...)
-			}
-			for _, count := range tc.counts {
-				assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
-			}
-			for _, field := range tc.fields {
-				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
-			}
-		})
+		assertReleaseReportRegistrySmoke(t, root, registry, releaseReportSmokeCase(tc))
 	}
 }
 
@@ -1691,32 +1666,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, counts: []string{"workflow_count", "install_target_count"}, fields: []string{"workflow_files", "install_targets"}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, counts: []string{"checked_file_count", "failure_count"}, fields: []string{"checked_files", "failures"}},
 	} {
-		t.Run(tc.reportCommand, func(t *testing.T) {
-			declared, ok := registry[tc.reportCommand]
-			if !ok {
-				t.Fatalf("capabilities report registry missing %q", tc.reportCommand)
-			}
-			for _, count := range tc.counts {
-				if !stringSliceContains(declared.CountFields, count) {
-					t.Fatalf("capabilities report %q count_fields = %#v, want %q", tc.reportCommand, declared.CountFields, count)
-				}
-			}
-			for _, field := range tc.fields {
-				if !stringSliceContains(declared.CollectionFields, field) {
-					t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared.CollectionFields, field)
-				}
-			}
-			out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
-			if declared.StatusField != "" {
-				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(declared.StatusField, ".")...)
-			}
-			for _, count := range tc.counts {
-				assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
-			}
-			for _, field := range tc.fields {
-				assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
-			}
-		})
+		assertReleaseReportRegistrySmoke(t, root, registry, releaseReportSmokeCase(tc))
 	}
 }
 
@@ -4206,6 +4156,43 @@ type releaseReportRegistryEntry struct {
 	StatusField      string
 	CountFields      []string
 	CollectionFields []string
+}
+
+type releaseReportSmokeCase struct {
+	reportCommand string
+	args          []string
+	counts        []string
+	fields        []string
+}
+
+func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[string]releaseReportRegistryEntry, tc releaseReportSmokeCase) {
+	t.Helper()
+	t.Run(tc.reportCommand, func(t *testing.T) {
+		declared, ok := registry[tc.reportCommand]
+		if !ok {
+			t.Fatalf("capabilities report registry missing %q", tc.reportCommand)
+		}
+		for _, count := range tc.counts {
+			if !stringSliceContains(declared.CountFields, count) {
+				t.Fatalf("capabilities report %q count_fields = %#v, want %q", tc.reportCommand, declared.CountFields, count)
+			}
+		}
+		for _, field := range tc.fields {
+			if !stringSliceContains(declared.CollectionFields, field) {
+				t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared.CollectionFields, field)
+			}
+		}
+		out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+		if declared.StatusField != "" {
+			assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(declared.StatusField, ".")...)
+		}
+		for _, count := range tc.counts {
+			assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
+		}
+		for _, field := range tc.fields {
+			assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
+		}
+	})
 }
 
 func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRegistryEntry {
