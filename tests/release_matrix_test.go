@@ -711,6 +711,31 @@ func TestReleaseMatrixDocumentedCIProfilesAreInspectable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixShellScriptsParse(t *testing.T) {
+	root := findRepoRoot(t)
+	var scripts []string
+	for _, pattern := range []string{"scripts/*.sh", "benchmarks/*.sh"} {
+		matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
+		if err != nil {
+			t.Fatalf("glob %s: %v", pattern, err)
+		}
+		scripts = append(scripts, matches...)
+	}
+	if len(scripts) == 0 {
+		t.Fatal("release shell syntax gate found no scripts")
+	}
+	sort.Strings(scripts)
+	for _, script := range scripts {
+		rel, err := filepath.Rel(root, script)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Run(filepath.ToSlash(rel), func(t *testing.T) {
+			runCommand(t, root, 30*time.Second, "bash", "-n", rel)
+		})
+	}
+}
+
 func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, item := range []struct {
