@@ -165,6 +165,9 @@ func TestCapabilitiesJSON(t *testing.T) {
 		if report.Command == "" || report.SchemaVersion <= 0 || !containsString(report.Formats, "json") {
 			t.Fatalf("report capability = %+v, want command, json format, and schema version", report)
 		}
+		if report.StatusField == "" {
+			t.Fatalf("report capability %q must advertise a status field", report.Command)
+		}
 		if seenReports[report.Command] {
 			t.Fatalf("duplicate report capability command %q", report.Command)
 		}
