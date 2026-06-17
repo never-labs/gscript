@@ -1596,7 +1596,7 @@ collection vendor ./vendor
 	}{
 		{reportCommand: "leia capabilities --json", args: []string{"go", "run", "./cmd/leia", "capabilities", "--json"}, counts: []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}, fields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}, matches: []releaseReportCountMatch{{"command_count", "commands"}, {"stdlib_module_count", "stdlib_modules"}, {"stdlib_layer_count", "stdlib_layers"}, {"default_import_count", "default_imports"}, {"dialect_count", "dialects"}, {"tooling.report_count", "tooling.reports"}}},
 		{reportCommand: "leia check --json", args: []string{"go", "run", "./cmd/leia", "check", "--json", "--quick", testDir}, counts: []string{"step_count", "failed_count", "skipped_count"}, fields: []string{"steps"}, matches: []releaseReportCountMatch{{"step_count", "steps"}}},
-		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count", "commands[].arg_count"}, fields: []string{"commands"}, matches: []releaseReportCountMatch{{"command_count", "commands"}, {"commands[].arg_count", "commands[].args"}}},
+		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count", "commands[].arg_count"}, fields: []string{"commands", "commands[].args"}, matches: []releaseReportCountMatch{{"command_count", "commands"}, {"commands[].arg_count", "commands[].args"}}},
 		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}},
 		{reportCommand: "leia diag bundle --json", args: []string{"go", "run", "./cmd/leia", "diag", "bundle", "--output", diagOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, counts: []string{"failure_count", "file_count"}, fields: []string{"files"}, matches: []releaseReportCountMatch{{"file_count", "files"}}},
 		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, counts: []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}, matches: []releaseReportCountMatch{{"cli.command_count", "cli.commands"}, {"stdlib.layer_count", "stdlib.layers"}, {"stdlib.default_import_count", "stdlib.default_imports"}, {"dialects.dialect_count", "dialects.dialects"}}},
@@ -4099,23 +4099,11 @@ func assertJSONFieldsPresentAndNonNull(t *testing.T, data, label string, fields 
 
 func assertNestedJSONFieldPresentAndNonNull(t *testing.T, data, label string, path ...string) {
 	t.Helper()
-	if len(path) == 0 {
-		t.Fatalf("%s nested JSON assertion needs a path", label)
-	}
-	var current json.RawMessage = []byte(data)
-	for _, field := range path {
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(current, &raw); err != nil {
-			t.Fatalf("%s failed to decode object while checking %s: %v\n%s", label, strings.Join(path, "."), err, data)
-		}
-		value, ok := raw[field]
-		if !ok {
-			t.Fatalf("%s missing JSON field %q while checking %s in %s", label, field, strings.Join(path, "."), data)
-		}
+	values := nestedJSONFields(t, data, label, path...)
+	for _, value := range values {
 		if strings.TrimSpace(string(value)) == "null" {
-			t.Fatalf("%s field %q is null while checking %s in %s", label, field, strings.Join(path, "."), data)
+			t.Fatalf("%s field %s is null in %s", label, strings.Join(path, "."), data)
 		}
-		current = value
 	}
 }
 
