@@ -1750,6 +1750,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, counts: []string{"workflow_count", "install_target_count"}, fields: []string{"workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_count"}, fields: []string{"checked_files", "failures"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_count", "failures"}}},
+		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, counts: []string{"finding_count"}, fields: []string{"findings"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}}},
 	} {
 		assertReleaseReportRegistrySmoke(t, root, registry, releaseReportSmokeCase(tc))
 	}
