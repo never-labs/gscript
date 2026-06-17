@@ -1522,9 +1522,19 @@ func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing
 		t.Fatal(err)
 	}
 
+	lintDir := t.TempDir()
+	lintPath := filepath.Join(lintDir, "warn.leia")
+	if err := os.WriteFile(lintPath, []byte("xs := {1, 2}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
 	inspectDir := t.TempDir()
 	inspectPath := filepath.Join(inspectDir, "fn.leia")
 	if err := os.WriteFile(inspectPath, []byte("func add(a, b) { return a + b }\nprint(add(1, 2))\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	directivePath := filepath.Join(inspectDir, "directives.leia")
+	if err := os.WriteFile(directivePath, []byte("//leia:cap fs.read, net.client\nprint(\"ok\")\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1541,12 +1551,22 @@ func TestReleaseMatrixReportRegistryCollectionFieldsMatchSmokeOutputs(t *testing
 		args          []string
 		fields        []string
 	}{
+		{reportCommand: "leia capabilities --json", args: []string{"go", "run", "./cmd/leia", "capabilities", "--json"}, fields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
+		{reportCommand: "leia check --json", args: []string{"go", "run", "./cmd/leia", "check", "--json", "--quick", testDir}, fields: []string{"steps"}},
+		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, fields: []string{"commands"}},
 		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, fields: []string{"diagnostics"}},
+		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
+		{reportCommand: "leia env --json", args: []string{"go", "run", "./cmd/leia", "env", "--json"}, fields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}},
 		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/basic_assert.leia"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
+		{reportCommand: "leia examples check --json", args: []string{"go", "run", "./cmd/leia", "examples", "check", "--json", "--jobs=1", "repo-evaluate-basic_assert"}, fields: []string{"results"}},
 		{reportCommand: "leia examples list --json", args: []string{"go", "run", "./cmd/leia", "examples", "list", "--json"}, fields: []string{"examples"}},
 		{reportCommand: "leia fmt --json", args: []string{"go", "run", "./cmd/leia", "fmt", "--check", "--json", testPath}, fields: []string{"files"}},
 		{reportCommand: "leia inspect bytecode --json", args: []string{"go", "run", "./cmd/leia", "inspect", "bytecode", "--json", "--proto", "add", inspectPath}, fields: []string{"proto.children"}},
+		{reportCommand: "leia inspect directives --json", args: []string{"go", "run", "./cmd/leia", "inspect", "directives", "--json", directivePath}, fields: []string{"directives"}},
+		{reportCommand: "leia lint --json", args: []string{"go", "run", "./cmd/leia", "lint", "--json", lintPath}, fields: []string{"diagnostics"}},
 		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, fields: []string{"files", "diagnostics"}},
+		{reportCommand: "leia mod list --json", args: []string{"go", "run", "./cmd/leia", "mod", "list", "--json", modDir}, fields: []string{"requires", "replaces", "collections", "diagnostics"}},
+		{reportCommand: "leia mod verify --json", args: []string{"go", "run", "./cmd/leia", "mod", "verify", "--json", modDir}, fields: []string{"graph.files", "diagnostics"}},
 		{reportCommand: "leia test --json", args: []string{"go", "run", "./cmd/leia", "test", "--json", testDir}, fields: []string{"files"}},
 		{reportCommand: "leia test --list --json", args: []string{"go", "run", "./cmd/leia", "test", "--list", "--json", testDir}, fields: []string{"files"}},
 	} {
