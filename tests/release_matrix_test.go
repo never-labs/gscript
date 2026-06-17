@@ -1166,6 +1166,21 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		}
 	}
 
+	releaseNotesIndex := readFileString(t, filepath.Join(root, "docs", "release", "notes", "README.md"))
+	for _, snippet := range []string{
+		"`leia_vX.Y.Z_darwin_amd64.tar.gz`",
+		"`leia_vX.Y.Z_darwin_arm64.tar.gz`",
+		"`leia_vX.Y.Z_linux_amd64.tar.gz`",
+		"`leia_vX.Y.Z_linux_arm64.tar.gz`",
+		"`leia_vX.Y.Z_windows_amd64.zip`",
+		"`leia_vX.Y.Z_windows_arm64.zip`",
+		"`SHA256SUMS`",
+	} {
+		if !strings.Contains(releaseNotesIndex, snippet) {
+			t.Fatalf("docs/release/notes/README.md must mention %q", snippet)
+		}
+	}
+
 	decisions := readFileString(t, filepath.Join(root, "docs", "release", "decisions.md"))
 	for _, snippet := range []string{
 		"Public releases require explicit maintainer decisions",
