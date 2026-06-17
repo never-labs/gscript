@@ -106,6 +106,7 @@ print(add(1, 2))
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON bytecode report: %v; stdout = %q", err, stdout.String())
 	}
+	assertInspectProtoChildrenPresentAndNonNull(t, stdout.String())
 	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.SelectedProto != "add" || report.Recursive || report.ProtoCount != 1 {
 		t.Fatalf("report = %+v, want selected non-recursive add report", report)
 	}
@@ -114,6 +115,23 @@ print(add(1, 2))
 	}
 	if strings.Contains(report.Proto.Disassembly, "=== <main>") || !strings.Contains(report.Proto.Disassembly, "RETURN") {
 		t.Fatalf("disassembly = %q, want named proto disassembly only", report.Proto.Disassembly)
+	}
+}
+
+func assertInspectProtoChildrenPresentAndNonNull(t *testing.T, data string) {
+	t.Helper()
+	var raw struct {
+		Proto map[string]json.RawMessage `json:"proto"`
+	}
+	if err := json.Unmarshal([]byte(data), &raw); err != nil {
+		t.Fatalf("inspect bytecode JSON failed to decode as raw object: %v\n%s", err, data)
+	}
+	value, ok := raw.Proto["children"]
+	if !ok {
+		t.Fatalf("inspect bytecode JSON missing proto.children in %s", data)
+	}
+	if strings.TrimSpace(string(value)) == "null" {
+		t.Fatalf("inspect bytecode JSON proto.children is null in %s", data)
 	}
 }
 

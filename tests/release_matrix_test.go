@@ -1297,6 +1297,7 @@ print(add(1, 2))
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("inspect bytecode JSON failed to decode: %v\n%s", err, out)
 	}
+	assertNestedJSONFieldPresentAndNonNull(t, out, "inspect bytecode JSON", "proto", "children")
 	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.Source != path || report.SelectedProto != "<main>" || !report.Recursive || report.ProtoCount != 2 {
 		t.Fatalf("inspect bytecode JSON = %+v, want recursive main schema v1 report", report)
 	}
@@ -3893,6 +3894,28 @@ func assertJSONFieldsPresentAndNonNull(t *testing.T, data, label string, fields 
 		if strings.TrimSpace(string(value)) == "null" {
 			t.Fatalf("%s field %q is null in %s", label, field, data)
 		}
+	}
+}
+
+func assertNestedJSONFieldPresentAndNonNull(t *testing.T, data, label string, path ...string) {
+	t.Helper()
+	if len(path) == 0 {
+		t.Fatalf("%s nested JSON assertion needs a path", label)
+	}
+	var current json.RawMessage = []byte(data)
+	for _, field := range path {
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(current, &raw); err != nil {
+			t.Fatalf("%s failed to decode object while checking %s: %v\n%s", label, strings.Join(path, "."), err, data)
+		}
+		value, ok := raw[field]
+		if !ok {
+			t.Fatalf("%s missing JSON field %q while checking %s in %s", label, field, strings.Join(path, "."), data)
+		}
+		if strings.TrimSpace(string(value)) == "null" {
+			t.Fatalf("%s field %q is null while checking %s in %s", label, field, strings.Join(path, "."), data)
+		}
+		current = value
 	}
 }
 

@@ -110,7 +110,7 @@ type inspectProtoReport struct {
 	Tier1              inspectJITDecisionReport `json:"tier1"`
 	Tier2              inspectJITDecisionReport `json:"tier2"`
 	Disassembly        string                   `json:"disassembly"`
-	Children           []inspectProtoReport     `json:"children,omitempty"`
+	Children           []inspectProtoReport     `json:"children"`
 }
 
 type inspectJITDecisionReport struct {
@@ -151,7 +151,7 @@ func inspectProtoCount(proto *bytecodevm.FuncProto, recursive bool) int {
 
 func inspectProtoRow(displayName string, proto *bytecodevm.FuncProto, recursive bool) inspectProtoReport {
 	if proto == nil {
-		return inspectProtoReport{DisplayName: displayName}
+		return inspectProtoReport{DisplayName: displayName, Children: []inspectProtoReport{}}
 	}
 	tier1 := proto.MethodJITTier1CallableDecision()
 	tier2 := proto.MethodJITTier2CallableDecision()
@@ -174,9 +174,9 @@ func inspectProtoRow(displayName string, proto *bytecodevm.FuncProto, recursive 
 		Tier1:              inspectJITDecisionRow(tier1),
 		Tier2:              inspectJITDecisionRow(tier2),
 		Disassembly:        bytecodevm.Disassemble(proto),
+		Children:           []inspectProtoReport{},
 	}
 	if recursive {
-		row.Children = make([]inspectProtoReport, 0, len(proto.Protos))
 		for _, child := range proto.Protos {
 			row.Children = append(row.Children, inspectProtoRow(child.Name, child, true))
 		}
