@@ -44,6 +44,8 @@ json_out="false"
 dry_run_verified="false"
 build_verified="false"
 install_archive_verified="false"
+checksum_entry_count=0
+install_archive_checksum_count=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -132,11 +134,13 @@ print_json_report() {
   printf '  "metadata": "%s",\n' "$(json_escape "$metadata_name")"
   printf '  "install_archive": "%s",\n' "$(json_escape "$install_archive_name")"
   printf '  "artifact_count": 4,\n'
+  printf '  "checksum_entry_count": %d,\n' "$checksum_entry_count"
+  printf '  "install_archive_checksum_count": %d,\n' "$install_archive_checksum_count"
   printf '  "artifact_files": [\n'
   printf '    "%s",\n' "$(json_escape "$binary_name")"
   printf '    "%s",\n' "$(json_escape "$lsp_binary_name")"
   printf '    "%s",\n' "$(json_escape "$metadata_name")"
-  printf '    "%s"\n' "$(json_escape "$install_archive_name")"
+  printf '    "SHA256SUMS"\n'
   printf '  ],\n'
   printf '  "dry_run_verified": %s,\n' "$dry_run_verified"
   printf '  "build_verified": %s,\n' "$build_verified"
@@ -219,6 +223,7 @@ verify_checksums() {
     echo "error: expected 3 checksum entries, found $checked" >&2
     exit 1
   fi
+  checksum_entry_count="$checked"
 }
 
 write_checksum_line() {
@@ -416,6 +421,7 @@ trap 'cleanup; cleanup_install_fixture' EXIT
 
 package_install_archive "$release_dir" "$install_archive_name" "$binary_path" "$lsp_binary_path" "$archive_ext"
 write_checksum_line "$release_dir" "$install_archive_name" >"$release_dir/SHA256SUMS"
+install_archive_checksum_count=1
 
 bash "$install_script" \
   --version "$version" \

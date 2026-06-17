@@ -1710,7 +1710,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count"}, fields: []string{"blockers", "blocker_details"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, counts: []string{"language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
 		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, counts: []string{"artifact_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
-		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, counts: []string{"artifact_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
+		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, counts: []string{"workflow_count", "install_target_count"}, fields: []string{"workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_count"}, fields: []string{"checked_files", "failures"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_count", "failures"}}},
 	} {
@@ -2062,24 +2062,26 @@ func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1")
 	var report struct {
-		SchemaVersion          int      `json:"schema_version"`
-		Status                 string   `json:"status"`
-		Version                string   `json:"version"`
-		Build                  bool     `json:"build"`
-		RequireClean           bool     `json:"require_clean"`
-		RequireTag             bool     `json:"require_tag"`
-		GOOS                   string   `json:"goos"`
-		GOARCH                 string   `json:"goarch"`
-		Artifact               string   `json:"artifact"`
-		LSPArtifact            string   `json:"lsp_artifact"`
-		Metadata               string   `json:"metadata"`
-		InstallArchive         string   `json:"install_archive"`
-		ArtifactCount          int      `json:"artifact_count"`
-		ArtifactFiles          []string `json:"artifact_files"`
-		DryRunVerified         bool     `json:"dry_run_verified"`
-		BuildVerified          bool     `json:"build_verified"`
-		InstallArchiveVerified bool     `json:"install_archive_verified"`
-		OutputDir              string   `json:"output_dir"`
+		SchemaVersion               int      `json:"schema_version"`
+		Status                      string   `json:"status"`
+		Version                     string   `json:"version"`
+		Build                       bool     `json:"build"`
+		RequireClean                bool     `json:"require_clean"`
+		RequireTag                  bool     `json:"require_tag"`
+		GOOS                        string   `json:"goos"`
+		GOARCH                      string   `json:"goarch"`
+		Artifact                    string   `json:"artifact"`
+		LSPArtifact                 string   `json:"lsp_artifact"`
+		Metadata                    string   `json:"metadata"`
+		InstallArchive              string   `json:"install_archive"`
+		ArtifactCount               int      `json:"artifact_count"`
+		ChecksumEntryCount          int      `json:"checksum_entry_count"`
+		InstallArchiveChecksumCount int      `json:"install_archive_checksum_count"`
+		ArtifactFiles               []string `json:"artifact_files"`
+		DryRunVerified              bool     `json:"dry_run_verified"`
+		BuildVerified               bool     `json:"build_verified"`
+		InstallArchiveVerified      bool     `json:"install_archive_verified"`
+		OutputDir                   string   `json:"output_dir"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("release artifact JSON failed to decode: %v\n%s", err, out)
@@ -2089,6 +2091,12 @@ func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 	}
 	if report.ArtifactCount != len(report.ArtifactFiles) || report.ArtifactCount != 4 {
 		t.Fatalf("release artifact JSON artifact counts = %d/%d, want 4", report.ArtifactCount, len(report.ArtifactFiles))
+	}
+	if report.ChecksumEntryCount != 0 || report.InstallArchiveChecksumCount != 0 {
+		t.Fatalf("release artifact dry-run checksum counts = %d/%d, want 0/0", report.ChecksumEntryCount, report.InstallArchiveChecksumCount)
+	}
+	if !stringSliceContains(report.ArtifactFiles, "SHA256SUMS") || stringSliceContains(report.ArtifactFiles, report.InstallArchive) {
+		t.Fatalf("release artifact files = %+v, want SHA256SUMS and no install archive fixture", report.ArtifactFiles)
 	}
 	if report.GOOS == "" || report.GOARCH == "" {
 		t.Fatalf("release artifact JSON missing platform: %+v", report)
