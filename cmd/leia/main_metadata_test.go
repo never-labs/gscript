@@ -300,6 +300,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/production_check.sh --list --json", []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}},
 		{"scripts/public_release_blockers_check.sh --json", []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count"}},
 		{"scripts/release_artifacts.sh --dry-run --json", []string{"artifact_count"}},
+		{"scripts/release_artifacts_check.sh --json", []string{"artifact_count"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		for _, want := range tc.fields {
