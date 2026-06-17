@@ -298,6 +298,7 @@ if [[ -f .github/workflows/release.yml ]]; then
   require_contains .github/workflows/release.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
   require_contains .github/workflows/release.yml "release tags must match vMAJOR.MINOR.PATCH"
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" --version'
+  require_contains .github/workflows/release.yml 'bash scripts/release_notes_check.sh --require-ready --version "${GITHUB_REF_NAME}"'
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" release --clean'
   require_contains .github/workflows/release.yml '--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"'
 fi

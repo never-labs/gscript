@@ -50,6 +50,8 @@ jobs:
             export LEIA_RELEASE_ARTIFACT_VERSION="${GITHUB_REF_NAME}"
           fi
           go run ./cmd/leia ci release
+      - if: github.ref_type == 'tag'
+        run: bash scripts/release_notes_check.sh --require-ready --version "${GITHUB_REF_NAME}"
       - if: github.event_name == 'workflow_dispatch'
         run: '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
       - if: github.event_name == 'push'

@@ -810,6 +810,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				`"$(go env GOPATH)/bin/goreleaser" --version`,
 				"LEIA_RELEASE_REQUIRE_TAG=1",
 				"LEIA_RELEASE_ARTIFACT_VERSION=\"${GITHUB_REF_NAME}\"",
+				`bash scripts/release_notes_check.sh --require-ready --version "${GITHUB_REF_NAME}"`,
 				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
 				`"$(go env GOPATH)/bin/goreleaser" release --clean`,
 				`--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"`,
