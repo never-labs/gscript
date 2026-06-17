@@ -1568,6 +1568,7 @@ collection vendor ./vendor
 	if err := os.WriteFile(filepath.Join(richModDir, "main.leia"), []byte("require(\"example.com/lib\")\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	diagOutDir := filepath.Join(t.TempDir(), "bundle")
 
 	for _, tc := range []struct {
 		reportCommand string
@@ -1579,6 +1580,7 @@ collection vendor ./vendor
 		{reportCommand: "leia check --json", args: []string{"go", "run", "./cmd/leia", "check", "--json", "--quick", testDir}, counts: []string{"step_count", "failed_count", "skipped_count"}, fields: []string{"steps"}},
 		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count"}, fields: []string{"commands"}},
 		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}},
+		{reportCommand: "leia diag bundle --json", args: []string{"go", "run", "./cmd/leia", "diag", "bundle", "--output", diagOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, counts: []string{"failure_count", "file_count"}, fields: []string{"files"}},
 		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, counts: []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
 		{reportCommand: "leia env --json", args: []string{"go", "run", "./cmd/leia", "env", "--json"}, counts: []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.stdlib_layer_count", "capabilities.default_import_count", "capabilities.dialect_count", "capabilities.tooling.report_count"}, fields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}},
 		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/basic_assert.leia"}, counts: []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
@@ -1590,6 +1592,8 @@ collection vendor ./vendor
 		{reportCommand: "leia lint --json", args: []string{"go", "run", "./cmd/leia", "lint", "--json", lintPath}, counts: []string{"diagnostic_count", "error_count", "warning_count"}, fields: []string{"diagnostics"}},
 		{reportCommand: "leia mod capability --json", args: []string{"go", "run", "./cmd/leia", "mod", "capability", "--json", richModDir}, counts: []string{"capability_count", "module_count", "diagnostic_count"}, fields: []string{"capabilities", "modules", "matrix", "diagnostics"}},
 		{reportCommand: "leia mod check --json", args: []string{"go", "run", "./cmd/leia", "mod", "check", "--json", richModDir}, counts: []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}, fields: []string{"graph.files", "diagnostics"}},
+		{reportCommand: "leia mod explain --json", args: []string{"go", "run", "./cmd/leia", "mod", "explain", "--json", "--dir", richModDir, "example.com/lib"}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}},
+		{reportCommand: "leia mod gomod --json", args: []string{"go", "run", "./cmd/leia", "mod", "gomod", "--json", richModDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}},
 		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, counts: []string{"file_count", "diagnostic_count"}, fields: []string{"files", "diagnostics"}},
 		{reportCommand: "leia mod list --json", args: []string{"go", "run", "./cmd/leia", "mod", "list", "--json", modDir}, counts: []string{"require_count", "replace_count", "collection_count", "diagnostic_count"}, fields: []string{"requires", "replaces", "collections", "diagnostics"}},
 		{reportCommand: "leia mod lock --json", args: []string{"go", "run", "./cmd/leia", "mod", "lock", "--json", richModDir}, counts: []string{"entry_count", "diagnostic_count"}, fields: []string{"entries", "diagnostics"}},
@@ -1632,6 +1636,26 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 	root := findRepoRoot(t)
 	registry := releaseReportRegistry(t, root)
 	installBinDir := filepath.Join(t.TempDir(), "bin")
+	perfDir := t.TempDir()
+	perfTimingJSON := filepath.Join(perfDir, "timing.json")
+	if err := os.WriteFile(perfTimingJSON, []byte(`{
+  "modes": ["default"],
+  "results": [
+    {
+      "group": "control",
+      "benchmark": "sieve",
+      "modes": {
+        "default": {
+          "current": {"status": "ok", "seconds": 0.018, "source": "script_repeat", "stats": {"median": 0.018, "cv_pct": 0}},
+          "head": {"status": "ok", "seconds": 0.018, "source": "script_repeat", "stats": {"median": 0.018, "cv_pct": 0}}
+        }
+      }
+    }
+  ]
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, tc := range []struct {
 		reportCommand string
@@ -1641,6 +1665,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 	}{
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, counts: []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}},
 		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}},
+		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, counts: []string{"failure_count", "output_line_count"}, fields: []string{"failures", "output_lines"}},
 		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, counts: []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "release_critical_skip_names", "release_critical_skips"}},
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count"}, fields: []string{"blockers", "blocker_details"}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, counts: []string{"language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"language_cases", "example_cases", "benchmark_cases"}},
