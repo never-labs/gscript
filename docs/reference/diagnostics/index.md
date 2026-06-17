@@ -60,6 +60,7 @@ if errors.As(err, &budgetErr) {
 Release scripts that emit JSON follow the same pattern: a `schema_version`,
 status field, top-level count fields, and collection fields. The advertised
 field names are listed in `leia capabilities --json` under `tooling.reports`.
+Nested report fields use dotted JSON paths, and `[]` marks per-item array paths.
 In particular,
 `scripts/public_release_blockers_check.sh --json` exposes `blocker_count` and
 kind counts for missing files, open release decisions, stale text, unconfirmed
