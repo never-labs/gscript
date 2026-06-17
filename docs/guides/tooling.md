@@ -204,6 +204,7 @@ collect environment, docs/test status, and optional benchmark summaries.
 go run ./cmd/leia capabilities --json
 bash scripts/production_check.sh --quick
 bash scripts/production_check.sh --quick --list --json
+bash scripts/production_check.sh --quick --list --out-dir /tmp/leia-release-plan
 go test ./tests -run 'TestReleaseMatrix' -count=1
 bash scripts/q_conformance_gate.sh --scope core --bench none --json
 bash scripts/editor_check.sh --json

@@ -1045,6 +1045,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
 		"bash scripts/production_check.sh --quick --list --json",
+		"bash scripts/production_check.sh --quick --list --out-dir /tmp/leia-release-plan",
 		"go run ./cmd/leia ci release --release-version vX.Y.Z --list --json",
 		"bash scripts/performance_gate.sh --validate-only /tmp/leia_performance_gate/timing_gate.json --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench none --json",
@@ -1180,6 +1181,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"complete the release decisions recorded in `docs/release/decisions.md`",
 		"examples/README.md",
 		"docs/reference/platforms/index.md",
+		"bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan",
 		"bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json",
 		"go run ./cmd/leia doc check --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench smoke --json",
@@ -1197,6 +1199,8 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"`status_field`",
 		"`count_fields`",
 		"`collection_fields`",
+		"`plan.json`",
+		"`commands.log`",
 		"## Release-Critical Gates",
 	} {
 		if !strings.Contains(release, snippet) {
@@ -1207,6 +1211,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"Correctness",
 		"Manifest Coverage",
 		"Module Path Gate",
+		"Shell Script Syntax",
 		"Documentation References",
 		"Editor Assets",
 		"Performance Gate",

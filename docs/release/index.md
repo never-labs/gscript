@@ -17,6 +17,7 @@ Machine-readable release evidence:
 ```bash
 go run ./cmd/leia capabilities --json
 bash scripts/diagnostics_bundle.sh --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
+bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan
 bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
 bash scripts/q_conformance_gate.sh --scope core --bench smoke --json
@@ -36,6 +37,9 @@ bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
 entry advertises `status_field`, `count_fields`, and `collection_fields` when
 the report exposes machine-readable release evidence. Nested fields use dotted
 JSON paths; `[]` marks per-item array paths.
+`scripts/production_check.sh --out-dir DIR` writes `plan.txt`, `plan.json`,
+and `commands.log` so the resolved release plan can be archived with both
+human-readable and machine-readable evidence.
 
 `leia ci release` delegates to the same production release profile. That
 profile is the release validation source of truth: correctness, documentation,
@@ -113,6 +117,7 @@ release-critical:
 | Correctness | Go tests, release matrix, spec examples, and stdlib contracts. |
 | Manifest Coverage | Test and benchmark manifest coverage. |
 | Module Path Gate | Published module path validation. |
+| Shell Script Syntax | Bash syntax parsing for release and benchmark scripts. |
 | Documentation References | Markdown links, spec HTML, generated references, and runnable examples. |
 | Editor Assets | TextMate, tree-sitter, VS Code, and editor smoke checks. |
 | Performance Gate | LuaJIT-class timing and strict performance evidence. |
