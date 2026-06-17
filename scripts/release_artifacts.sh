@@ -209,6 +209,7 @@ print_json_report() {
   printf '  "metadata": "%s",\n' "$(json_escape "$metadata_name")"
   printf '  "checksums": "SHA256SUMS",\n'
   printf '  "artifact_count": 4,\n'
+  printf '  "checksum_entry_count": 3,\n'
   printf '  "artifact_files": [\n'
   printf '    "%s",\n' "$(json_escape "$binary_name")"
   printf '    "%s",\n' "$(json_escape "$lsp_binary_name")"

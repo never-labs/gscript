@@ -1709,7 +1709,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, counts: []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "release_critical_skip_names", "release_critical_skips"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"critical_skip_count", "release_critical_skips"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count"}, fields: []string{"blockers", "blocker_details"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, counts: []string{"language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
-		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, counts: []string{"artifact_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
+		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, counts: []string{"workflow_count", "install_target_count"}, fields: []string{"workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_count"}, fields: []string{"checked_files", "failures"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_count", "failures"}}},
@@ -2112,30 +2112,31 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json")
 	var report struct {
-		SchemaVersion   int      `json:"schema_version"`
-		Status          string   `json:"status"`
-		DryRun          bool     `json:"dry_run"`
-		OutputDir       string   `json:"output_dir"`
-		Version         string   `json:"version"`
-		Module          string   `json:"module"`
-		GOOS            string   `json:"goos"`
-		GOARCH          string   `json:"goarch"`
-		Artifact        string   `json:"artifact"`
-		LSPArtifact     string   `json:"lsp_artifact"`
-		Metadata        string   `json:"metadata"`
-		Checksums       string   `json:"checksums"`
-		ArtifactCount   int      `json:"artifact_count"`
-		ArtifactFiles   []string `json:"artifact_files"`
-		ArtifactPath    string   `json:"artifact_path"`
-		LSPArtifactPath string   `json:"lsp_artifact_path"`
-		MetadataPath    string   `json:"metadata_path"`
-		ChecksumsPath   string   `json:"checksums_path"`
-		GitCommit       string   `json:"git_commit"`
-		GitShortCommit  string   `json:"git_short_commit"`
-		GitBranch       string   `json:"git_branch"`
-		GitDirty        bool     `json:"git_dirty"`
-		GoVersion       string   `json:"go_version"`
-		BuildTimeUTC    string   `json:"build_time_utc"`
+		SchemaVersion      int      `json:"schema_version"`
+		Status             string   `json:"status"`
+		DryRun             bool     `json:"dry_run"`
+		OutputDir          string   `json:"output_dir"`
+		Version            string   `json:"version"`
+		Module             string   `json:"module"`
+		GOOS               string   `json:"goos"`
+		GOARCH             string   `json:"goarch"`
+		Artifact           string   `json:"artifact"`
+		LSPArtifact        string   `json:"lsp_artifact"`
+		Metadata           string   `json:"metadata"`
+		Checksums          string   `json:"checksums"`
+		ArtifactCount      int      `json:"artifact_count"`
+		ChecksumEntryCount int      `json:"checksum_entry_count"`
+		ArtifactFiles      []string `json:"artifact_files"`
+		ArtifactPath       string   `json:"artifact_path"`
+		LSPArtifactPath    string   `json:"lsp_artifact_path"`
+		MetadataPath       string   `json:"metadata_path"`
+		ChecksumsPath      string   `json:"checksums_path"`
+		GitCommit          string   `json:"git_commit"`
+		GitShortCommit     string   `json:"git_short_commit"`
+		GitBranch          string   `json:"git_branch"`
+		GitDirty           bool     `json:"git_dirty"`
+		GoVersion          string   `json:"go_version"`
+		BuildTimeUTC       string   `json:"build_time_utc"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("release artifact plan JSON failed to decode: %v\n%s", err, out)
@@ -2148,6 +2149,9 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 	}
 	if report.ArtifactCount != len(report.ArtifactFiles) || report.ArtifactCount != 4 {
 		t.Fatalf("release artifact plan JSON artifact counts = %d/%d, want 4: %+v", report.ArtifactCount, len(report.ArtifactFiles), report)
+	}
+	if report.ChecksumEntryCount != 3 {
+		t.Fatalf("release artifact plan JSON checksum count = %d, want 3: %+v", report.ChecksumEntryCount, report)
 	}
 	for _, want := range []string{"leia_v1.2.3-rc.1_", "leia-lsp_v1.2.3-rc.1_", "metadata.txt", "SHA256SUMS"} {
 		if !strings.Contains(report.Artifact+" "+report.LSPArtifact+" "+report.Metadata+" "+report.Checksums, want) {
