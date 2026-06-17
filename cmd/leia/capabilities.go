@@ -311,7 +311,7 @@ func buildReportCapabilities() []cliReportCapability {
 		{Command: "scripts/release_artifacts.sh --dry-run --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"artifact_count"}, CollectionFields: []string{"artifact_files"}},
 		{Command: "scripts/release_artifacts_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"artifact_count"}, CollectionFields: []string{"artifact_files"}},
 		{Command: "scripts/release_distribution_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"workflow_count", "install_target_count"}, CollectionFields: []string{"workflow_files", "install_targets"}},
-		{Command: "scripts/release_notes_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"checked_file_count", "failure_count"}, CollectionFields: []string{"checked_files", "failures"}},
+		{Command: "scripts/release_notes_check.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_count"}, CollectionFields: []string{"checked_files", "failures"}},
 		{Command: "scripts/worktree_audit.sh --json", Formats: []string{"json"}, SchemaVersion: 1, StatusField: "status", CountFields: []string{"finding_count"}, CollectionFields: []string{"findings"}},
 	}
 }

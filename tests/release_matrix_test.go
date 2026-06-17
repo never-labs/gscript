@@ -1712,7 +1712,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, counts: []string{"artifact_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, counts: []string{"artifact_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, counts: []string{"workflow_count", "install_target_count"}, fields: []string{"workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
-		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, counts: []string{"checked_file_count", "failure_count"}, fields: []string{"checked_files", "failures"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_count", "failures"}}},
+		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_count"}, fields: []string{"checked_files", "failures"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_count", "failures"}}},
 	} {
 		assertReleaseReportRegistrySmoke(t, root, registry, releaseReportSmokeCase(tc))
 	}
@@ -1754,37 +1754,41 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")
 	var passReport struct {
-		SchemaVersion    int      `json:"schema_version"`
-		Status           string   `json:"status"`
-		RequireReady     bool     `json:"require_ready"`
-		Version          string   `json:"version"`
-		CheckedFileCount int      `json:"checked_file_count"`
-		CheckedFiles     []string `json:"checked_files"`
-		FailureCount     int      `json:"failure_count"`
-		Failures         []string `json:"failures"`
+		SchemaVersion         int      `json:"schema_version"`
+		Status                string   `json:"status"`
+		RequireReady          bool     `json:"require_ready"`
+		Version               string   `json:"version"`
+		CheckedFileCount      int      `json:"checked_file_count"`
+		RequiredArtifactCount int      `json:"required_artifact_count"`
+		ArtifactChecksumCount int      `json:"artifact_checksum_count"`
+		CheckedFiles          []string `json:"checked_files"`
+		FailureCount          int      `json:"failure_count"`
+		Failures              []string `json:"failures"`
 	}
 	if err := json.Unmarshal([]byte(out), &passReport); err != nil {
 		t.Fatalf("release notes JSON failed to decode: %v\n%s", err, out)
 	}
-	if passReport.SchemaVersion != 1 || passReport.Status != "pass" || passReport.RequireReady || passReport.Version != "" || passReport.CheckedFileCount != 1 || len(passReport.CheckedFiles) != 1 || passReport.CheckedFiles[0] != "docs/release/notes-template.md" || passReport.FailureCount != 0 || len(passReport.Failures) != 0 {
+	if passReport.SchemaVersion != 1 || passReport.Status != "pass" || passReport.RequireReady || passReport.Version != "" || passReport.CheckedFileCount != 1 || passReport.RequiredArtifactCount != 0 || passReport.ArtifactChecksumCount != 0 || len(passReport.CheckedFiles) != 1 || passReport.CheckedFiles[0] != "docs/release/notes-template.md" || passReport.FailureCount != 0 || len(passReport.Failures) != 0 {
 		t.Fatalf("release notes template JSON = %+v, want passing schema v1 report", passReport)
 	}
 
 	missingOut := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json", "--version", "v9.9.9")
 	var missingReport struct {
-		SchemaVersion    int      `json:"schema_version"`
-		Status           string   `json:"status"`
-		RequireReady     bool     `json:"require_ready"`
-		Version          string   `json:"version"`
-		CheckedFileCount int      `json:"checked_file_count"`
-		CheckedFiles     []string `json:"checked_files"`
-		FailureCount     int      `json:"failure_count"`
-		Failures         []string `json:"failures"`
+		SchemaVersion         int      `json:"schema_version"`
+		Status                string   `json:"status"`
+		RequireReady          bool     `json:"require_ready"`
+		Version               string   `json:"version"`
+		CheckedFileCount      int      `json:"checked_file_count"`
+		RequiredArtifactCount int      `json:"required_artifact_count"`
+		ArtifactChecksumCount int      `json:"artifact_checksum_count"`
+		CheckedFiles          []string `json:"checked_files"`
+		FailureCount          int      `json:"failure_count"`
+		Failures              []string `json:"failures"`
 	}
 	if err := json.Unmarshal([]byte(missingOut), &missingReport); err != nil {
 		t.Fatalf("missing release notes JSON failed to decode: %v\n%s", err, missingOut)
 	}
-	if missingReport.SchemaVersion != 1 || missingReport.Status != "issues" || missingReport.RequireReady || missingReport.Version != "v9.9.9" || missingReport.CheckedFileCount != len(missingReport.CheckedFiles) || missingReport.CheckedFileCount != 2 || missingReport.FailureCount != len(missingReport.Failures) {
+	if missingReport.SchemaVersion != 1 || missingReport.Status != "issues" || missingReport.RequireReady || missingReport.Version != "v9.9.9" || missingReport.CheckedFileCount != len(missingReport.CheckedFiles) || missingReport.CheckedFileCount != 2 || missingReport.RequiredArtifactCount != 0 || missingReport.ArtifactChecksumCount != 0 || missingReport.FailureCount != len(missingReport.Failures) {
 		t.Fatalf("missing release notes JSON = %+v, want issues schema v1 report", missingReport)
 	}
 	if !stringSliceContains(missingReport.CheckedFiles, "docs/release/notes-template.md") || !stringSliceContains(missingReport.CheckedFiles, "docs/release/notes/v9.9.9.md") {
@@ -1901,9 +1905,11 @@ Each archive includes leia and leia-lsp.
 		t.Fatalf("release notes with missing archive checksum unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", badChecksumOut.stdout, badChecksumOut.stderr)
 	}
 	var badChecksumReport struct {
-		Status   string   `json:"status"`
-		Version  string   `json:"version"`
-		Failures []string `json:"failures"`
+		Status                string   `json:"status"`
+		Version               string   `json:"version"`
+		RequiredArtifactCount int      `json:"required_artifact_count"`
+		ArtifactChecksumCount int      `json:"artifact_checksum_count"`
+		Failures              []string `json:"failures"`
 	}
 	if err := json.Unmarshal([]byte(badChecksumOut.stdout), &badChecksumReport); err != nil {
 		t.Fatalf("bad-checksum release notes JSON failed to decode: %v\n%s", err, badChecksumOut.stdout)
@@ -1911,6 +1917,9 @@ Each archive includes leia and leia-lsp.
 	wantChecksumFailure := "docs/release/notes/" + badChecksumVersion + ".md must include a 64-hex SHA256 checksum for leia_" + badChecksumVersion + "_linux_amd64.tar.gz"
 	if badChecksumReport.Status != "issues" || badChecksumReport.Version != badChecksumVersion || !stringSliceContains(badChecksumReport.Failures, wantChecksumFailure) {
 		t.Fatalf("bad-checksum release notes report = %+v, want %q", badChecksumReport, wantChecksumFailure)
+	}
+	if badChecksumReport.RequiredArtifactCount != 7 || badChecksumReport.ArtifactChecksumCount != 6 {
+		t.Fatalf("bad-checksum artifact counts = %d/%d, want 6 valid checksums across 7 required artifacts", badChecksumReport.ArtifactChecksumCount, badChecksumReport.RequiredArtifactCount)
 	}
 }
 

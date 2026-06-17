@@ -65,6 +65,8 @@ fi
 
 failures=()
 checked_files=()
+required_artifact_count=0
+artifact_checksum_count=0
 
 add_failure() {
   failures+=("$1")
@@ -95,6 +97,8 @@ print_json_report() {
   printf '  "require_ready": %s,\n' "$require_ready"
   printf '  "version": "%s",\n' "$(json_escape "$version")"
   printf '  "checked_file_count": %d,\n' "${#checked_files[@]}"
+  printf '  "required_artifact_count": %d,\n' "$required_artifact_count"
+  printf '  "artifact_checksum_count": %d,\n' "$artifact_checksum_count"
   printf '  "checked_files": [\n'
   local i=0
   while [[ "$i" -lt ${#checked_files[@]} ]]; do
@@ -160,7 +164,10 @@ require_release_archive_names() {
 require_archive_checksum() {
   local file="$1"
   local artifact="$2"
-  if ! grep -E "\\|[[:space:]]*\`?${artifact}\`?[[:space:]]*\\|[[:space:]]*[[:xdigit:]]{64}[[:space:]]*\\|" "$file" >/dev/null; then
+  required_artifact_count=$((required_artifact_count + 1))
+  if grep -E "\\|[[:space:]]*\`?${artifact}\`?[[:space:]]*\\|[[:space:]]*[[:xdigit:]]{64}[[:space:]]*\\|" "$file" >/dev/null; then
+    artifact_checksum_count=$((artifact_checksum_count + 1))
+  else
     add_failure "$file must include a 64-hex SHA256 checksum for $artifact"
   fi
 }
