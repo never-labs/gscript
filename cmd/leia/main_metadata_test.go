@@ -241,9 +241,17 @@ func TestCapabilitiesJSON(t *testing.T) {
 		scalars []string
 	}{
 		{"scripts/diagnostics_bundle.sh --json", []string{"output_dir"}},
+		{"scripts/editor_check.sh --json", []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}},
+		{"scripts/install.sh --dry-run --json", []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}},
+		{"scripts/performance_gate.sh --json", []string{"validate_only", "timing_json", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}},
 		{"scripts/production_check.sh --list --json", []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}},
+		{"scripts/public_release_blockers_check.sh --json", []string{"require_resolved"}},
+		{"scripts/q_conformance_gate.sh --json", []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}},
 		{"scripts/release_artifacts.sh --dry-run --json", []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}},
 		{"scripts/release_artifacts_check.sh --json", []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}},
+		{"scripts/release_distribution_check.sh --json", []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}},
+		{"scripts/release_notes_check.sh --json", []string{"require_ready", "version"}},
+		{"scripts/worktree_audit.sh --json", []string{"fail_on_findings"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		for _, want := range tc.scalars {
