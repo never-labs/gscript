@@ -71,9 +71,15 @@ List known issues, or write `None known` after release validation.
 
 | Artifact | SHA256 |
 |---|---|
+| `leia_vX.Y.Z_darwin_amd64.tar.gz` | |
 | `leia_vX.Y.Z_darwin_arm64.tar.gz` | |
-| `leia-lsp` included in each archive | |
+| `leia_vX.Y.Z_linux_amd64.tar.gz` | |
+| `leia_vX.Y.Z_linux_arm64.tar.gz` | |
+| `leia_vX.Y.Z_windows_amd64.zip` | |
+| `leia_vX.Y.Z_windows_arm64.zip` | |
 | `SHA256SUMS` | |
+
+Each archive includes `leia` and `leia-lsp`.
 
 ## Release Decisions
 

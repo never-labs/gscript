@@ -350,6 +350,13 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				releaseNotesCmd,
 				strictReleaseArtifactsCmd,
 				"List known issues, or write `None known` after release validation.",
+				"`leia_vX.Y.Z_darwin_amd64.tar.gz`",
+				"`leia_vX.Y.Z_darwin_arm64.tar.gz`",
+				"`leia_vX.Y.Z_linux_amd64.tar.gz`",
+				"`leia_vX.Y.Z_linux_arm64.tar.gz`",
+				"`leia_vX.Y.Z_windows_amd64.zip`",
+				"`leia_vX.Y.Z_windows_arm64.zip`",
+				"Each archive includes `leia` and `leia-lsp`.",
 			},
 		},
 		{
