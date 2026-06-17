@@ -13,6 +13,7 @@ RELEASE_PROFILE=0
 RELEASE_VERSION=""
 JSON_OUT=0
 ARTIFACT_PLAN=""
+ARTIFACT_PLAN_JSON=""
 ARTIFACT_COMMAND_LOG=""
 SMOKE_SCRIPT="tests/smoke/01_basic.leia"
 EXPECTED_MODULE_PATH="github.com/never-labs/leia"
@@ -256,6 +257,7 @@ init_artifacts() {
 
     mkdir -p "$OUT_DIR"
     ARTIFACT_PLAN="$OUT_DIR/plan.txt"
+    ARTIFACT_PLAN_JSON="$OUT_DIR/plan.json"
     ARTIFACT_COMMAND_LOG="$OUT_DIR/commands.log"
     : > "$ARTIFACT_COMMAND_LOG"
 }
@@ -285,8 +287,10 @@ write_plan_artifact() {
             done
         fi
     } > "$ARTIFACT_PLAN"
+    print_plan_json > "$ARTIFACT_PLAN_JSON"
 
     artifact_log "plan: $ARTIFACT_PLAN"
+    artifact_log "plan_json: $ARTIFACT_PLAN_JSON"
 }
 
 add_go_test() {

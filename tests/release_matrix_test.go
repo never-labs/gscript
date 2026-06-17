@@ -2267,6 +2267,30 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	if quickReport.SchemaVersion != 1 || quickReport.Status != "pass" || quickReport.Mode != "quick" || quickReport.ReleaseProfile || !quickReport.ListOnly || quickReport.RunCount != len(quickReport.RunnableChecks) || quickReport.SkipCount != len(quickReport.SkippedChecks) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkips) || quickReport.CriticalNameCount != len(quickReport.ReleaseCriticalNames) {
 		t.Fatalf("quick production plan JSON = %+v, want quick schema v1 plan", quickReport)
 	}
+	planDir := t.TempDir()
+	runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--list", "--out-dir", planDir)
+	for _, name := range []string{"plan.txt", "plan.json", "commands.log"} {
+		if _, err := os.Stat(filepath.Join(planDir, name)); err != nil {
+			t.Fatalf("production --out-dir missing %s: %v", name, err)
+		}
+	}
+	planJSON := readFileString(t, filepath.Join(planDir, "plan.json"))
+	var planArtifact struct {
+		SchemaVersion int    `json:"schema_version"`
+		Status        string `json:"status"`
+		Mode          string `json:"mode"`
+		RunCount      int    `json:"run_count"`
+		Runnable      []struct {
+			Name    string `json:"name"`
+			Command string `json:"command"`
+		} `json:"runnable_checks"`
+	}
+	if err := json.Unmarshal([]byte(planJSON), &planArtifact); err != nil {
+		t.Fatalf("production plan artifact JSON failed to decode: %v\n%s", err, planJSON)
+	}
+	if planArtifact.SchemaVersion != 1 || planArtifact.Status != "pass" || planArtifact.Mode != "quick" || planArtifact.RunCount != len(planArtifact.Runnable) || planArtifact.RunCount == 0 {
+		t.Fatalf("production plan artifact JSON = %+v, want quick schema v1 plan artifact", planArtifact)
+	}
 
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z", "--list", "--json")
 	var report struct {
