@@ -28,7 +28,7 @@ type GraphReport struct {
 	FileCount       int          `json:"file_count"`
 	DiagnosticCount int          `json:"diagnostic_count"`
 	Files           []GraphFile  `json:"files"`
-	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type GraphFile struct {
@@ -52,9 +52,9 @@ type TidyReport struct {
 	RemovedCount    int          `json:"removed_count"`
 	MissingCount    int          `json:"missing_count"`
 	DiagnosticCount int          `json:"diagnostic_count"`
-	Removed         []string     `json:"removed,omitempty"`
-	Missing         []string     `json:"missing,omitempty"`
-	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
+	Removed         []string     `json:"removed"`
+	Missing         []string     `json:"missing"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type ExplainReport struct {
@@ -66,7 +66,7 @@ type ExplainReport struct {
 	Root            string       `json:"root,omitempty"`
 	File            string       `json:"file,omitempty"`
 	DiagnosticCount int          `json:"diagnostic_count"`
-	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type ListReport struct {
@@ -79,10 +79,10 @@ type ListReport struct {
 	ReplaceCount    int              `json:"replace_count"`
 	CollectionCount int              `json:"collection_count"`
 	DiagnosticCount int              `json:"diagnostic_count"`
-	Requires        []ListRequire    `json:"requires,omitempty"`
-	Replaces        []ListReplace    `json:"replaces,omitempty"`
-	Collections     []ListCollection `json:"collections,omitempty"`
-	Diagnostics     []Diagnostic     `json:"diagnostics,omitempty"`
+	Requires        []ListRequire    `json:"requires"`
+	Replaces        []ListReplace    `json:"replaces"`
+	Collections     []ListCollection `json:"collections"`
+	Diagnostics     []Diagnostic     `json:"diagnostics"`
 }
 
 type ListRequire struct {
@@ -114,10 +114,10 @@ type CapabilityReport struct {
 	CapabilityCount int                        `json:"capability_count"`
 	ModuleCount     int                        `json:"module_count"`
 	DiagnosticCount int                        `json:"diagnostic_count"`
-	Capabilities    []string                   `json:"capabilities,omitempty"`
-	Modules         []CapabilityModule         `json:"modules,omitempty"`
-	Matrix          map[string]map[string]bool `json:"matrix,omitempty"`
-	Diagnostics     []Diagnostic               `json:"diagnostics,omitempty"`
+	Capabilities    []string                   `json:"capabilities"`
+	Modules         []CapabilityModule         `json:"modules"`
+	Matrix          map[string]map[string]bool `json:"matrix"`
+	Diagnostics     []Diagnostic               `json:"diagnostics"`
 }
 
 type GoModReport struct {
@@ -128,7 +128,7 @@ type GoModReport struct {
 	Content         string       `json:"content,omitempty"`
 	Written         bool         `json:"written,omitempty"`
 	DiagnosticCount int          `json:"diagnostic_count"`
-	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type CapabilityModule struct {
@@ -162,8 +162,8 @@ type SumReport struct {
 	Sum             string       `json:"sum,omitempty"`
 	EntryCount      int          `json:"entry_count"`
 	DiagnosticCount int          `json:"diagnostic_count"`
-	Entries         []SumEntry   `json:"entries,omitempty"`
-	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
+	Entries         []SumEntry   `json:"entries"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type SumEntry struct {
@@ -271,6 +271,12 @@ func Graph(path string) (GraphReport, error) {
 func setGraphReportCounts(report *GraphReport) {
 	report.FileCount = len(report.Files)
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Files == nil {
+		report.Files = []GraphFile{}
+	}
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func graphExcludeRoots(root string) []string {
@@ -585,6 +591,15 @@ func setTidyReportCounts(report *TidyReport) {
 	report.RemovedCount = len(report.Removed)
 	report.MissingCount = len(report.Missing)
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Removed == nil {
+		report.Removed = []string{}
+	}
+	if report.Missing == nil {
+		report.Missing = []string{}
+	}
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func Explain(path, module string) (report ExplainReport) {
@@ -620,6 +635,9 @@ func Explain(path, module string) (report ExplainReport) {
 
 func setExplainReportCounts(report *ExplainReport) {
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func List(path string) (report ListReport) {
@@ -687,6 +705,18 @@ func setListReportCounts(report *ListReport) {
 	report.ReplaceCount = len(report.Replaces)
 	report.CollectionCount = len(report.Collections)
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Requires == nil {
+		report.Requires = []ListRequire{}
+	}
+	if report.Replaces == nil {
+		report.Replaces = []ListReplace{}
+	}
+	if report.Collections == nil {
+		report.Collections = []ListCollection{}
+	}
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func Capability(path string) (report CapabilityReport) {
@@ -751,6 +781,18 @@ func setCapabilityReportCounts(report *CapabilityReport) {
 	report.CapabilityCount = len(report.Capabilities)
 	report.ModuleCount = len(report.Modules)
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Capabilities == nil {
+		report.Capabilities = []string{}
+	}
+	if report.Modules == nil {
+		report.Modules = []CapabilityModule{}
+	}
+	if report.Matrix == nil {
+		report.Matrix = map[string]map[string]bool{}
+	}
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func dependencyRoot(root string, manifest modfile.File, req modfile.Require) (string, string, bool) {
@@ -911,6 +953,12 @@ func Lock(path string) (report SumReport) {
 func setSumReportCounts(report *SumReport) {
 	report.EntryCount = len(report.Entries)
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Entries == nil {
+		report.Entries = []SumEntry{}
+	}
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func VerifySum(path string) []Diagnostic {
@@ -1067,6 +1115,9 @@ func GenerateGoMod(path string, write bool) (report GoModReport) {
 
 func setGoModReportCounts(report *GoModReport) {
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func GoModContent(manifest modfile.File) ([]byte, error) {

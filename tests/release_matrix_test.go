@@ -2556,6 +2556,7 @@ func TestReleaseMatrixModuleGraphJSONReportsCounts(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("mod graph JSON failed to decode: %v\n%s", err, out)
 	}
+	assertJSONFieldsPresentAndNonNull(t, out, "mod graph JSON", "files", "diagnostics")
 	if report.SchemaVersion != 1 || report.FileCount != len(report.Files) || report.FileCount != 1 || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 {
 		t.Fatalf("mod graph JSON = %+v, want counted schema v1 graph", report)
 	}
@@ -2605,6 +2606,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal([]byte(listOut), &listReport); err != nil {
 		t.Fatalf("mod list JSON failed to decode: %v\n%s", err, listOut)
 	}
+	assertJSONFieldsPresentAndNonNull(t, listOut, "mod list JSON", "requires", "replaces", "collections", "diagnostics")
 	if listReport.SchemaVersion != 1 || !listReport.OK || listReport.RequireCount != len(listReport.Requires) || listReport.RequireCount != 1 || listReport.ReplaceCount != len(listReport.Replaces) || listReport.ReplaceCount != 1 || listReport.CollectionCount != len(listReport.Collections) || listReport.CollectionCount != 1 || listReport.DiagnosticCount != len(listReport.Diagnostics) || listReport.DiagnosticCount != 0 {
 		t.Fatalf("mod list JSON = %+v, want counted module metadata", listReport)
 	}
@@ -2623,6 +2625,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal([]byte(capabilityOut), &capabilityReport); err != nil {
 		t.Fatalf("mod capability JSON failed to decode: %v\n%s", err, capabilityOut)
 	}
+	assertJSONFieldsPresentAndNonNull(t, capabilityOut, "mod capability JSON", "capabilities", "modules", "matrix", "diagnostics")
 	if capabilityReport.SchemaVersion != 1 || !capabilityReport.OK || capabilityReport.CapabilityCount != len(capabilityReport.Capabilities) || capabilityReport.CapabilityCount != 2 || capabilityReport.ModuleCount != len(capabilityReport.Modules) || capabilityReport.ModuleCount != 2 || capabilityReport.DiagnosticCount != len(capabilityReport.Diagnostics) || capabilityReport.DiagnosticCount != 0 {
 		t.Fatalf("mod capability JSON = %+v, want counted capability matrix", capabilityReport)
 	}
@@ -2639,6 +2642,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal([]byte(lockOut), &lockReport); err != nil {
 		t.Fatalf("mod lock JSON failed to decode: %v\n%s", err, lockOut)
 	}
+	assertJSONFieldsPresentAndNonNull(t, lockOut, "mod lock JSON", "entries", "diagnostics")
 	if lockReport.SchemaVersion != 1 || !lockReport.OK || lockReport.EntryCount != len(lockReport.Entries) || lockReport.EntryCount == 0 || lockReport.DiagnosticCount != len(lockReport.Diagnostics) || lockReport.DiagnosticCount != 0 {
 		t.Fatalf("mod lock JSON = %+v, want counted lock entries", lockReport)
 	}
@@ -2657,6 +2661,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal([]byte(tidyOut), &tidyReport); err != nil {
 		t.Fatalf("mod tidy JSON failed to decode: %v\n%s", err, tidyOut)
 	}
+	assertJSONFieldsPresentAndNonNull(t, tidyOut, "mod tidy JSON", "removed", "missing", "diagnostics")
 	if tidyReport.SchemaVersion != 1 || !tidyReport.OK || tidyReport.RemovedCount != len(tidyReport.Removed) || tidyReport.MissingCount != len(tidyReport.Missing) || tidyReport.DiagnosticCount != len(tidyReport.Diagnostics) || tidyReport.MissingCount != 0 || tidyReport.DiagnosticCount != 0 {
 		t.Fatalf("mod tidy JSON = %+v, want counted tidy result", tidyReport)
 	}
@@ -2671,6 +2676,7 @@ collection vendor ./vendor
 	if err := json.Unmarshal([]byte(verifyOut), &verifyReport); err != nil {
 		t.Fatalf("mod verify JSON failed to decode: %v\n%s", err, verifyOut)
 	}
+	assertJSONFieldsPresentAndNonNull(t, verifyOut, "mod verify JSON", "diagnostics")
 	if verifyReport.SchemaVersion != 1 || !verifyReport.OK || verifyReport.DiagnosticCount != len(verifyReport.Diagnostics) || verifyReport.DiagnosticCount != 0 {
 		t.Fatalf("mod verify JSON = %+v, want counted top-level diagnostics", verifyReport)
 	}
@@ -3871,6 +3877,23 @@ func readFileString(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(data)
+}
+
+func assertJSONFieldsPresentAndNonNull(t *testing.T, data, label string, fields ...string) {
+	t.Helper()
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(data), &raw); err != nil {
+		t.Fatalf("%s failed to decode as raw JSON: %v\n%s", label, err, data)
+	}
+	for _, field := range fields {
+		value, ok := raw[field]
+		if !ok {
+			t.Fatalf("%s missing JSON field %q in %s", label, field, data)
+		}
+		if strings.TrimSpace(string(value)) == "null" {
+			t.Fatalf("%s field %q is null in %s", label, field, data)
+		}
+	}
 }
 
 func stringSliceContains(values []string, want string) bool {

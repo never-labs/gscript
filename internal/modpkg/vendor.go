@@ -20,8 +20,8 @@ type VendorReport struct {
 	VendorDir       string        `json:"vendor_dir,omitempty"`
 	ModuleCount     int           `json:"module_count"`
 	DiagnosticCount int           `json:"diagnostic_count"`
-	Modules         []VendorEntry `json:"modules,omitempty"`
-	Diagnostics     []Diagnostic  `json:"diagnostics,omitempty"`
+	Modules         []VendorEntry `json:"modules"`
+	Diagnostics     []Diagnostic  `json:"diagnostics"`
 }
 
 type VendorEntry struct {
@@ -92,6 +92,12 @@ func Vendor(path string, opts VendorOptions) (report VendorReport) {
 func setVendorReportCounts(report *VendorReport) {
 	report.ModuleCount = len(report.Modules)
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Modules == nil {
+		report.Modules = []VendorEntry{}
+	}
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func vendorRequirement(cacheDir, vendorDir, modulePath, version string) (VendorEntry, error) {

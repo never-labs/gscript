@@ -26,8 +26,8 @@ type DownloadReport struct {
 	CacheDir        string          `json:"cache_dir,omitempty"`
 	ModuleCount     int             `json:"module_count"`
 	DiagnosticCount int             `json:"diagnostic_count"`
-	Modules         []DownloadEntry `json:"modules,omitempty"`
-	Diagnostics     []Diagnostic    `json:"diagnostics,omitempty"`
+	Modules         []DownloadEntry `json:"modules"`
+	Diagnostics     []Diagnostic    `json:"diagnostics"`
 }
 
 type DownloadEntry struct {
@@ -80,6 +80,12 @@ func Download(path string, opts DownloadOptions) (report DownloadReport) {
 func setDownloadReportCounts(report *DownloadReport) {
 	report.ModuleCount = len(report.Modules)
 	report.DiagnosticCount = len(report.Diagnostics)
+	if report.Modules == nil {
+		report.Modules = []DownloadEntry{}
+	}
+	if report.Diagnostics == nil {
+		report.Diagnostics = []Diagnostic{}
+	}
 }
 
 func downloadRequirements(root string, manifest modfile.File, cacheDir string, opts DownloadOptions, diags *[]Diagnostic, seen map[string]bool) []DownloadEntry {
