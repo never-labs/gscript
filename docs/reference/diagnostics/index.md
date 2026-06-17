@@ -65,8 +65,9 @@ In particular,
 `scripts/public_release_blockers_check.sh --json` exposes `blocker_count` and
 kind counts for missing files, open release decisions, stale text, unconfirmed
 policies, missing guidance, missing documentation snippets, plus
-`decision_area_count` and `decision_areas` for the required maintainer decision
-domains.
+`open_blocker_count`, `blocker_status_count`, `blocker_statuses`,
+`decision_area_count`, and `decision_areas` for the required maintainer
+decision domains.
 `leia diag bundle --json` and
 `scripts/diagnostics_bundle.sh --json` expose `file_count` for the generated
 bundle files listed in `files`.

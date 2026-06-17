@@ -331,7 +331,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/install.sh --dry-run --json", []string{"install_count", "binary_count", "install_path_count"}},
 		{"scripts/performance_gate.sh --json", []string{"failure_count", "output_line_count"}},
 		{"scripts/production_check.sh --list --json", []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}},
-		{"scripts/public_release_blockers_check.sh --json", []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "decision_area_count"}},
+		{"scripts/public_release_blockers_check.sh --json", []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}},
 		{"scripts/release_artifacts.sh --dry-run --json", []string{"artifact_count", "checksum_entry_count"}},
 		{"scripts/release_artifacts_check.sh --json", []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}},
 	} {

@@ -52,6 +52,7 @@ blocker_actions=()
 blocker_statuses=()
 blocker_paths=()
 decision_areas=()
+blocker_status_values=()
 
 add_blocker() {
   blockers+=("$1")
@@ -60,6 +61,9 @@ add_blocker() {
   blocker_actions+=("${4:-}")
   blocker_statuses+=("${5:-}")
   blocker_paths+=("${6:-}")
+  if [[ -n "${5:-}" ]]; then
+    record_blocker_status "${5:-}"
+  fi
 }
 
 json_escape() {
@@ -92,6 +96,19 @@ count_blocker_kind() {
   printf '%d' "$count"
 }
 
+count_blocker_status() {
+  local status="$1"
+  local count=0
+  local i=0
+  while [[ "$i" -lt ${#blocker_statuses[@]} ]]; do
+    if [[ "${blocker_statuses[$i]}" == "$status" ]]; then
+      count=$((count + 1))
+    fi
+    i=$((i + 1))
+  done
+  printf '%d' "$count"
+}
+
 record_decision_area() {
   local area="$1"
   local existing
@@ -103,6 +120,19 @@ record_decision_area() {
     done
   fi
   decision_areas+=("$area")
+}
+
+record_blocker_status() {
+  local status="$1"
+  local existing
+  if [[ "${#blocker_status_values[@]}" -gt 0 ]]; then
+    for existing in "${blocker_status_values[@]}"; do
+      if [[ "$existing" == "$status" ]]; then
+        return
+      fi
+    done
+  fi
+  blocker_status_values+=("$status")
 }
 
 print_json_string_array() {
@@ -138,6 +168,11 @@ print_json_report() {
   printf '  "unconfirmed_policy_count": %d,\n' "$(count_blocker_kind "unconfirmed_policy")"
   printf '  "missing_guidance_count": %d,\n' "$(count_blocker_kind "missing_guidance")"
   printf '  "missing_doc_snippet_count": %d,\n' "$(count_blocker_kind "missing_doc_snippet")"
+  printf '  "open_blocker_count": %d,\n' "$(count_blocker_status "Open")"
+  printf '  "blocker_status_count": %d,\n' "${#blocker_status_values[@]}"
+  printf '  "blocker_statuses": '
+  print_json_string_array "  " "${blocker_status_values[@]}"
+  printf ',\n'
   printf '  "decision_area_count": %d,\n' "${#decision_areas[@]}"
   printf '  "decision_areas": '
   print_json_string_array "  " "${decision_areas[@]}"
