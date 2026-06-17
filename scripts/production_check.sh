@@ -191,9 +191,14 @@ print_plan_json() {
         [ -n "$reason" ] || continue
         critical+=("$reason")
     done < <(release_critical_skips)
+    local status="pass"
+    if [ "$RELEASE_PROFILE" -eq 1 ] && [ "${#critical[@]}" -gt 0 ]; then
+        status="blocked"
+    fi
 
     printf '{\n'
     printf '  "schema_version": 1,\n'
+    printf '  "status": "%s",\n' "$status"
     printf '  "mode": "%s",\n' "$(json_escape "$MODE")"
     printf '  "release_profile": %s,\n' "$([ "$RELEASE_PROFILE" -eq 1 ] && echo true || echo false)"
     printf '  "release_version": "%s",\n' "$(json_escape "$RELEASE_VERSION")"
