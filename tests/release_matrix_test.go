@@ -1595,12 +1595,12 @@ collection vendor ./vendor
 	}{
 		{reportCommand: "leia capabilities --json", args: []string{"go", "run", "./cmd/leia", "capabilities", "--json"}, counts: []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}, fields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}},
 		{reportCommand: "leia check --json", args: []string{"go", "run", "./cmd/leia", "check", "--json", "--quick", testDir}, counts: []string{"step_count", "failed_count", "skipped_count"}, fields: []string{"steps"}},
-		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count"}, fields: []string{"commands"}},
+		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count", "commands[].arg_count"}, fields: []string{"commands"}},
 		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}},
 		{reportCommand: "leia diag bundle --json", args: []string{"go", "run", "./cmd/leia", "diag", "bundle", "--output", diagOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, counts: []string{"failure_count", "file_count"}, fields: []string{"files"}},
 		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, counts: []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}},
 		{reportCommand: "leia env --json", args: []string{"go", "run", "./cmd/leia", "env", "--json"}, counts: []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.stdlib_layer_count", "capabilities.default_import_count", "capabilities.dialect_count", "capabilities.tooling.report_count"}, fields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}},
-		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/basic_assert.leia"}, counts: []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
+		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/corpus_metrics.leia"}, counts: []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos", "metrics[].count"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
 		{reportCommand: "leia examples check --json", args: []string{"go", "run", "./cmd/leia", "examples", "check", "--json", "--jobs=1", "repo-evaluate-basic_assert"}, counts: []string{"result_count", "runnable", "skipped", "failed"}, fields: []string{"results"}},
 		{reportCommand: "leia examples list --json", args: []string{"go", "run", "./cmd/leia", "examples", "list", "--json"}, counts: []string{"example_count"}, fields: []string{"examples"}},
 		{reportCommand: "leia fmt --json", args: []string{"go", "run", "./cmd/leia", "fmt", "--check", "--json", testPath}, counts: []string{"file_count", "changed_count", "error_count"}, fields: []string{"files"}},
@@ -4119,35 +4119,63 @@ func assertNestedJSONFieldPresentAndNonNull(t *testing.T, data, label string, pa
 
 func assertNestedJSONNumberFieldPresent(t *testing.T, data, label string, path ...string) {
 	t.Helper()
-	value := nestedJSONField(t, data, label, path...)
-	var number json.Number
-	if err := json.Unmarshal(value, &number); err != nil {
-		t.Fatalf("%s field %s must be a JSON number: %v\n%s", label, strings.Join(path, "."), err, data)
-	}
-	if _, err := number.Int64(); err != nil {
-		t.Fatalf("%s field %s must be an integer JSON number: %v\n%s", label, strings.Join(path, "."), err, data)
+	values := nestedJSONFields(t, data, label, path...)
+	for _, value := range values {
+		var number json.Number
+		if err := json.Unmarshal(value, &number); err != nil {
+			t.Fatalf("%s field %s must be a JSON number: %v\n%s", label, strings.Join(path, "."), err, data)
+		}
+		if _, err := number.Int64(); err != nil {
+			t.Fatalf("%s field %s must be an integer JSON number: %v\n%s", label, strings.Join(path, "."), err, data)
+		}
 	}
 }
 
 func nestedJSONField(t *testing.T, data, label string, path ...string) json.RawMessage {
 	t.Helper()
+	values := nestedJSONFields(t, data, label, path...)
+	if len(values) != 1 {
+		t.Fatalf("%s path %s resolved to %d values, want 1\n%s", label, strings.Join(path, "."), len(values), data)
+	}
+	return values[0]
+}
+
+func nestedJSONFields(t *testing.T, data, label string, path ...string) []json.RawMessage {
+	t.Helper()
 	if len(path) == 0 {
 		t.Fatalf("%s nested JSON assertion needs a path", label)
 	}
-	var current json.RawMessage = []byte(data)
+	current := []json.RawMessage{[]byte(data)}
 	for _, field := range path {
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(current, &raw); err != nil {
-			t.Fatalf("%s failed to decode object while checking %s: %v\n%s", label, strings.Join(path, "."), err, data)
+		arrayField := strings.HasSuffix(field, "[]")
+		objectField := strings.TrimSuffix(field, "[]")
+		var next []json.RawMessage
+		for _, item := range current {
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal(item, &raw); err != nil {
+				t.Fatalf("%s failed to decode object while checking %s: %v\n%s", label, strings.Join(path, "."), err, data)
+			}
+			value, ok := raw[objectField]
+			if !ok {
+				t.Fatalf("%s missing JSON field %q while checking %s in %s", label, objectField, strings.Join(path, "."), data)
+			}
+			if strings.TrimSpace(string(value)) == "null" {
+				t.Fatalf("%s field %q is null while checking %s in %s", label, objectField, strings.Join(path, "."), data)
+			}
+			if !arrayField {
+				next = append(next, value)
+				continue
+			}
+			var array []json.RawMessage
+			if err := json.Unmarshal(value, &array); err != nil {
+				t.Fatalf("%s field %q must be an array while checking %s: %v\n%s", label, objectField, strings.Join(path, "."), err, data)
+			}
+			if len(array) == 0 {
+				t.Fatalf("%s field %q must be a non-empty array while checking %s in %s", label, objectField, strings.Join(path, "."), data)
+			}
+			next = append(next, array...)
 		}
-		value, ok := raw[field]
-		if !ok {
-			t.Fatalf("%s missing JSON field %q while checking %s in %s", label, field, strings.Join(path, "."), data)
-		}
-		if strings.TrimSpace(string(value)) == "null" {
-			t.Fatalf("%s field %q is null while checking %s in %s", label, field, strings.Join(path, "."), data)
-		}
-		current = value
+		current = next
 	}
 	return current
 }
