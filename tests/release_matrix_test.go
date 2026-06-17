@@ -356,6 +356,9 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 			path: "docs/guides/tooling.md",
 			snippets: []string{
 				ciReleaseListCmd,
+				"`status_field`",
+				"`count_fields`",
+				"`collection_fields`",
 			},
 		},
 		{
@@ -1032,6 +1035,19 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 			t.Fatalf("%s must keep tooling script evidence snippet %q", item.path, item.snippet)
 		}
 	}
+
+	diagnosticsRef := readFileString(t, filepath.Join(root, "docs", "reference", "diagnostics", "index.md"))
+	for _, snippet := range []string{
+		"`tooling.reports` JSON report registry",
+		"`status_field`",
+		"`count_fields`",
+		"`collection_fields`",
+		"field names are listed in `leia capabilities --json` under `tooling.reports`",
+	} {
+		if !strings.Contains(diagnosticsRef, snippet) {
+			t.Fatalf("docs/reference/diagnostics/index.md must keep JSON registry snippet %q", snippet)
+		}
+	}
 }
 
 func TestReleaseMatrixToolingAuditCommandsStayInToolingGuide(t *testing.T) {
@@ -1134,6 +1150,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 		"`blocker_count` plus kind-specific counts",
 		"`release_decision_count`",
+		"`status_field`",
 		"`count_fields`",
 		"`collection_fields`",
 	} {

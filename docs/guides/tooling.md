@@ -37,9 +37,10 @@ go run ./cmd/leia evaluate --json --report eval-report.json examples/evaluate/ba
 
 `capabilities --json` includes `tooling.report_count` and `tooling.reports`,
 the registry of CLI and release-script JSON reports.
-Each registry entry advertises `count_fields` and `collection_fields` when the
-report exposes countable evidence. Release dashboards should read those fields
-instead of scraping human output; for example,
+Each registry entry advertises `status_field`, `count_fields`, and
+`collection_fields` when the report exposes machine-readable release evidence.
+Release dashboards should read those fields instead of scraping human output;
+for example,
 `scripts/public_release_blockers_check.sh --json` exposes blocker kind counts
 and `scripts/production_check.sh --list --json` exposes runnable, skipped, and
 release-critical skip counts plus the configured release-critical skip names.
