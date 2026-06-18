@@ -1737,6 +1737,7 @@ require github.com/acme/toolkit v1.2.3
 		scalars       []string
 		counts        []string
 		fields        []string
+		itemFields    []string
 		matches       []releaseReportCountMatch
 	}{
 		{reportCommand: "leia capabilities --json", args: []string{"go", "run", "./cmd/leia", "capabilities", "--json"}, counts: []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}, fields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}, matches: []releaseReportCountMatch{{"command_count", "commands"}, {"stdlib_module_count", "stdlib_modules"}, {"stdlib_layer_count", "stdlib_layers"}, {"default_import_count", "default_imports"}, {"dialect_count", "dialects"}, {"tooling.report_count", "tooling.reports"}}},
@@ -1828,21 +1829,22 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		scalars       []string
 		counts        []string
 		fields        []string
+		itemFields    []string
 		matches       []releaseReportCountMatch
 	}{
 		{reportCommand: "scripts/arch_check.sh --json", args: []string{"bash", "scripts/arch_check.sh", "--json"}, scalars: []string{"module"}, counts: []string{"source_file_count", "source_line_count", "test_file_count", "test_line_count", "test_ratio_pct", "top_file_count", "large_file_count", "pass_pipeline_line_count", "debt_marker_count", "missing_test_count"}, fields: []string{"top_file_details", "large_file_details", "pass_pipeline_lines", "debt_marker_details", "missing_test_files"}, matches: []releaseReportCountMatch{{"top_file_count", "top_file_details"}, {"large_file_count", "large_file_details"}, {"pass_pipeline_line_count", "pass_pipeline_lines"}, {"debt_marker_count", "debt_marker_details"}, {"missing_test_count", "missing_test_files"}}},
 		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
 		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"failure_kinds", "failure_details", "textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
-		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths", "install_entries"}, matches: []releaseReportCountMatch{{"install_count", "install_entries"}, {"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
+		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths", "install_entries"}, itemFields: []string{"install_entries[].role", "install_entries[].name", "install_entries[].path"}, matches: []releaseReportCountMatch{{"install_count", "install_entries"}, {"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
 		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "validate_target.path", "validate_target.exists", "validate_target.is_file", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"validate_target.size_bytes", "failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
-		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "skipped_check_details", "release_critical_runs", "release_critical_skip_names", "release_critical_skips", "release_critical_skip_details"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"skip_count", "skipped_check_details"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"critical_skip_count", "release_critical_skip_details"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
+		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "skipped_check_details", "release_critical_runs", "release_critical_skip_names", "release_critical_skips", "release_critical_skip_details"}, itemFields: []string{"runnable_checks[].name", "runnable_checks[].command", "runnable_checks[].release_critical"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"skip_count", "skipped_check_details"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"critical_skip_count", "release_critical_skip_details"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, scalars: []string{"require_resolved"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}, fields: []string{"blockers", "blocker_details", "blocker_statuses", "blocker_status_details", "decision_areas"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}, {"blocker_status_count", "blocker_statuses"}, {"blocker_status_count", "blocker_status_details"}, {"decision_area_count", "decision_areas"}}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, scalars: []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}, counts: []string{"failure_kind_count", "failure_count", "language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"failure_kinds", "failure_details", "language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
 		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files", "artifact_entries"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}}},
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "artifact_entries", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
-		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets", "install_target_details"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}, {"install_target_count", "install_target_details"}}},
-		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "checked_file_details", "required_artifact_details", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"checked_file_count", "checked_file_details"}, {"required_artifact_count", "required_artifact_details"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
+		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets", "install_target_details"}, itemFields: []string{"install_target_details[].target", "install_target_details[].goos", "install_target_details[].goarch"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}, {"install_target_count", "install_target_details"}}},
+		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "checked_file_details", "required_artifact_details", "failure_kinds", "failures", "failure_details"}, itemFields: []string{"checked_file_details[].path", "checked_file_details[].role", "checked_file_details[].required", "checked_file_details[].exists"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"checked_file_count", "checked_file_details"}, {"required_artifact_count", "required_artifact_details"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/release_snapshot_install_check.sh --json", args: []string{"bash", "scripts/release_snapshot_install_check.sh", "--dist-dir", snapshotDistDir, "--bin-dir", filepath.Join(t.TempDir(), "snapshot-bin"), "--os", "linux", "--arch", "amd64", "--json"}, scalars: []string{"dist_dir", "goos", "goarch", "archive", "archive_name", "snapshot_version", "installer_version", "staged_asset", "staged_release_dir", "bin_dir"}, counts: []string{"install_count", "failure_kind_count", "failure_count"}, fields: []string{"installed_paths", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"install_count", "installed_paths"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/site_check.sh --json", args: []string{"bash", "scripts/site_check.sh", "--site-dir", siteDir, "--json"}, scalars: []string{"site_dir"}, counts: []string{"html_file_count", "local_link_count", "asset_ref_count", "fragment_check_count", "failure_kind_count", "failure_count"}, fields: []string{"failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count", "finding_status_count"}, fields: []string{"findings", "finding_statuses"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}, {"finding_status_count", "finding_statuses"}}},
@@ -2988,7 +2990,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		commands[check.Name] = check.Command
 	}
 	for name, want := range map[string]string{
-		"Architecture Health":      "bash scripts/arch_check.sh --json",
+		"Architecture Health":     "bash scripts/arch_check.sh --json",
 		"Public Release Blockers": "bash scripts/public_release_blockers_check.sh --require-resolved",
 		"Release Distribution":    "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 		"Release Notes":           "bash scripts/release_notes_check.sh --require-ready --version \"vX.Y.Z\"",
@@ -5293,11 +5295,12 @@ func nestedJSONFields(t *testing.T, data, label string, path ...string) []json.R
 }
 
 type releaseReportRegistryEntry struct {
-	StatusField      string
-	SchemaVersion    int
-	ScalarFields     []string
-	CountFields      []string
-	CollectionFields []string
+	StatusField          string
+	SchemaVersion        int
+	ScalarFields         []string
+	CountFields          []string
+	CollectionFields     []string
+	CollectionItemFields []string
 }
 
 type releaseReportSmokeCase struct {
@@ -5306,6 +5309,7 @@ type releaseReportSmokeCase struct {
 	scalars       []string
 	counts        []string
 	fields        []string
+	itemFields    []string
 	matches       []releaseReportCountMatch
 }
 
@@ -5331,6 +5335,11 @@ func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[st
 				t.Fatalf("capabilities report %q collection_fields = %#v, want %q", tc.reportCommand, declared.CollectionFields, field)
 			}
 		}
+		for _, field := range tc.itemFields {
+			if !stringSliceContains(declared.CollectionItemFields, field) {
+				t.Fatalf("capabilities report %q collection_item_fields = %#v, want %q", tc.reportCommand, declared.CollectionItemFields, field)
+			}
+		}
 		out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
 		assertReleaseReportSchemaVersion(t, out, tc.reportCommand, declared.SchemaVersion)
 		if declared.StatusField != "" {
@@ -5346,6 +5355,9 @@ func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[st
 			assertNestedJSONNumberFieldPresent(t, out, tc.reportCommand, strings.Split(count, ".")...)
 		}
 		for _, field := range tc.fields {
+			assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
+		}
+		for _, field := range tc.itemFields {
 			assertNestedJSONFieldPresentAndNonNull(t, out, tc.reportCommand, strings.Split(field, ".")...)
 		}
 		for _, match := range tc.matches {
@@ -5420,12 +5432,13 @@ func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRe
 	var payload struct {
 		Tooling struct {
 			Reports []struct {
-				Command          string   `json:"command"`
-				StatusField      string   `json:"status_field"`
-				SchemaVersion    int      `json:"schema_version"`
-				ScalarFields     []string `json:"scalar_fields"`
-				CountFields      []string `json:"count_fields"`
-				CollectionFields []string `json:"collection_fields"`
+				Command              string   `json:"command"`
+				StatusField          string   `json:"status_field"`
+				SchemaVersion        int      `json:"schema_version"`
+				ScalarFields         []string `json:"scalar_fields"`
+				CountFields          []string `json:"count_fields"`
+				CollectionFields     []string `json:"collection_fields"`
+				CollectionItemFields []string `json:"collection_item_fields"`
 			} `json:"reports"`
 		} `json:"tooling"`
 	}
@@ -5435,11 +5448,12 @@ func releaseReportRegistry(t *testing.T, root string) map[string]releaseReportRe
 	registry := map[string]releaseReportRegistryEntry{}
 	for _, report := range payload.Tooling.Reports {
 		registry[report.Command] = releaseReportRegistryEntry{
-			StatusField:      report.StatusField,
-			SchemaVersion:    report.SchemaVersion,
-			ScalarFields:     report.ScalarFields,
-			CountFields:      report.CountFields,
-			CollectionFields: report.CollectionFields,
+			StatusField:          report.StatusField,
+			SchemaVersion:        report.SchemaVersion,
+			ScalarFields:         report.ScalarFields,
+			CountFields:          report.CountFields,
+			CollectionFields:     report.CollectionFields,
+			CollectionItemFields: report.CollectionItemFields,
 		}
 	}
 	return registry

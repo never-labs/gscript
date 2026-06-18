@@ -324,6 +324,22 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("%s report capability = %+v, want collection field %q", tc.command, report, tc.collection)
 		}
 	}
+	for _, tc := range []struct {
+		command string
+		fields  []string
+	}{
+		{"scripts/install.sh --dry-run --json", []string{"install_entries[].role", "install_entries[].name", "install_entries[].path"}},
+		{"scripts/production_check.sh --list --json", []string{"runnable_checks[].name", "runnable_checks[].command", "runnable_checks[].release_critical"}},
+		{"scripts/release_distribution_check.sh --json", []string{"install_target_details[].target", "install_target_details[].goos", "install_target_details[].goarch"}},
+		{"scripts/release_notes_check.sh --json", []string{"checked_file_details[].path", "checked_file_details[].role", "checked_file_details[].required", "checked_file_details[].exists"}},
+	} {
+		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
+		for _, want := range tc.fields {
+			if report == nil || !containsString(report.CollectionItemFields, want) {
+				t.Fatalf("%s report capability = %+v, want collection item field %q", tc.command, report, want)
+			}
+		}
+	}
 	evaluateReport := capabilitiesReport(caps.Tooling.Reports, "leia evaluate --json")
 	for _, want := range []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos", "metrics[].count"} {
 		if evaluateReport == nil || !containsString(evaluateReport.CountFields, want) {
