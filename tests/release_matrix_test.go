@@ -3126,6 +3126,26 @@ func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
 	if failedReport.FailureKindCount != 1 || failedReport.FailureCount != 1 || !stringSliceContains(failedReport.FailureKinds, "invalid_jobs") || len(failedReport.FailureDetails) != 1 || failedReport.FailureDetails[0].Kind != "invalid_jobs" || failedReport.FailureDetails[0].Value != "0" {
 		t.Fatalf("q conformance invalid jobs failure details = %+v, want invalid_jobs", failedReport)
 	}
+
+	invalidScope := runCommandResult(root, 30*time.Second, "bash", "scripts/q_conformance_gate.sh", "--scope", "language", "--bench", "none", "--json")
+	if invalidScope.err == nil {
+		t.Fatalf("q conformance invalid scope unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", invalidScope.stdout, invalidScope.stderr)
+	}
+	var invalidScopeReport struct {
+		SchemaVersion  int    `json:"schema_version"`
+		Status         string `json:"status"`
+		Scope          string `json:"scope"`
+		FailureDetails []struct {
+			Kind  string `json:"kind"`
+			Value string `json:"value"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(invalidScope.stdout), &invalidScopeReport); err != nil {
+		t.Fatalf("q conformance invalid scope JSON failed to decode: %v\nstdout:\n%s\nstderr:\n%s", err, invalidScope.stdout, invalidScope.stderr)
+	}
+	if invalidScopeReport.SchemaVersion != 1 || invalidScopeReport.Status != "fail" || invalidScopeReport.Scope != "language" || len(invalidScopeReport.FailureDetails) != 1 || invalidScopeReport.FailureDetails[0].Kind != "invalid_scope" || invalidScopeReport.FailureDetails[0].Value != "language" {
+		t.Fatalf("q conformance invalid scope JSON = %+v, want invalid_scope", invalidScopeReport)
+	}
 }
 
 func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {

@@ -306,6 +306,13 @@ print_json_report() {
 
 trap 'on_error "$?"' ERR
 
+case "$Q_GATE_SCOPE" in
+  all|core|extended)
+    ;;
+  *)
+    fail "invalid_scope" "--scope must be one of: all, core, extended" 2 "$Q_GATE_SCOPE"
+    ;;
+esac
 if ! [[ "$JOBS" =~ ^[1-9][0-9]*$ ]]; then
   fail "invalid_jobs" "--jobs must be a positive integer: $JOBS" 2 "$JOBS"
 fi
