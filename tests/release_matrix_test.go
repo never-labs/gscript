@@ -846,6 +846,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			snippets: []string{
 				"name: Release",
 				"go run ./cmd/leia ci release",
+				`go run ./cmd/leia ci release --release-version "${GITHUB_REF_NAME}"`,
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
 				"release tags must match vMAJOR.MINOR.PATCH",
 				`"$(go env GOPATH)/bin/goreleaser" --version`,
