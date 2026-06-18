@@ -268,6 +268,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia ci --list --json", "commands"},
 		{"leia ci --list --json", "commands[].args"},
 		{"leia config --json", "diagnostics"},
+		{"leia diag bundle --json", "failure_details"},
 		{"leia evaluate --json", "cases"},
 		{"leia evaluate --json", "findings"},
 		{"leia evaluate --json", "inputs"},
