@@ -334,6 +334,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/public_release_blockers_check.sh --json", []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}},
 		{"scripts/release_artifacts.sh --dry-run --json", []string{"artifact_count", "checksum_entry_count"}},
 		{"scripts/release_artifacts_check.sh --json", []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}},
+		{"scripts/release_notes_check.sh --json", []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		for _, want := range tc.fields {

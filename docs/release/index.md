@@ -152,6 +152,12 @@ Every public tag must have release notes. The notes must identify:
 - evidence links for the spec, feature coverage, security reference, platform
   reference, and performance validation.
 
+`scripts/release_notes_check.sh --json --version vX.Y.Z` reports
+`checked_file_count`, `required_artifact_count`, `artifact_checksum_count`,
+`failure_kind_count`, and `failure_count`. Its `failure_kinds` and
+`failure_details` fields make missing files, missing required text, template
+placeholders, and missing checksums machine-groupable.
+
 ## Public Release Blockers
 
 Do not cut a public release until these repository-level decisions are complete:

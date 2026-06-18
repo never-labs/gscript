@@ -64,12 +64,20 @@ if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)
 fi
 
 failures=()
+failure_kinds=()
+failure_paths=()
+failure_values=()
+failure_kind_values=()
 checked_files=()
 required_artifact_count=0
 artifact_checksum_count=0
 
 add_failure() {
   failures+=("$1")
+  failure_kinds+=("${2:-general}")
+  failure_paths+=("${3:-}")
+  failure_values+=("${4:-}")
+  record_failure_kind "${2:-general}"
 }
 
 add_checked_file() {
@@ -86,6 +94,36 @@ json_escape() {
   printf '%s' "$value"
 }
 
+record_failure_kind() {
+  local kind="$1"
+  local existing
+  if [[ "${#failure_kind_values[@]}" -gt 0 ]]; then
+    for existing in "${failure_kind_values[@]}"; do
+      if [[ "$existing" == "$kind" ]]; then
+        return
+      fi
+    done
+  fi
+  failure_kind_values+=("$kind")
+}
+
+print_json_string_array() {
+  local indent="$1"
+  shift
+  local values=("$@")
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#values[@]}" ]]; do
+    printf '%s  "%s"' "$indent" "$(json_escape "${values[$i]}")"
+    if [[ "$i" -lt $((${#values[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
 print_json_report() {
   local status="pass"
   if [[ ${#failures[@]} -gt 0 ]]; then
@@ -99,22 +137,38 @@ print_json_report() {
   printf '  "checked_file_count": %d,\n' "${#checked_files[@]}"
   printf '  "required_artifact_count": %d,\n' "$required_artifact_count"
   printf '  "artifact_checksum_count": %d,\n' "$artifact_checksum_count"
-  printf '  "checked_files": [\n'
+  printf '  "failure_kind_count": %d,\n' "${#failure_kind_values[@]}"
+  printf '  "checked_files": '
+  print_json_string_array "  " "${checked_files[@]}"
+  printf ',\n'
+  printf '  "failure_count": %d,\n' "${#failures[@]}"
+  printf '  "failure_kinds": '
+  print_json_string_array "  " ${failure_kind_values[@]+"${failure_kind_values[@]}"}
+  printf ',\n'
+  printf '  "failures": [\n'
   local i=0
-  while [[ "$i" -lt ${#checked_files[@]} ]]; do
-    printf '    "%s"' "$(json_escape "${checked_files[$i]}")"
-    if [[ "$i" -lt $((${#checked_files[@]} - 1)) ]]; then
+  while [[ "$i" -lt ${#failures[@]} ]]; do
+    printf '    "%s"' "$(json_escape "${failures[$i]}")"
+    if [[ "$i" -lt $((${#failures[@]} - 1)) ]]; then
       printf ','
     fi
     printf '\n'
     i=$((i + 1))
   done
   printf '  ],\n'
-  printf '  "failure_count": %d,\n' "${#failures[@]}"
-  printf '  "failures": [\n'
+  printf '  "failure_details": [\n'
   i=0
   while [[ "$i" -lt ${#failures[@]} ]]; do
-    printf '    "%s"' "$(json_escape "${failures[$i]}")"
+    printf '    {\n'
+    printf '      "message": "%s",\n' "$(json_escape "${failures[$i]}")"
+    printf '      "kind": "%s"' "$(json_escape "${failure_kinds[$i]}")"
+    if [[ -n "${failure_paths[$i]}" ]]; then
+      printf ',\n      "path": "%s"' "$(json_escape "${failure_paths[$i]}")"
+    fi
+    if [[ -n "${failure_values[$i]}" ]]; then
+      printf ',\n      "value": "%s"' "$(json_escape "${failure_values[$i]}")"
+    fi
+    printf '\n    }'
     if [[ "$i" -lt $((${#failures[@]} - 1)) ]]; then
       printf ','
     fi
@@ -129,7 +183,7 @@ require_contains() {
   local file="$1"
   local text="$2"
   if ! grep -Fq -- "$text" "$file"; then
-    add_failure "$file missing required text: $text"
+    add_failure "$file missing required text: $text" "missing_text" "$file" "$text"
   fi
 }
 
@@ -138,7 +192,7 @@ require_not_matching() {
   local pattern="$2"
   local description="$3"
   if grep -Eq -- "$pattern" "$file"; then
-    add_failure "$file still contains template placeholder: $description"
+    add_failure "$file still contains template placeholder: $description" "placeholder" "$file" "$description"
   fi
 }
 
@@ -168,7 +222,7 @@ require_archive_checksum() {
   if grep -E "\\|[[:space:]]*\`?${artifact}\`?[[:space:]]*\\|[[:space:]]*[[:xdigit:]]{64}[[:space:]]*\\|" "$file" >/dev/null; then
     artifact_checksum_count=$((artifact_checksum_count + 1))
   else
-    add_failure "$file must include a 64-hex SHA256 checksum for $artifact"
+    add_failure "$file must include a 64-hex SHA256 checksum for $artifact" "missing_checksum" "$file" "$artifact"
   fi
 }
 
@@ -186,7 +240,7 @@ check_template() {
   local template="docs/release/notes-template.md"
   add_checked_file "$template"
   if [[ ! -f "$template" ]]; then
-    add_failure "missing $template"
+    add_failure "missing $template" "missing_file" "$template"
     return
   fi
   require_contains "$template" "bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version vX.Y.Z"
@@ -201,7 +255,7 @@ check_version() {
   local notes="docs/release/notes/$version.md"
   add_checked_file "$notes"
   if [[ ! -f "$notes" ]]; then
-    add_failure "missing release notes for $version: $notes"
+    add_failure "missing release notes for $version: $notes" "missing_file" "$notes" "$version"
     return
   fi
 
@@ -214,7 +268,7 @@ check_version() {
   require_release_archive_names "$notes" "$version"
 
   if ! grep -Eq '[[:xdigit:]]{64}' "$notes"; then
-    add_failure "$notes must include at least one 64-hex SHA256 checksum"
+    add_failure "$notes must include at least one 64-hex SHA256 checksum" "missing_checksum" "$notes"
   fi
   require_release_archive_checksums "$notes" "$version"
 
@@ -225,7 +279,7 @@ check_version() {
     "TODO" \
     "TBD"; do
     if grep -Fq -- "$placeholder" "$notes"; then
-      add_failure "$notes still contains template placeholder: $placeholder"
+      add_failure "$notes still contains template placeholder: $placeholder" "placeholder" "$notes" "$placeholder"
     fi
   done
   require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*License:[[:space:]]*$' "- License:"
