@@ -291,6 +291,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/docs_check.sh --json", "failure_details"},
 		{"scripts/editor_check.sh --json", "failure_kinds"},
 		{"scripts/editor_check.sh --json", "failure_details"},
+		{"scripts/install.sh --dry-run --json", "install_entries"},
 		{"scripts/production_check.sh --list --json", "skipped_check_details"},
 		{"scripts/production_check.sh --list --json", "release_critical_runs"},
 		{"scripts/production_check.sh --list --json", "release_critical_skip_names"},

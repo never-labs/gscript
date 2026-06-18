@@ -109,6 +109,9 @@ Release archives must include both executables:
 - `leia`, the CLI and script runner;
 - `leia-lsp`, the shared language server used by editor integrations.
 
+`scripts/install.sh --dry-run --json` reports `install_entries` so automation
+can map each executable role to the exact install path.
+
 Use [`notes-template.md`](notes-template.md) for release candidates and public
 tags. Candidate notes live under [`notes/`](notes/) as `vX.Y.Z.md` so
 compatibility, security, performance, validation, and artifact evidence are

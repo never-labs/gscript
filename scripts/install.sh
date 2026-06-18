@@ -170,6 +170,10 @@ print_json_report() {
   printf '    "%s",\n' "$(json_escape "$install_path")"
   printf '    "%s"\n' "$(json_escape "$lsp_install_path")"
   printf '  ],\n'
+  printf '  "install_entries": [\n'
+  printf '    {"role": "cli", "name": "%s", "path": "%s"},\n' "$(json_escape "$binary_name")" "$(json_escape "$install_path")"
+  printf '    {"role": "lsp", "name": "%s", "path": "%s"}\n' "$(json_escape "$lsp_binary_name")" "$(json_escape "$lsp_install_path")"
+  printf '  ],\n'
   printf '  "install_path": "%s",\n' "$(json_escape "$install_path")"
   printf '  "lsp_install_path": "%s"\n' "$(json_escape "$lsp_install_path")"
   printf '}\n'

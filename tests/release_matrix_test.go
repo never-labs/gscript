@@ -1805,7 +1805,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
 		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"failure_kinds", "failure_details", "textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
-		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}, matches: []releaseReportCountMatch{{"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
+		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths", "install_entries"}, matches: []releaseReportCountMatch{{"install_count", "install_entries"}, {"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
 		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "validate_target.path", "validate_target.exists", "validate_target.is_file", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"validate_target.size_bytes", "failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
 		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "skipped_check_details", "release_critical_runs", "release_critical_skip_names", "release_critical_skips", "release_critical_skip_details"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"skip_count", "skipped_check_details"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"critical_skip_count", "release_critical_skip_details"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, scalars: []string{"require_resolved"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}, fields: []string{"blockers", "blocker_details", "blocker_statuses", "blocker_status_details", "decision_areas"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}, {"blocker_status_count", "blocker_statuses"}, {"blocker_status_count", "blocker_status_details"}, {"decision_area_count", "decision_areas"}}},
@@ -3002,8 +3002,13 @@ func TestReleaseMatrixInstallDryRunReportIsMachineReadable(t *testing.T) {
 			InstallPathCount int      `json:"install_path_count"`
 			Binaries         []string `json:"binaries"`
 			InstallPaths     []string `json:"install_paths"`
-			InstallPath      string   `json:"install_path"`
-			LSPInstallPath   string   `json:"lsp_install_path"`
+			InstallEntries   []struct {
+				Role string `json:"role"`
+				Name string `json:"name"`
+				Path string `json:"path"`
+			} `json:"install_entries"`
+			InstallPath    string `json:"install_path"`
+			LSPInstallPath string `json:"lsp_install_path"`
 		}
 		if err := json.Unmarshal([]byte(out), &report); err != nil {
 			t.Fatalf("install dry-run JSON failed to decode for %s/%s: %v\n%s", tc.goos, tc.goarch, err, out)
@@ -3014,14 +3019,27 @@ func TestReleaseMatrixInstallDryRunReportIsMachineReadable(t *testing.T) {
 		if report.GOOS != tc.goos || report.GOARCH != tc.goarch || report.ArchiveExt != tc.archiveExt || report.Binary != tc.binary || report.LSPBinary != tc.lspBinary {
 			t.Fatalf("install dry-run JSON has wrong platform fields for %s/%s: %+v", tc.goos, tc.goarch, report)
 		}
-		if report.InstallCount != 2 || report.BinaryCount != 2 || report.InstallPathCount != 2 || len(report.Binaries) != report.BinaryCount || len(report.InstallPaths) != report.InstallPathCount {
-			t.Fatalf("install dry-run JSON install counts = install:%d binary:%d/%d path:%d/%d", report.InstallCount, report.BinaryCount, len(report.Binaries), report.InstallPathCount, len(report.InstallPaths))
+		if report.InstallCount != 2 || report.BinaryCount != 2 || report.InstallPathCount != 2 || len(report.Binaries) != report.BinaryCount || len(report.InstallPaths) != report.InstallPathCount || len(report.InstallEntries) != report.InstallCount {
+			t.Fatalf("install dry-run JSON install counts = install:%d/%d binary:%d/%d path:%d/%d", report.InstallCount, len(report.InstallEntries), report.BinaryCount, len(report.Binaries), report.InstallPathCount, len(report.InstallPaths))
 		}
 		if !stringSliceContains(report.Binaries, report.Binary) || !stringSliceContains(report.Binaries, report.LSPBinary) || !stringSliceContains(report.InstallPaths, report.InstallPath) || !stringSliceContains(report.InstallPaths, report.LSPInstallPath) {
 			t.Fatalf("install dry-run JSON collection fields do not match scalar fields for %s/%s: %+v", tc.goos, tc.goarch, report)
 		}
 		if report.InstallPath != tc.installPath || report.LSPInstallPath != tc.lspInstallPath || report.BinDir != "/tmp/leia-bin" {
 			t.Fatalf("install dry-run JSON has wrong install paths for %s/%s: %+v", tc.goos, tc.goarch, report)
+		}
+		entries := map[string]struct {
+			Name string
+			Path string
+		}{}
+		for _, entry := range report.InstallEntries {
+			entries[entry.Role] = struct {
+				Name string
+				Path string
+			}{Name: entry.Name, Path: entry.Path}
+		}
+		if entries["cli"].Name != report.Binary || entries["cli"].Path != report.InstallPath || entries["lsp"].Name != report.LSPBinary || entries["lsp"].Path != report.LSPInstallPath {
+			t.Fatalf("install dry-run JSON install entries do not map binaries to paths for %s/%s: %+v", tc.goos, tc.goarch, report.InstallEntries)
 		}
 		wantAsset := "leia_v1.2.3-rc.1_" + tc.goos + "_" + tc.goarch + "." + tc.archiveExt
 		if report.Asset != wantAsset || !strings.Contains(report.URL, "/"+wantAsset) || !strings.HasSuffix(report.Checksums, "/SHA256SUMS") {
