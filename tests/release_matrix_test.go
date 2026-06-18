@@ -1804,7 +1804,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 	}{
 		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
 		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
-		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
+		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"failure_kinds", "failure_details", "textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
 		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}, matches: []releaseReportCountMatch{{"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
 		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
 		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "release_critical_skip_names", "release_critical_skips"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"critical_skip_count", "release_critical_skips"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
@@ -2656,20 +2656,31 @@ func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
 		TreeSitterCommand string   `json:"tree_sitter_command"`
 		EmacsStatus       string   `json:"emacs_status"`
 		EmacsCommand      string   `json:"emacs_command"`
-		TextMateCount     int      `json:"textmate_grammar_count"`
-		VSCodeCount       int      `json:"vscode_asset_count"`
-		TreeSitterCount   int      `json:"tree_sitter_asset_count"`
-		SmokeTestCount    int      `json:"smoke_test_count"`
-		TextMateGrammars  []string `json:"textmate_grammars"`
-		VSCodeAssets      []string `json:"vscode_assets"`
-		TreeSitterAssets  []string `json:"tree_sitter_assets"`
-		SmokeTests        []string `json:"smoke_tests"`
+		FailureKindCount  int      `json:"failure_kind_count"`
+		FailureCount      int      `json:"failure_count"`
+		FailureKinds      []string `json:"failure_kinds"`
+		FailureDetails    []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+			Value   string `json:"value"`
+		} `json:"failure_details"`
+		TextMateCount    int      `json:"textmate_grammar_count"`
+		VSCodeCount      int      `json:"vscode_asset_count"`
+		TreeSitterCount  int      `json:"tree_sitter_asset_count"`
+		SmokeTestCount   int      `json:"smoke_test_count"`
+		TextMateGrammars []string `json:"textmate_grammars"`
+		VSCodeAssets     []string `json:"vscode_assets"`
+		TreeSitterAssets []string `json:"tree_sitter_assets"`
+		SmokeTests       []string `json:"smoke_tests"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("editor asset JSON failed to decode: %v\n%s", err, out)
 	}
 	if report.SchemaVersion != 1 || report.Status != "pass" || report.RequireTreeSitter {
 		t.Fatalf("editor asset JSON = %+v, want passing schema v1 non-strict report", report)
+	}
+	if report.FailureKindCount != 0 || report.FailureCount != 0 || len(report.FailureKinds) != 0 || len(report.FailureDetails) != 0 {
+		t.Fatalf("editor asset JSON failures = kinds %d/%d details %d/%d, want none", report.FailureKindCount, len(report.FailureKinds), report.FailureCount, len(report.FailureDetails))
 	}
 	for _, status := range []string{report.TreeSitterStatus, report.EmacsStatus} {
 		if status != "verified" && status != "skipped" {

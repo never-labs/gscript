@@ -75,6 +75,8 @@ checks.
 `leia doc check --json` and `scripts/docs_check.sh --json` expose
 `failure_kind_count`, `failure_kinds`, and `failure_details` for documentation
 gate failures.
+`scripts/editor_check.sh --json` uses the same failure fields for editor asset
+and optional tool checks.
 `scripts/performance_gate.sh --validate-only FILE --json` exposes
 `failure_kind_count`, `failure_kinds`, `failure_details`, and
 `output_line_count` for captured validation output.
