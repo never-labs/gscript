@@ -128,7 +128,7 @@ repository script entrypoints. Use `--json` for machine-readable documentation
 evidence with `failure_kinds` and `failure_details`.
 
 GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`. The
-workflow runs `go run ./cmd/leia doc check` before building the site.
+workflow runs `bash scripts/docs_check.sh` before building the site.
 
 ## Editors
 

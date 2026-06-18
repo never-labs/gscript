@@ -923,6 +923,12 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 			t.Fatalf("ci smoke --list must include %q so example/import guards stay in the smoke test matrix; got:\n%s", want, smokeOut)
 		}
 	}
+	prOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "pr", "--no-luajit", "--list")
+	for _, want := range []string{"go test ./... -count=1", "go run ./cmd/leia examples check --jobs=6", "bash scripts/docs_check.sh", "bash scripts/performance_gate.sh --smoke --no-luajit"} {
+		if !strings.Contains(prOut, want) {
+			t.Fatalf("ci pr --list must include %q so PR validation matches product gates; got:\n%s", want, prOut)
+		}
+	}
 	examplesCommandGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
 	for _, snippet := range []string{
 		`runExamplesCommand([]string{"check",`,

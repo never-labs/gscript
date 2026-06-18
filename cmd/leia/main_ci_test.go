@@ -31,7 +31,7 @@ func TestCICommandPRProfileIncludesExampleCheck(t *testing.T) {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"leia examples check", "--jobs=6", "performance_gate.sh"} {
+	for _, want := range []string{"leia examples check", "--jobs=6", "bash scripts/docs_check.sh", "performance_gate.sh"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}

@@ -153,7 +153,7 @@ func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]
 			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
 			{Name: "Module path gate", Args: modulePathGateCommand()},
 			{Name: "Example projects check", Args: []string{"go", "run", "./cmd/leia", "examples", "check", "--jobs=6"}},
-			{Name: "Docs check", Args: []string{"go", "run", "./cmd/leia", "doc", "check"}},
+			{Name: "Docs check", Args: []string{"bash", "scripts/docs_check.sh"}},
 			{Name: "Performance smoke", Args: appendNoLuaJIT([]string{"bash", "scripts/performance_gate.sh", "--smoke"}, noLuaJIT)},
 		}, nil
 	case "perf":
