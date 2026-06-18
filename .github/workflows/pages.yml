@@ -26,7 +26,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go run ./cmd/leia doc check
+      - run: bash scripts/docs_check.sh
       - uses: actions/configure-pages@v5
       - uses: actions/jekyll-build-pages@v1
         with:

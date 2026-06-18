@@ -867,7 +867,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			snippets: []string{
 				"name: Pages",
 				"branches: [main]",
-				"go run ./cmd/leia doc check",
+				"bash scripts/docs_check.sh",
 				"actions/jekyll-build-pages",
 				"source: ./docs",
 				"destination: ./_site",

@@ -364,6 +364,7 @@ if [[ -f .github/workflows/pages.yml ]]; then
   require_file docs/_config.yml
   require_contains docs/_config.yml "exclude:"
   require_contains docs/_config.yml "spec/index.html"
+  require_contains .github/workflows/pages.yml "bash scripts/docs_check.sh"
   require_contains .github/workflows/pages.yml "source: ./docs"
   require_contains .github/workflows/pages.yml "destination: ./_site"
 fi
