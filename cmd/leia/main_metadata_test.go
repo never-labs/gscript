@@ -174,6 +174,15 @@ func TestCapabilitiesJSON(t *testing.T) {
 		if len(report.CollectionFields) > 0 && len(report.CountFields) == 0 {
 			t.Fatalf("report capability %q advertises collections %v without count fields", report.Command, report.CollectionFields)
 		}
+		for _, itemField := range report.CollectionItemFields {
+			collection := collectionItemFieldCollection(itemField)
+			if collection == "" {
+				t.Fatalf("report capability %q collection item field %q must use dotted array-item form", report.Command, itemField)
+			}
+			if !containsString(report.CollectionFields, collection) {
+				t.Fatalf("report capability %q collection item field %q must reference advertised collection %q in %v", report.Command, itemField, collection, report.CollectionFields)
+			}
+		}
 		seenReports[report.Command] = true
 	}
 	for _, want := range []string{
@@ -328,6 +337,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		command string
 		fields  []string
 	}{
+		{"leia capabilities --json", []string{"tooling.reports[].command", "tooling.reports[].formats", "tooling.reports[].schema_version", "tooling.reports[].status_field"}},
+		{"leia env --json", []string{"capabilities.tooling.reports[].command", "capabilities.tooling.reports[].formats", "capabilities.tooling.reports[].schema_version", "capabilities.tooling.reports[].status_field"}},
 		{"scripts/install.sh --dry-run --json", []string{"install_entries[].role", "install_entries[].name", "install_entries[].path"}},
 		{"scripts/production_check.sh --list --json", []string{"runnable_checks[].name", "runnable_checks[].command", "runnable_checks[].release_critical"}},
 		{"scripts/release_distribution_check.sh --json", []string{"install_target_details[].target", "install_target_details[].goos", "install_target_details[].goarch"}},
@@ -678,4 +689,13 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func collectionItemFieldCollection(field string) string {
+	const marker = "[]."
+	index := strings.Index(field, marker)
+	if index <= 0 || index+len(marker) >= len(field) {
+		return ""
+	}
+	return field[:index]
 }
