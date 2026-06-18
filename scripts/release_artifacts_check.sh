@@ -46,6 +46,16 @@ build_verified="false"
 install_archive_verified="false"
 checksum_entry_count=0
 install_archive_checksum_count=0
+goos=""
+goarch=""
+binary_name=""
+lsp_binary_name=""
+metadata_name=""
+install_archive_name=""
+artifact_files=()
+failure_kinds=()
+failure_messages=()
+failure_printed="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -115,14 +125,56 @@ json_escape() {
   printf '%s' "$value"
 }
 
+record_failure() {
+  local kind="$1"
+  local message="$2"
+  failure_kinds+=("$kind")
+  failure_messages+=("$message")
+}
+
+print_json_string_array() {
+  local indent="$1"
+  shift
+  local values=("$@")
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#values[@]}" ]]; do
+    printf '%s  "%s"' "$indent" "$(json_escape "${values[$i]}")"
+    if [[ "$i" -lt $((${#values[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
+print_json_failure_details() {
+  local indent="$1"
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#failure_messages[@]}" ]]; do
+    printf '%s  {"kind": "%s", "message": "%s"}' "$indent" "$(json_escape "${failure_kinds[$i]}")" "$(json_escape "${failure_messages[$i]}")"
+    if [[ "$i" -lt $((${#failure_messages[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
 print_json_report() {
+  local status="${1:-pass}"
   local report_out_dir="$out_dir"
+  local artifact_file_count="${#artifact_files[@]}"
+  local failure_kind_count="${#failure_kinds[@]}"
   if [[ "$build" != "true" ]]; then
     report_out_dir=""
   fi
   printf '{\n'
   printf '  "schema_version": 1,\n'
-  printf '  "status": "pass",\n'
+  printf '  "status": "%s",\n' "$(json_escape "$status")"
   printf '  "version": "%s",\n' "$(json_escape "$version")"
   printf '  "build": %s,\n' "$build"
   printf '  "require_clean": %s,\n' "$require_clean"
@@ -133,15 +185,28 @@ print_json_report() {
   printf '  "lsp_artifact": "%s",\n' "$(json_escape "$lsp_binary_name")"
   printf '  "metadata": "%s",\n' "$(json_escape "$metadata_name")"
   printf '  "install_archive": "%s",\n' "$(json_escape "$install_archive_name")"
-  printf '  "artifact_count": 4,\n'
+  printf '  "artifact_count": %d,\n' "$artifact_file_count"
   printf '  "checksum_entry_count": %d,\n' "$checksum_entry_count"
   printf '  "install_archive_checksum_count": %d,\n' "$install_archive_checksum_count"
-  printf '  "artifact_files": [\n'
-  printf '    "%s",\n' "$(json_escape "$binary_name")"
-  printf '    "%s",\n' "$(json_escape "$lsp_binary_name")"
-  printf '    "%s",\n' "$(json_escape "$metadata_name")"
-  printf '    "SHA256SUMS"\n'
-  printf '  ],\n'
+  printf '  "failure_kind_count": %d,\n' "$failure_kind_count"
+  printf '  "failure_kinds": '
+  if [[ "$failure_kind_count" -eq 0 ]]; then
+    print_json_string_array "  "
+  else
+    print_json_string_array "  " "${failure_kinds[@]}"
+  fi
+  printf ',\n'
+  printf '  "failure_count": %d,\n' "${#failure_messages[@]}"
+  printf '  "failure_details": '
+  print_json_failure_details "  "
+  printf ',\n'
+  printf '  "artifact_files": '
+  if [[ "$artifact_file_count" -eq 0 ]]; then
+    print_json_string_array "  "
+  else
+    print_json_string_array "  " "${artifact_files[@]}"
+  fi
+  printf ',\n'
   printf '  "dry_run_verified": %s,\n' "$dry_run_verified"
   printf '  "build_verified": %s,\n' "$build_verified"
   printf '  "install_archive_verified": %s,\n' "$install_archive_verified"
@@ -149,17 +214,41 @@ print_json_report() {
   printf '}\n'
 }
 
+fail() {
+  local kind="$1"
+  local message="$2"
+  local code="${3:-1}"
+  record_failure "$kind" "$message"
+  if [[ "$json_out" == "true" ]]; then
+    failure_printed="true"
+    print_json_report "fail"
+  else
+    echo "error: $message" >&2
+  fi
+  exit "$code"
+}
+
+on_error() {
+  local code="$1"
+  if [[ "$json_out" == "true" && "$failure_printed" != "true" ]]; then
+    record_failure "command_failed" "command failed: ${BASH_COMMAND}"
+    failure_printed="true"
+    print_json_report "fail"
+  fi
+  exit "$code"
+}
+
+trap 'on_error "$?"' ERR
+
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
-    echo "error: required command not found: $1" >&2
-    exit 1
+    fail "missing_command" "required command not found: $1"
   fi
 }
 
 require_file() {
   if [[ ! -f "$1" ]]; then
-    echo "error: missing required file: $1" >&2
-    exit 1
+    fail "missing_file" "missing required file: $1"
   fi
 }
 
@@ -167,8 +256,7 @@ require_contains() {
   local file="$1"
   local pattern="$2"
   if ! grep -Fq "$pattern" "$file"; then
-    echo "error: $file does not contain expected text: $pattern" >&2
-    exit 1
+    fail "missing_text" "$file does not contain expected text: $pattern"
   fi
 }
 
@@ -180,8 +268,7 @@ sha256_file() {
   elif command -v openssl >/dev/null 2>&1; then
     openssl dgst -sha256 -r "$1" | awk '{print $1}'
   else
-    echo "error: need sha256sum, shasum, or openssl for checksum verification" >&2
-    exit 1
+    fail "missing_command" "need sha256sum, shasum, or openssl for checksum verification"
   fi
 }
 
@@ -197,31 +284,24 @@ verify_checksums() {
       continue
     fi
     if [[ -n "${extra:-}" ]]; then
-      echo "error: malformed checksum line in $sums: $expected $name $extra" >&2
-      exit 1
+      fail "checksum_format" "malformed checksum line in $sums: $expected $name $extra"
     fi
     if [[ ! "$expected" =~ ^[0-9a-fA-F]{64}$ ]]; then
-      echo "error: malformed sha256 digest in $sums: $expected" >&2
-      exit 1
+      fail "checksum_format" "malformed sha256 digest in $sums: $expected"
     fi
     if [[ "$name" == */* || "$name" == "." || "$name" == ".." ]]; then
-      echo "error: unsafe checksum filename in $sums: $name" >&2
-      exit 1
+      fail "checksum_format" "unsafe checksum filename in $sums: $name"
     fi
     require_file "$dir/$name"
     actual="$(sha256_file "$dir/$name")"
     if [[ "$actual" != "$expected" ]]; then
-      echo "error: checksum mismatch for $name" >&2
-      echo "  expected: $expected" >&2
-      echo "  actual:   $actual" >&2
-      exit 1
+      fail "checksum_mismatch" "checksum mismatch for $name"
     fi
     checked=$((checked + 1))
   done < "$sums"
 
   if [[ "$checked" -ne 3 ]]; then
-    echo "error: expected 3 checksum entries, found $checked" >&2
-    exit 1
+    fail "checksum_count" "expected 3 checksum entries, found $checked"
   fi
   checksum_entry_count="$checked"
 }
@@ -269,23 +349,19 @@ require_file "$install_script"
 require_file "$repo_root/$smoke_script"
 
 if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ && "$version" != "smoke-check" ]]; then
-  echo "error: release artifact check version must match vMAJOR.MINOR.PATCH, prerelease, or smoke-check: $version" >&2
-  exit 2
+  fail "invalid_version" "release artifact check version must match vMAJOR.MINOR.PATCH, prerelease, or smoke-check: $version" 2
 fi
 
 if [[ "$require_clean" == "true" && -n "$(git status --porcelain)" ]]; then
-  echo "error: release artifact check requires a clean git worktree" >&2
-  exit 1
+  fail "dirty_worktree" "release artifact check requires a clean git worktree"
 fi
 if [[ "$require_tag" == "true" ]]; then
   exact_tag="$(git describe --tags --exact-match 2>/dev/null || true)"
   if [[ -z "$exact_tag" ]]; then
-    echo "error: release artifact check requires HEAD to be exactly tagged" >&2
-    exit 1
+    fail "missing_tag" "release artifact check requires HEAD to be exactly tagged"
   fi
   if [[ "$version" != "$exact_tag" ]]; then
-    echo "error: release artifact version $version does not match exact git tag $exact_tag" >&2
-    exit 1
+    fail "tag_mismatch" "release artifact version $version does not match exact git tag $exact_tag"
   fi
 fi
 
@@ -293,8 +369,7 @@ goos="$(go env GOOS)"
 goarch="$(go env GOARCH)"
 module_path="$(go list -m)"
 if [[ "$module_path" != "$expected_module_path" ]]; then
-  echo "error: module path = $module_path, want $expected_module_path" >&2
-  exit 1
+  fail "module_path" "module path = $module_path, want $expected_module_path"
 fi
 exe_ext=""
 archive_ext="tar.gz"
@@ -311,6 +386,7 @@ metadata_name="${artifact_base}_metadata.txt"
 install_archive_name="${artifact_base}.${archive_ext}"
 install_binary_name="leia${exe_ext}"
 lsp_install_binary_name="leia-lsp${exe_ext}"
+artifact_files=("$binary_name" "$lsp_binary_name" "$metadata_name" "SHA256SUMS")
 
 dry_run_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-artifacts-check-dry-run.XXXXXX")"
 dry_run_log="$(mktemp "${TMPDIR:-/tmp}/leia-release-artifacts-dry-run.XXXXXX")"
@@ -320,8 +396,7 @@ rmdir "$dry_run_dir"
 bash "$release_script" --version "$version" --output-dir "$dry_run_dir" --dry-run > "$dry_run_log"
 
 if [[ -e "$dry_run_dir" ]]; then
-  echo "error: dry-run created output path: $dry_run_dir" >&2
-  exit 1
+  fail "dry_run_side_effect" "dry-run created output path: $dry_run_dir"
 fi
 
 require_contains "$dry_run_log" "dry-run: would write $dry_run_dir/$binary_name"
@@ -381,12 +456,10 @@ require_file "$metadata_path"
 require_file "$checksums_path"
 
 if [[ ! -x "$binary_path" ]]; then
-  echo "error: built binary is not executable: $binary_path" >&2
-  exit 1
+  fail "artifact_mode" "built binary is not executable: $binary_path"
 fi
 if [[ ! -x "$lsp_binary_path" ]]; then
-  echo "error: built LSP binary is not executable: $lsp_binary_path" >&2
-  exit 1
+  fail "artifact_mode" "built LSP binary is not executable: $lsp_binary_path"
 fi
 
 require_contains "$metadata_path" "artifact=$binary_name"
@@ -399,14 +472,10 @@ require_contains "$metadata_path" "goarch=$goarch"
 verify_checksums "$out_dir"
 version_json="$("$binary_path" version --json)"
 if ! grep -Fq "\"version\": \"$version\"" <<<"$version_json"; then
-  echo "error: built CLI version metadata did not include version $version" >&2
-  echo "$version_json" >&2
-  exit 1
+  fail "version_metadata" "built CLI version metadata did not include version $version"
 fi
 if grep -Fq '"version": "dev"' <<<"$version_json"; then
-  echo "error: built CLI still reports dev version" >&2
-  echo "$version_json" >&2
-  exit 1
+  fail "version_metadata" "built CLI still reports dev version"
 fi
 "$binary_path" "$smoke_script" >/dev/null
 "$lsp_binary_path" --help >/dev/null
@@ -435,18 +504,14 @@ installed_lsp_binary="$install_bin_dir/$lsp_install_binary_name"
 require_file "$installed_binary"
 require_file "$installed_lsp_binary"
 if [[ ! -x "$installed_binary" ]]; then
-  echo "error: installed CLI is not executable: $installed_binary" >&2
-  exit 1
+  fail "install_archive" "installed CLI is not executable: $installed_binary"
 fi
 if [[ ! -x "$installed_lsp_binary" ]]; then
-  echo "error: installed LSP is not executable: $installed_lsp_binary" >&2
-  exit 1
+  fail "install_archive" "installed LSP is not executable: $installed_lsp_binary"
 fi
 installed_version_json="$("$installed_binary" version --json)"
 if ! grep -Fq "\"version\": \"$version\"" <<<"$installed_version_json"; then
-  echo "error: installed CLI version metadata did not include version $version" >&2
-  echo "$installed_version_json" >&2
-  exit 1
+  fail "install_archive" "installed CLI version metadata did not include version $version"
 fi
 "$installed_lsp_binary" --help >/dev/null
 install_archive_verified="true"

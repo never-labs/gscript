@@ -284,6 +284,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/diagnostics_bundle.sh --json", "files"},
 		{"scripts/docs_check.sh --json", "failures"},
 		{"scripts/production_check.sh --list --json", "release_critical_skip_names"},
+		{"scripts/release_artifacts_check.sh --json", "failure_kinds"},
+		{"scripts/release_artifacts_check.sh --json", "failure_details"},
 		{"scripts/release_distribution_check.sh --json", "failure_kinds"},
 		{"scripts/release_distribution_check.sh --json", "failure_details"},
 		{"scripts/worktree_audit.sh --json", "findings"},
@@ -336,7 +338,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/production_check.sh --list --json", []string{"run_count", "skip_count", "critical_skip_count", "release_critical_skip_name_count"}},
 		{"scripts/public_release_blockers_check.sh --json", []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}},
 		{"scripts/release_artifacts.sh --dry-run --json", []string{"artifact_count", "checksum_entry_count"}},
-		{"scripts/release_artifacts_check.sh --json", []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}},
+		{"scripts/release_artifacts_check.sh --json", []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}},
 		{"scripts/release_distribution_check.sh --json", []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}},
 		{"scripts/release_notes_check.sh --json", []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}},
 	} {

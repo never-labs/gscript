@@ -1799,7 +1799,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, scalars: []string{"require_resolved"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}, fields: []string{"blockers", "blocker_details", "blocker_statuses", "decision_areas"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}, {"blocker_status_count", "blocker_statuses"}, {"decision_area_count", "decision_areas"}}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, scalars: []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}, counts: []string{"language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
 		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
-		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
+		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count"}, fields: []string{"findings"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}}},
@@ -2308,11 +2308,18 @@ func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 		ArtifactCount               int      `json:"artifact_count"`
 		ChecksumEntryCount          int      `json:"checksum_entry_count"`
 		InstallArchiveChecksumCount int      `json:"install_archive_checksum_count"`
-		ArtifactFiles               []string `json:"artifact_files"`
-		DryRunVerified              bool     `json:"dry_run_verified"`
-		BuildVerified               bool     `json:"build_verified"`
-		InstallArchiveVerified      bool     `json:"install_archive_verified"`
-		OutputDir                   string   `json:"output_dir"`
+		FailureKindCount            int      `json:"failure_kind_count"`
+		FailureKinds                []string `json:"failure_kinds"`
+		FailureCount                int      `json:"failure_count"`
+		FailureDetails              []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"failure_details"`
+		ArtifactFiles          []string `json:"artifact_files"`
+		DryRunVerified         bool     `json:"dry_run_verified"`
+		BuildVerified          bool     `json:"build_verified"`
+		InstallArchiveVerified bool     `json:"install_archive_verified"`
+		OutputDir              string   `json:"output_dir"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("release artifact JSON failed to decode: %v\n%s", err, out)
@@ -2325,6 +2332,9 @@ func TestReleaseMatrixReleaseArtifactReportIsMachineReadable(t *testing.T) {
 	}
 	if report.ChecksumEntryCount != 0 || report.InstallArchiveChecksumCount != 0 {
 		t.Fatalf("release artifact dry-run checksum counts = %d/%d, want 0/0", report.ChecksumEntryCount, report.InstallArchiveChecksumCount)
+	}
+	if report.FailureKindCount != 0 || len(report.FailureKinds) != 0 || report.FailureCount != 0 || len(report.FailureDetails) != 0 {
+		t.Fatalf("release artifact dry-run failures = kinds %d/%d details %d/%d, want none", report.FailureKindCount, len(report.FailureKinds), report.FailureCount, len(report.FailureDetails))
 	}
 	if !stringSliceContains(report.ArtifactFiles, "SHA256SUMS") || stringSliceContains(report.ArtifactFiles, report.InstallArchive) {
 		t.Fatalf("release artifact files = %+v, want SHA256SUMS and no install archive fixture", report.ArtifactFiles)
@@ -2851,6 +2861,31 @@ func TestReleaseMatrixArtifactVersionValidationIsExplicit(t *testing.T) {
 	}
 	if !strings.Contains(checkResult.stderr, "release artifact check version must match vMAJOR.MINOR.PATCH") {
 		t.Fatalf("release_artifacts_check.sh bad version stderr = %q", checkResult.stderr)
+	}
+	jsonCheckResult := runCommandResult(root, 30*time.Second, "bash", "scripts/release_artifacts_check.sh", "--json", "--version", "bad version")
+	if jsonCheckResult.err == nil {
+		t.Fatalf("release_artifacts_check.sh bad JSON version unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", jsonCheckResult.stdout, jsonCheckResult.stderr)
+	}
+	var checkReport struct {
+		SchemaVersion    int      `json:"schema_version"`
+		Status           string   `json:"status"`
+		Version          string   `json:"version"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		FailureCount     int      `json:"failure_count"`
+		FailureDetails   []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(jsonCheckResult.stdout), &checkReport); err != nil {
+		t.Fatalf("release_artifacts_check.sh bad version JSON failed to decode: %v\nstdout:\n%s\nstderr:\n%s", err, jsonCheckResult.stdout, jsonCheckResult.stderr)
+	}
+	if checkReport.SchemaVersion != 1 || checkReport.Status != "fail" || checkReport.Version != "bad version" {
+		t.Fatalf("release_artifacts_check.sh bad version JSON = %+v, want failed schema v1 report", checkReport)
+	}
+	if checkReport.FailureKindCount != 1 || checkReport.FailureCount != 1 || !stringSliceContains(checkReport.FailureKinds, "invalid_version") || len(checkReport.FailureDetails) != 1 || checkReport.FailureDetails[0].Kind != "invalid_version" || !strings.Contains(checkReport.FailureDetails[0].Message, "release artifact check version must match") {
+		t.Fatalf("release_artifacts_check.sh bad version failure details = %+v, want invalid_version", checkReport)
 	}
 
 	artifactResult := runCommandResult(root, 30*time.Second, "bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "bad version")
