@@ -109,7 +109,9 @@ leia bench strict \
 
 `scripts/performance_gate.sh --validate-only FILE --json` validates an
 existing timing report and exposes `failure_kind_count`, `failure_kinds`,
-`failure_details`, and captured `output_lines` for release dashboards.
+`failure_details`, `validate_target`, and captured `output_lines` for release
+dashboards. `validate_target` records the checked timing report path, whether
+it exists, whether it is a file, and its byte size.
 
 Release and diagnostic scripts collect these artifacts into evidence bundles.
 Do not commit temporary timing output. Only maintainers should update

@@ -1806,7 +1806,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"failure_kinds", "failure_details", "textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
 		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}, matches: []releaseReportCountMatch{{"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
-		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
+		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "validate_target.path", "validate_target.exists", "validate_target.is_file", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"validate_target.size_bytes", "failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
 		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "skipped_check_details", "release_critical_runs", "release_critical_skip_names", "release_critical_skips", "release_critical_skip_details"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"skip_count", "skipped_check_details"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"critical_skip_count", "release_critical_skip_details"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, scalars: []string{"require_resolved"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}, fields: []string{"blockers", "blocker_details", "blocker_statuses", "blocker_status_details", "decision_areas"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}, {"blocker_status_count", "blocker_statuses"}, {"blocker_status_count", "blocker_status_details"}, {"decision_area_count", "decision_areas"}}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, scalars: []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}, counts: []string{"failure_kind_count", "failure_count", "language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"failure_kinds", "failure_details", "language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
@@ -2264,10 +2264,16 @@ func TestReleaseMatrixPerformanceGateReportIsMachineReadable(t *testing.T) {
 		t.Fatalf("performance gate missing timing JSON unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", out.stdout, out.stderr)
 	}
 	var report struct {
-		SchemaVersion    int      `json:"schema_version"`
-		Status           string   `json:"status"`
-		ValidateOnly     bool     `json:"validate_only"`
-		TimingJSON       string   `json:"timing_json"`
+		SchemaVersion  int    `json:"schema_version"`
+		Status         string `json:"status"`
+		ValidateOnly   bool   `json:"validate_only"`
+		TimingJSON     string `json:"timing_json"`
+		ValidateTarget struct {
+			Path      string `json:"path"`
+			Exists    bool   `json:"exists"`
+			IsFile    bool   `json:"is_file"`
+			SizeBytes int    `json:"size_bytes"`
+		} `json:"validate_target"`
 		NoLuaJIT         bool     `json:"no_luajit"`
 		Threshold        float64  `json:"threshold"`
 		WallThreshold    float64  `json:"wall_threshold"`
@@ -2290,6 +2296,9 @@ func TestReleaseMatrixPerformanceGateReportIsMachineReadable(t *testing.T) {
 	if report.SchemaVersion != 1 || report.Status != "issues" || !report.ValidateOnly || report.TimingJSON != missingTiming || !report.NoLuaJIT {
 		t.Fatalf("performance gate JSON = %+v, want issue schema v1 validate-only report", report)
 	}
+	if report.ValidateTarget.Path != missingTiming || report.ValidateTarget.Exists || report.ValidateTarget.IsFile || report.ValidateTarget.SizeBytes != 0 {
+		t.Fatalf("performance gate validate target = %+v, want missing timing target", report.ValidateTarget)
+	}
 	if report.Threshold <= 0 || report.WallThreshold <= 0 || report.LuaJITThreshold <= 0 {
 		t.Fatalf("performance gate thresholds missing: %+v", report)
 	}
@@ -2304,6 +2313,45 @@ func TestReleaseMatrixPerformanceGateReportIsMachineReadable(t *testing.T) {
 	}
 	if report.OutputLineCount != len(report.OutputLines) || report.OutputLineCount == 0 {
 		t.Fatalf("performance gate output lines = %d/%d, want captured validator output", report.OutputLineCount, len(report.OutputLines))
+	}
+
+	validTiming := filepath.Join(t.TempDir(), "timing.json")
+	validTimingPayload := []byte(`{
+  "modes": ["default"],
+  "results": [
+    {
+      "group": "control",
+      "benchmark": "sieve",
+      "modes": {
+        "default": {
+          "current": {"status": "ok", "seconds": 0.018, "source": "script_repeat", "stats": {"median": 0.018, "cv_pct": 0}},
+          "head": {"status": "ok", "seconds": 0.018, "source": "script_repeat", "stats": {"median": 0.018, "cv_pct": 0}}
+        }
+      }
+    }
+  ]
+}
+`)
+	if err := os.WriteFile(validTiming, validTimingPayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	validOut := runCommand(t, root, 30*time.Second, "bash", "scripts/performance_gate.sh", "--validate-only", validTiming, "--no-luajit", "--json")
+	var validReport struct {
+		SchemaVersion  int    `json:"schema_version"`
+		Status         string `json:"status"`
+		ValidateTarget struct {
+			Path      string `json:"path"`
+			Exists    bool   `json:"exists"`
+			IsFile    bool   `json:"is_file"`
+			SizeBytes int    `json:"size_bytes"`
+		} `json:"validate_target"`
+		FailureCount int `json:"failure_count"`
+	}
+	if err := json.Unmarshal([]byte(validOut), &validReport); err != nil {
+		t.Fatalf("performance gate valid JSON failed to decode: %v\n%s", err, validOut)
+	}
+	if validReport.SchemaVersion != 1 || validReport.Status != "pass" || validReport.FailureCount != 0 || validReport.ValidateTarget.Path != validTiming || !validReport.ValidateTarget.Exists || !validReport.ValidateTarget.IsFile || validReport.ValidateTarget.SizeBytes != len(validTimingPayload) {
+		t.Fatalf("performance gate valid target report = %+v, want existing timing target", validReport)
 	}
 }
 

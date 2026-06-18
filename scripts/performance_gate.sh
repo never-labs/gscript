@@ -332,12 +332,23 @@ print_validate_json_report() {
     local status="$1"
     local output_file="$2"
     local output_line_count
+    local validate_exists=false
+    local validate_is_file=false
+    local validate_size_bytes=0
     output_line_count="$(awk 'END { print NR + 0 }' "$output_file")"
+    if [ -e "$VALIDATE_ONLY" ]; then
+        validate_exists=true
+    fi
+    if [ -f "$VALIDATE_ONLY" ]; then
+        validate_is_file=true
+        validate_size_bytes="$(wc -c < "$VALIDATE_ONLY" | tr -d '[:space:]')"
+    fi
     printf '{\n'
     printf '  "schema_version": 1,\n'
     printf '  "status": "%s",\n' "$status"
     printf '  "validate_only": true,\n'
     printf '  "timing_json": "%s",\n' "$(json_escape "$VALIDATE_ONLY")"
+    printf '  "validate_target": {"path": "%s", "exists": %s, "is_file": %s, "size_bytes": %d},\n' "$(json_escape "$VALIDATE_ONLY")" "$validate_exists" "$validate_is_file" "$validate_size_bytes"
     printf '  "no_luajit": %s,\n' "$([ "$NO_LUAJIT" -eq 1 ] && printf true || printf false)"
     printf '  "threshold": %s,\n' "$THRESHOLD"
     printf '  "wall_threshold": %s,\n' "$WALL_THRESHOLD"
