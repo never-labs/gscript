@@ -173,6 +173,19 @@ print_json_report() {
   printf '  "blocker_statuses": '
   print_json_string_array "  " "${blocker_status_values[@]}"
   printf ',\n'
+  printf '  "blocker_status_details": [\n'
+  local status_i=0
+  while [[ "$status_i" -lt "${#blocker_status_values[@]}" ]]; do
+    printf '    {"status": "%s", "count": %d}' \
+      "$(json_escape "${blocker_status_values[$status_i]}")" \
+      "$(count_blocker_status "${blocker_status_values[$status_i]}")"
+    if [[ "$status_i" -lt $((${#blocker_status_values[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    status_i=$((status_i + 1))
+  done
+  printf '  ],\n'
   printf '  "decision_area_count": %d,\n' "${#decision_areas[@]}"
   printf '  "decision_areas": '
   print_json_string_array "  " "${decision_areas[@]}"

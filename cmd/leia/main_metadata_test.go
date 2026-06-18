@@ -285,6 +285,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/diagnostics_bundle.sh --json", "files"},
 		{"scripts/docs_check.sh --json", "failures"},
 		{"scripts/production_check.sh --list --json", "release_critical_skip_names"},
+		{"scripts/public_release_blockers_check.sh --json", "blocker_status_details"},
 		{"scripts/q_conformance_gate.sh --json", "failure_kinds"},
 		{"scripts/q_conformance_gate.sh --json", "failure_details"},
 		{"scripts/release_artifacts_check.sh --json", "failure_kinds"},

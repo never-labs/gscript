@@ -84,9 +84,10 @@ Its JSON report includes `blocker_count` plus kind-specific counts:
 `missing_file_count`, `release_decision_count`, `stale_text_count`,
 `unconfirmed_policy_count`, `missing_guidance_count`, and
 `missing_doc_snippet_count`. It also exposes `open_blocker_count`,
-`blocker_status_count`, and `blocker_statuses` so dashboards can summarize
-decision state without walking every detail row. Use `blocker_details[].kind`
-for dashboards that need to group the exact unresolved work.
+`blocker_status_count`, `blocker_statuses`, and `blocker_status_details` so
+dashboards can summarize decision state without walking every detail row. Use
+`blocker_details[].kind` for dashboards that need to group the exact unresolved
+work.
 
 Distribution checks are split between local artifacts and hosted workflow
 presence. The local check validates GoReleaser metadata, the install script
