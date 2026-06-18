@@ -312,6 +312,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/release_distribution_check.sh --json", "install_target_details"},
 		{"scripts/release_notes_check.sh --json", "checked_file_details"},
 		{"scripts/release_notes_check.sh --json", "required_artifact_details"},
+		{"scripts/release_snapshot_install_check.sh --json", "installed_paths"},
+		{"scripts/release_snapshot_install_check.sh --json", "failure_details"},
 		{"scripts/site_check.sh --json", "failure_kinds"},
 		{"scripts/site_check.sh --json", "failure_details"},
 		{"scripts/worktree_audit.sh --json", "finding_statuses"},
@@ -371,6 +373,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/release_artifacts_check.sh --json", []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}},
 		{"scripts/release_distribution_check.sh --json", []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}},
 		{"scripts/release_notes_check.sh --json", []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}},
+		{"scripts/release_snapshot_install_check.sh --json", []string{"install_count", "failure_kind_count", "failure_count"}},
 		{"scripts/site_check.sh --json", []string{"html_file_count", "local_link_count", "asset_ref_count", "fragment_check_count", "failure_kind_count", "failure_count"}},
 		{"scripts/worktree_audit.sh --json", []string{"finding_count", "finding_status_count"}},
 	} {

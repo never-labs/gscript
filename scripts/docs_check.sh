@@ -36,6 +36,7 @@ The repository-script mention check covers:
   scripts/release_artifacts.sh
   scripts/release_artifacts_check.sh
   scripts/release_distribution_check.sh
+  scripts/release_snapshot_install_check.sh
   scripts/site_check.sh
   scripts/worktree_audit.sh
 EOF
@@ -235,6 +236,7 @@ script_names = {
     "release_artifacts": root / "scripts" / "release_artifacts.sh",
     "release_artifacts_check": root / "scripts" / "release_artifacts_check.sh",
     "release_distribution_check": root / "scripts" / "release_distribution_check.sh",
+    "release_snapshot_install_check": root / "scripts" / "release_snapshot_install_check.sh",
     "site_check": root / "scripts" / "site_check.sh",
     "worktree_audit": root / "scripts" / "worktree_audit.sh",
 }

@@ -342,6 +342,7 @@ check_local_install_fixture() {
 
 require_file .goreleaser.yaml
 require_file scripts/install.sh
+require_file scripts/release_snapshot_install_check.sh
 
 optional_workflow() {
   local file="$1"
@@ -365,6 +366,11 @@ if [[ -f .github/workflows/pages.yml ]]; then
   require_contains docs/_config.yml "spec/index.html"
   require_contains .github/workflows/pages.yml "source: ./docs"
   require_contains .github/workflows/pages.yml "destination: ./_site"
+fi
+
+if [[ -f .github/workflows/distribution-check.yml ]]; then
+  require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
+  require_contains .github/workflows/distribution-check.yml "bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
 fi
 
 require_contains .goreleaser.yaml "version: 2"

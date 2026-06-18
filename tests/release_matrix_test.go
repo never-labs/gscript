@@ -1,8 +1,10 @@
 package tests_test
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -830,11 +832,13 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"scripts/production_check.sh",
 				"scripts/public_release_blockers_check.sh",
 				"scripts/release_notes_check.sh",
+				"scripts/release_snapshot_install_check.sh",
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
 				`"$(go env GOPATH)/bin/goreleaser" --version`,
 				"bash scripts/release_notes_check.sh",
 				"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
+				"bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin",
 			},
 		},
 		{
@@ -1774,6 +1778,16 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 	registry := releaseReportRegistry(t, root)
 	installBinDir := filepath.Join(t.TempDir(), "bin")
 	diagScriptOutDir := filepath.Join(t.TempDir(), "script-bundle")
+	snapshotDistDir := filepath.Join(t.TempDir(), "snapshot-dist")
+	if err := os.MkdirAll(snapshotDistDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDistDir, "leia_0.0.1-next_linux_amd64.tar.gz"), releaseMatrixTarGz(t, map[string]string{
+		"leia":     "#!/bin/sh\nexit 0\n",
+		"leia-lsp": "#!/bin/sh\nexit 0\n",
+	}), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	siteDir := filepath.Join(t.TempDir(), "site")
 	if err := os.MkdirAll(filepath.Join(siteDir, "guide"), 0o755); err != nil {
 		t.Fatal(err)
@@ -1829,6 +1843,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "artifact_entries", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets", "install_target_details"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}, {"install_target_count", "install_target_details"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "checked_file_details", "required_artifact_details", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"checked_file_count", "checked_file_details"}, {"required_artifact_count", "required_artifact_details"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
+		{reportCommand: "scripts/release_snapshot_install_check.sh --json", args: []string{"bash", "scripts/release_snapshot_install_check.sh", "--dist-dir", snapshotDistDir, "--bin-dir", filepath.Join(t.TempDir(), "snapshot-bin"), "--os", "linux", "--arch", "amd64", "--json"}, scalars: []string{"dist_dir", "goos", "goarch", "archive", "archive_name", "snapshot_version", "installer_version", "staged_asset", "staged_release_dir", "bin_dir"}, counts: []string{"install_count", "failure_kind_count", "failure_count"}, fields: []string{"installed_paths", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"install_count", "installed_paths"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/site_check.sh --json", args: []string{"bash", "scripts/site_check.sh", "--site-dir", siteDir, "--json"}, scalars: []string{"site_dir"}, counts: []string{"html_file_count", "local_link_count", "asset_ref_count", "fragment_check_count", "failure_kind_count", "failure_count"}, fields: []string{"failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count", "finding_status_count"}, fields: []string{"findings", "finding_statuses"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}, {"finding_status_count", "finding_statuses"}}},
 	} {
@@ -2011,6 +2026,81 @@ func TestReleaseMatrixSiteReportIsMachineReadable(t *testing.T) {
 	}
 	if !stringSliceContains(brokenReport.FailureKinds, "missing_target") || !stringSliceContains(brokenReport.FailureKinds, "missing_anchor") {
 		t.Fatalf("broken site failure kinds = %+v, want missing target and anchor", brokenReport.FailureKinds)
+	}
+}
+
+func TestReleaseMatrixSnapshotInstallReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	distDir := filepath.Join(t.TempDir(), "dist")
+	if err := os.MkdirAll(distDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(distDir, "leia_0.0.1-next_linux_amd64.tar.gz"), releaseMatrixTarGz(t, map[string]string{
+		"leia":     "#!/bin/sh\nexit 0\n",
+		"leia-lsp": "#!/bin/sh\nexit 0\n",
+	}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	binDir := filepath.Join(t.TempDir(), "bin")
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_snapshot_install_check.sh", "--dist-dir", distDir, "--bin-dir", binDir, "--os", "linux", "--arch", "amd64", "--json")
+	var report struct {
+		SchemaVersion    int      `json:"schema_version"`
+		Status           string   `json:"status"`
+		DistDir          string   `json:"dist_dir"`
+		GOOS             string   `json:"goos"`
+		GOARCH           string   `json:"goarch"`
+		Archive          string   `json:"archive"`
+		ArchiveName      string   `json:"archive_name"`
+		SnapshotVersion  string   `json:"snapshot_version"`
+		InstallerVersion string   `json:"installer_version"`
+		StagedAsset      string   `json:"staged_asset"`
+		StagedReleaseDir string   `json:"staged_release_dir"`
+		BinDir           string   `json:"bin_dir"`
+		InstallCount     int      `json:"install_count"`
+		InstalledPaths   []string `json:"installed_paths"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureCount     int      `json:"failure_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		FailureDetails   []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("snapshot install JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.GOOS != "linux" || report.GOARCH != "amd64" || report.ArchiveName != "leia_0.0.1-next_linux_amd64.tar.gz" || report.SnapshotVersion != "0.0.1-next" || report.InstallerVersion != "v0.0.1-next" || report.StagedAsset != "leia_v0.0.1-next_linux_amd64.tar.gz" || report.InstallCount != 2 || len(report.InstalledPaths) != 2 || report.FailureKindCount != 0 || report.FailureCount != 0 || len(report.FailureKinds) != 0 || len(report.FailureDetails) != 0 {
+		t.Fatalf("snapshot install JSON = %+v, want passing staged installer report", report)
+	}
+	for _, path := range report.InstalledPaths {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("installed path %q is missing: %v", path, err)
+		}
+		if info.Mode()&0o111 == 0 {
+			t.Fatalf("installed path %q is not executable: %v", path, info.Mode())
+		}
+	}
+
+	missing := runCommandResult(root, 30*time.Second, "bash", "scripts/release_snapshot_install_check.sh", "--dist-dir", filepath.Join(t.TempDir(), "missing-dist"), "--os", "linux", "--arch", "amd64", "--json")
+	if missing.err == nil {
+		t.Fatalf("missing snapshot dist unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", missing.stdout, missing.stderr)
+	}
+	var missingReport struct {
+		Status           string   `json:"status"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureCount     int      `json:"failure_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		FailureDetails   []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(missing.stdout), &missingReport); err != nil {
+		t.Fatalf("missing snapshot install JSON failed to decode: %v\nstdout:\n%s\nstderr:\n%s", err, missing.stdout, missing.stderr)
+	}
+	if missingReport.Status != "fail" || missingReport.FailureKindCount != 1 || missingReport.FailureCount != 1 || !stringSliceContains(missingReport.FailureKinds, "missing_dist_dir") || len(missingReport.FailureDetails) != 1 || missingReport.FailureDetails[0].Kind != "missing_dist_dir" {
+		t.Fatalf("missing snapshot install JSON = %+v, want missing_dist_dir failure", missingReport)
 	}
 }
 
@@ -5078,6 +5168,34 @@ func releaseMatrixZip(t *testing.T, files map[string]string) []byte {
 		}
 	}
 	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func releaseMatrixTarGz(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		data := []byte(files[name])
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: int64(len(data))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gw.Close(); err != nil {
 		t.Fatal(err)
 	}
 	return buf.Bytes()

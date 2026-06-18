@@ -153,6 +153,9 @@ machine-readable.
 `scripts/release_artifacts_check.sh --json` uses the same failure fields for
 version, tag, clean-worktree, checksum, artifact, and local install failures,
 and reports `artifact_entries` for the verified release artifact roles.
+`scripts/release_snapshot_install_check.sh --json` verifies the GoReleaser
+snapshot archive through `scripts/install.sh` with a staged local `file://`
+release directory.
 `scripts/arch_check.sh --json` reports methodjit source/test size,
 `large_file_details`, `debt_marker_details`, and `missing_test_files` so
 architecture debt is visible to release dashboards.

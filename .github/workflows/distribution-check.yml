@@ -18,6 +18,7 @@ on:
       - scripts/public_release_blockers_check.sh
       - scripts/release_notes_check.sh
       - scripts/release_distribution_check.sh
+      - scripts/release_snapshot_install_check.sh
       - scripts/release_artifacts*.sh
       - go.mod
       - go.sum
@@ -46,3 +47,4 @@ jobs:
       - run: bash scripts/release_notes_check.sh
       - run: bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
       - run: '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
+      - run: bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin
