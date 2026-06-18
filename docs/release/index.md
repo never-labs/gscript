@@ -145,8 +145,10 @@ release-critical:
 
 `scripts/release_distribution_check.sh --json` reports
 `failure_kind_count`, `failure_count`, `workflow_count`, and
-`install_target_count`. Its `failure_kinds` and `failure_details` fields make
-missing workflow, install-plan, fixture, and local tool failures machine-readable.
+`install_target_count`. Its `install_target_details` field splits each target
+into `goos` and `goarch`, and its `failure_kinds` and `failure_details` fields
+make missing workflow, install-plan, fixture, and local tool failures
+machine-readable.
 `scripts/release_artifacts_check.sh --json` uses the same failure fields for
 version, tag, clean-worktree, checksum, artifact, and local install failures,
 and reports `artifact_entries` for the verified release artifact roles.

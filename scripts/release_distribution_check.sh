@@ -112,6 +112,24 @@ print_json_failure_details() {
   printf '%s]' "$indent"
 }
 
+print_json_install_target_details() {
+  local indent="$1"
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#install_targets[@]}" ]]; do
+    local target="${install_targets[$i]}"
+    local target_goos="${target%/*}"
+    local target_goarch="${target#*/}"
+    printf '%s  {"target": "%s", "goos": "%s", "goarch": "%s"}' "$indent" "$(json_escape "$target")" "$(json_escape "$target_goos")" "$(json_escape "$target_goarch")"
+    if [[ "$i" -lt $((${#install_targets[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
 print_json_report() {
   local status="${1:-pass}"
   local failure_kind_count="${#failure_kinds[@]}"
@@ -151,6 +169,9 @@ print_json_report() {
   else
     print_json_string_array "  " "${install_targets[@]}"
   fi
+  printf ',\n'
+  printf '  "install_target_details": '
+  print_json_install_target_details "  "
   printf '\n'
   printf '}\n'
 }
