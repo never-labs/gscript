@@ -305,14 +305,32 @@ print_json_string_array_from_file() {
     printf ']'
 }
 
+print_json_string_array() {
+    local indent="$1"
+    shift
+    local values=("$@")
+    printf '['
+    local i=0
+    while [ "$i" -lt "${#values[@]}" ]; do
+        if [ "$i" -eq 0 ]; then
+            printf '\n'
+        fi
+        printf '%s  "%s"' "$indent" "$(json_escape "${values[$i]}")"
+        if [ "$i" -lt $((${#values[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        i=$((i + 1))
+    done
+    if [ "${#values[@]}" -gt 0 ]; then
+        printf '%s' "$indent"
+    fi
+    printf ']'
+}
+
 print_validate_json_report() {
     local status="$1"
     local output_file="$2"
-    shift 2
-    local failures=()
-    if [ "$#" -gt 0 ]; then
-        failures=("$@")
-    fi
     local output_line_count
     output_line_count="$(awk 'END { print NR + 0 }' "$output_file")"
     printf '{\n'
@@ -325,11 +343,30 @@ print_validate_json_report() {
     printf '  "wall_threshold": %s,\n' "$WALL_THRESHOLD"
     printf '  "luajit_threshold": %s,\n' "$LUAJIT_THRESHOLD"
     printf '  "failure_count": %d,\n' "${#failures[@]}"
+    printf '  "failure_kind_count": %d,\n' "${#failure_kinds[@]}"
     printf '  "output_line_count": %d,\n' "$output_line_count"
+    printf '  "failure_kinds": '
+    print_json_string_array "  " ${failure_kinds[@]+"${failure_kinds[@]}"}
+    printf ',\n'
     printf '  "failures": [\n'
     local i=0
     while [ "$i" -lt "${#failures[@]}" ]; do
         printf '    "%s"' "$(json_escape "${failures[$i]}")"
+        if [ "$i" -lt $((${#failures[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        i=$((i + 1))
+    done
+    printf '  ],\n'
+    printf '  "failure_details": [\n'
+    i=0
+    while [ "$i" -lt "${#failures[@]}" ]; do
+        printf '    {\n'
+        printf '      "message": "%s",\n' "$(json_escape "${failures[$i]}")"
+        printf '      "kind": "%s",\n' "$(json_escape "${failure_kinds[$i]}")"
+        printf '      "value": "%s"\n' "$(json_escape "${failure_values[$i]}")"
+        printf '    }'
         if [ "$i" -lt $((${#failures[@]} - 1)) ]; then
             printf ','
         fi
@@ -574,17 +611,23 @@ if [ -n "$VALIDATE_ONLY" ]; then
     if [ "$JSON_OUT" -eq 1 ]; then
         validate_log="$(mktemp "${TMPDIR:-/tmp}/leia-performance-validate.XXXXXX")"
         failures=()
+        failure_kinds=()
+        failure_values=()
         if ! validate_artifact "$VALIDATE_ONLY" >"$validate_log" 2>&1; then
             failures+=("timing validation failed")
+            failure_kinds+=("timing_validation")
+            failure_values+=("$VALIDATE_ONLY")
         fi
         if ! validate_luajit_artifact "$VALIDATE_ONLY" >>"$validate_log" 2>&1; then
             failures+=("luajit submit guard failed")
+            failure_kinds+=("luajit_submit_guard")
+            failure_values+=("$VALIDATE_ONLY")
         fi
         status="pass"
         if [ "${#failures[@]}" -gt 0 ]; then
             status="issues"
         fi
-        print_validate_json_report "$status" "$validate_log" "${failures[@]+"${failures[@]}"}"
+        print_validate_json_report "$status" "$validate_log"
         rm -f "$validate_log"
         if [ "$status" = "issues" ]; then
             exit 1

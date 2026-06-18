@@ -107,6 +107,10 @@ leia bench strict \
   --markdown /tmp/leia_strict.md
 ```
 
+`scripts/performance_gate.sh --validate-only FILE --json` validates an
+existing timing report and exposes `failure_kind_count`, `failure_kinds`,
+`failure_details`, and captured `output_lines` for release dashboards.
+
 Release and diagnostic scripts collect these artifacts into evidence bundles.
 Do not commit temporary timing output. Only maintainers should update
 intentional baseline or history files under `benchmarks/data/`.
