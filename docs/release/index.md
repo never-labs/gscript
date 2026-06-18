@@ -111,6 +111,8 @@ Release archives must include both executables:
 
 `scripts/install.sh --dry-run --json` reports `install_entries` so automation
 can map each executable role to the exact install path.
+`scripts/release_artifacts.sh --dry-run --json` reports `artifact_entries` for
+the same role/name/path mapping before files are written.
 
 Use [`notes-template.md`](notes-template.md) for release candidates and public
 tags. Candidate notes live under [`notes/`](notes/) as `vX.Y.Z.md` so

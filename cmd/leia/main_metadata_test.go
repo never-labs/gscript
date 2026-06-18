@@ -299,6 +299,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/public_release_blockers_check.sh --json", "blocker_status_details"},
 		{"scripts/q_conformance_gate.sh --json", "failure_kinds"},
 		{"scripts/q_conformance_gate.sh --json", "failure_details"},
+		{"scripts/release_artifacts.sh --dry-run --json", "artifact_entries"},
 		{"scripts/release_artifacts_check.sh --json", "failure_kinds"},
 		{"scripts/release_artifacts_check.sh --json", "failure_details"},
 		{"scripts/release_distribution_check.sh --json", "failure_kinds"},

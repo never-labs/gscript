@@ -1810,7 +1810,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "skipped_check_details", "release_critical_runs", "release_critical_skip_names", "release_critical_skips", "release_critical_skip_details"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"skip_count", "skipped_check_details"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"critical_skip_count", "release_critical_skip_details"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, scalars: []string{"require_resolved"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}, fields: []string{"blockers", "blocker_details", "blocker_statuses", "blocker_status_details", "decision_areas"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}, {"blocker_status_count", "blocker_statuses"}, {"blocker_status_count", "blocker_status_details"}, {"decision_area_count", "decision_areas"}}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, scalars: []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}, counts: []string{"failure_kind_count", "failure_count", "language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"failure_kinds", "failure_details", "language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
-		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
+		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files", "artifact_entries"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}}},
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
@@ -2434,16 +2434,21 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 		ArtifactCount      int      `json:"artifact_count"`
 		ChecksumEntryCount int      `json:"checksum_entry_count"`
 		ArtifactFiles      []string `json:"artifact_files"`
-		ArtifactPath       string   `json:"artifact_path"`
-		LSPArtifactPath    string   `json:"lsp_artifact_path"`
-		MetadataPath       string   `json:"metadata_path"`
-		ChecksumsPath      string   `json:"checksums_path"`
-		GitCommit          string   `json:"git_commit"`
-		GitShortCommit     string   `json:"git_short_commit"`
-		GitBranch          string   `json:"git_branch"`
-		GitDirty           bool     `json:"git_dirty"`
-		GoVersion          string   `json:"go_version"`
-		BuildTimeUTC       string   `json:"build_time_utc"`
+		ArtifactEntries    []struct {
+			Role string `json:"role"`
+			Name string `json:"name"`
+			Path string `json:"path"`
+		} `json:"artifact_entries"`
+		ArtifactPath    string `json:"artifact_path"`
+		LSPArtifactPath string `json:"lsp_artifact_path"`
+		MetadataPath    string `json:"metadata_path"`
+		ChecksumsPath   string `json:"checksums_path"`
+		GitCommit       string `json:"git_commit"`
+		GitShortCommit  string `json:"git_short_commit"`
+		GitBranch       string `json:"git_branch"`
+		GitDirty        bool   `json:"git_dirty"`
+		GoVersion       string `json:"go_version"`
+		BuildTimeUTC    string `json:"build_time_utc"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("release artifact plan JSON failed to decode: %v\n%s", err, out)
@@ -2454,8 +2459,8 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 	if report.OutputDir == "" || report.GOOS == "" || report.GOARCH == "" || report.GitCommit == "" || report.GitShortCommit == "" || report.GoVersion == "" || report.BuildTimeUTC == "" {
 		t.Fatalf("release artifact plan JSON missing environment metadata: %+v", report)
 	}
-	if report.ArtifactCount != len(report.ArtifactFiles) || report.ArtifactCount != 4 {
-		t.Fatalf("release artifact plan JSON artifact counts = %d/%d, want 4: %+v", report.ArtifactCount, len(report.ArtifactFiles), report)
+	if report.ArtifactCount != len(report.ArtifactFiles) || report.ArtifactCount != len(report.ArtifactEntries) || report.ArtifactCount != 4 {
+		t.Fatalf("release artifact plan JSON artifact counts = %d/%d/%d, want 4: %+v", report.ArtifactCount, len(report.ArtifactFiles), len(report.ArtifactEntries), report)
 	}
 	if report.ChecksumEntryCount != 3 {
 		t.Fatalf("release artifact plan JSON checksum count = %d, want 3: %+v", report.ChecksumEntryCount, report)
@@ -2472,6 +2477,22 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 		if path == "" || !strings.HasPrefix(path, report.OutputDir) {
 			t.Fatalf("release artifact plan path %q must be under output dir %q: %+v", path, report.OutputDir, report)
 		}
+	}
+	entries := map[string]struct {
+		Name string
+		Path string
+	}{}
+	for _, entry := range report.ArtifactEntries {
+		entries[entry.Role] = struct {
+			Name string
+			Path string
+		}{Name: entry.Name, Path: entry.Path}
+	}
+	if entries["cli"].Name != report.Artifact || entries["cli"].Path != report.ArtifactPath ||
+		entries["lsp"].Name != report.LSPArtifact || entries["lsp"].Path != report.LSPArtifactPath ||
+		entries["metadata"].Name != report.Metadata || entries["metadata"].Path != report.MetadataPath ||
+		entries["checksums"].Name != report.Checksums || entries["checksums"].Path != report.ChecksumsPath {
+		t.Fatalf("release artifact plan entries do not map names to paths: %+v", report.ArtifactEntries)
 	}
 }
 
