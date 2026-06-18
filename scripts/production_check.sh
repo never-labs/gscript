@@ -102,6 +102,7 @@ SKIP_MESSAGES=()
 SKIP_REASONS=()
 RELEASE_CRITICAL_SKIP_NAMES=(
     "Correctness"
+    "Architecture Health"
     "Manifest Coverage"
     "Module Path Gate"
     "Shell Script Syntax"
@@ -460,6 +461,18 @@ add_documentation_references() {
     add_run "Documentation References" "bash scripts/docs_check.sh"
 }
 
+add_architecture_health_gate() {
+    if [ ! -f scripts/arch_check.sh ]; then
+        add_skip "Architecture Health" "missing scripts/arch_check.sh"
+        return
+    fi
+    if ! have_cmd python3; then
+        add_skip "Architecture Health" "missing python3"
+        return
+    fi
+    add_run "Architecture Health" "bash scripts/arch_check.sh --json"
+}
+
 add_language_conformance_gate() {
     if ! have_cmd go; then
         add_skip "Language Conformance Surface" "missing go"
@@ -688,6 +701,7 @@ build_quick_plan() {
         "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     add_go_test "Stdlib Contract" \
         "go test ./tests -run TestStdlibContract -count=1"
+    add_architecture_health_gate
     add_manifest_coverage
     add_module_path_gate
     add_shell_script_syntax_gate
@@ -708,6 +722,7 @@ build_full_plan() {
         add_skip "Release Matrix Metadata" "missing go"
     fi
     add_manifest_coverage
+    add_architecture_health_gate
     add_module_path_gate
     add_shell_script_syntax_gate
     add_documentation_references

@@ -2970,7 +2970,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 			t.Fatalf("production plan critical skip detail %d = %+v, release_critical_skips=%+v", i, detail, report.ReleaseCriticalSkips)
 		}
 	}
-	for _, want := range []string{"Correctness", "Performance Gate", "Public Release Blockers", "Release Smoke", "Release Distribution", "Release Notes", "Release Artifacts"} {
+	for _, want := range []string{"Correctness", "Architecture Health", "Performance Gate", "Public Release Blockers", "Release Smoke", "Release Distribution", "Release Notes", "Release Artifacts"} {
 		if !stringSliceContains(report.ReleaseCriticalNames, want) {
 			t.Fatalf("production plan JSON release critical names missing %q: %+v", want, report.ReleaseCriticalNames)
 		}
@@ -2988,6 +2988,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		commands[check.Name] = check.Command
 	}
 	for name, want := range map[string]string{
+		"Architecture Health":      "bash scripts/arch_check.sh --json",
 		"Public Release Blockers": "bash scripts/public_release_blockers_check.sh --require-resolved",
 		"Release Distribution":    "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 		"Release Notes":           "bash scripts/release_notes_check.sh --require-ready --version \"vX.Y.Z\"",
