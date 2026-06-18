@@ -41,9 +41,9 @@ Nested fields use dotted JSON paths; `[]` marks per-item array paths.
 and `commands.log` so the resolved release plan can be archived with both
 human-readable and machine-readable evidence. The JSON plan includes
 `output_dir` when an artifact directory is requested, plus
-`release_critical_runs` and `release_critical_skips` so release automation can
-distinguish required gates from optional local checks without scraping command
-text.
+`release_critical_runs`, `skipped_check_details`, and
+`release_critical_skip_details` so release automation can distinguish required
+gates from optional local checks without scraping command text.
 
 `leia ci release` delegates to the same production release profile. That
 profile is the release validation source of truth: correctness, documentation,

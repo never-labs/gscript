@@ -97,6 +97,8 @@ done
 
 RUN_NAMES=()
 RUN_CMDS=()
+SKIP_NAMES=()
+SKIP_MESSAGES=()
 SKIP_REASONS=()
 RELEASE_CRITICAL_SKIP_NAMES=(
     "Correctness"
@@ -123,6 +125,8 @@ add_run() {
 }
 
 add_skip() {
+    SKIP_NAMES+=("$1")
+    SKIP_MESSAGES+=("$2")
     SKIP_REASONS+=("$1: $2")
 }
 
@@ -138,16 +142,17 @@ is_release_critical_skip() {
 }
 
 release_critical_skips() {
-    if [ "${#SKIP_REASONS[@]}" -eq 0 ]; then
+    if [ "${#SKIP_NAMES[@]}" -eq 0 ]; then
         return
     fi
-    local reason
+    local i=0
     local name
-    for reason in "${SKIP_REASONS[@]}"; do
-        name="${reason%%:*}"
+    while [ "$i" -lt "${#SKIP_NAMES[@]}" ]; do
+        name="${SKIP_NAMES[$i]}"
         if is_release_critical_skip "$name"; then
-            printf '%s\n' "$reason"
+            printf '%s: %s\n' "$name" "${SKIP_MESSAGES[$i]}"
         fi
+        i=$((i + 1))
     done
 }
 
@@ -195,6 +200,35 @@ print_json_string_array() {
         printf '\n'
         i=$((i + 1))
     done
+    printf '%s]' "$indent"
+}
+
+print_skip_details_json() {
+    local indent="$1"
+    local only_release_critical="$2"
+    local printed=0
+    local i=0
+    printf '[\n'
+    while [ "$i" -lt "${#SKIP_NAMES[@]}" ]; do
+        local name="${SKIP_NAMES[$i]}"
+        local release_critical=false
+        if is_release_critical_skip "$name"; then
+            release_critical=true
+        fi
+        if [ "$only_release_critical" = "true" ] && [ "$release_critical" != "true" ]; then
+            i=$((i + 1))
+            continue
+        fi
+        if [ "$printed" -gt 0 ]; then
+            printf ',\n'
+        fi
+        printf '%s  {"name": "%s", "reason": "%s", "release_critical": %s}' "$indent" "$(json_escape "$name")" "$(json_escape "${SKIP_MESSAGES[$i]}")" "$release_critical"
+        printed=$((printed + 1))
+        i=$((i + 1))
+    done
+    if [ "$printed" -gt 0 ]; then
+        printf '\n'
+    fi
     printf '%s]' "$indent"
 }
 
@@ -251,6 +285,9 @@ print_plan_json() {
         print_json_string_array "  " "${SKIP_REASONS[@]}"
     fi
     printf ',\n'
+    printf '  "skipped_check_details": '
+    print_skip_details_json "  " false
+    printf ',\n'
     printf '  "release_critical_runs": '
     if [ "${#critical_runs[@]}" -eq 0 ]; then
         printf '[]'
@@ -267,6 +304,9 @@ print_plan_json() {
     else
         print_json_string_array "  " "${critical[@]}"
     fi
+    printf ',\n'
+    printf '  "release_critical_skip_details": '
+    print_skip_details_json "  " true
     printf '\n'
     printf '}\n'
 }

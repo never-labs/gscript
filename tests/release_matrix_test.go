@@ -1807,7 +1807,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"failure_kinds", "failure_details", "textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
 		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}, matches: []releaseReportCountMatch{{"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
 		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
-		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "release_critical_runs", "release_critical_skip_names", "release_critical_skips"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
+		{reportCommand: "scripts/production_check.sh --list --json", args: []string{"bash", "scripts/production_check.sh", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "skipped_check_details", "release_critical_runs", "release_critical_skip_names", "release_critical_skips", "release_critical_skip_details"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"skip_count", "skipped_check_details"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"critical_skip_count", "release_critical_skip_details"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
 		{reportCommand: "scripts/public_release_blockers_check.sh --json", args: []string{"bash", "scripts/public_release_blockers_check.sh", "--json"}, scalars: []string{"require_resolved"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}, fields: []string{"blockers", "blocker_details", "blocker_statuses", "blocker_status_details", "decision_areas"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}, {"blocker_status_count", "blocker_statuses"}, {"blocker_status_count", "blocker_status_details"}, {"decision_area_count", "decision_areas"}}},
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, scalars: []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}, counts: []string{"failure_kind_count", "failure_count", "language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"failure_kinds", "failure_details", "language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
 		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
@@ -2447,16 +2447,31 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 			Command         string `json:"command"`
 			ReleaseCritical bool   `json:"release_critical"`
 		} `json:"runnable_checks"`
-		SkippedChecks        []string `json:"skipped_checks"`
-		ReleaseCriticalRuns  []string `json:"release_critical_runs"`
-		ReleaseCriticalNames []string `json:"release_critical_skip_names"`
-		ReleaseCriticalSkips []string `json:"release_critical_skips"`
+		SkippedChecks       []string `json:"skipped_checks"`
+		SkippedCheckDetails []struct {
+			Name            string `json:"name"`
+			Reason          string `json:"reason"`
+			ReleaseCritical bool   `json:"release_critical"`
+		} `json:"skipped_check_details"`
+		ReleaseCriticalRuns        []string `json:"release_critical_runs"`
+		ReleaseCriticalNames       []string `json:"release_critical_skip_names"`
+		ReleaseCriticalSkips       []string `json:"release_critical_skips"`
+		ReleaseCriticalSkipDetails []struct {
+			Name            string `json:"name"`
+			Reason          string `json:"reason"`
+			ReleaseCritical bool   `json:"release_critical"`
+		} `json:"release_critical_skip_details"`
 	}
 	if err := json.Unmarshal([]byte(quickOut), &quickReport); err != nil {
 		t.Fatalf("quick production plan JSON failed to decode: %v\n%s", err, quickOut)
 	}
-	if quickReport.SchemaVersion != 1 || quickReport.Status != "pass" || quickReport.Mode != "quick" || quickReport.ReleaseProfile || quickReport.OutputDir != "" || !quickReport.ListOnly || quickReport.RunCount != len(quickReport.RunnableChecks) || quickReport.SkipCount != len(quickReport.SkippedChecks) || quickReport.CriticalRunCount != len(quickReport.ReleaseCriticalRuns) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkips) || quickReport.CriticalNameCount != len(quickReport.ReleaseCriticalNames) {
+	if quickReport.SchemaVersion != 1 || quickReport.Status != "pass" || quickReport.Mode != "quick" || quickReport.ReleaseProfile || quickReport.OutputDir != "" || !quickReport.ListOnly || quickReport.RunCount != len(quickReport.RunnableChecks) || quickReport.SkipCount != len(quickReport.SkippedChecks) || quickReport.SkipCount != len(quickReport.SkippedCheckDetails) || quickReport.CriticalRunCount != len(quickReport.ReleaseCriticalRuns) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkips) || quickReport.CriticalSkipCount != len(quickReport.ReleaseCriticalSkipDetails) || quickReport.CriticalNameCount != len(quickReport.ReleaseCriticalNames) {
 		t.Fatalf("quick production plan JSON = %+v, want quick schema v1 plan", quickReport)
+	}
+	for i, detail := range quickReport.SkippedCheckDetails {
+		if detail.Name == "" || detail.Reason == "" || quickReport.SkippedChecks[i] != detail.Name+": "+detail.Reason {
+			t.Fatalf("quick production skip detail %d = %+v, skipped_checks=%+v", i, detail, quickReport.SkippedChecks)
+		}
 	}
 	planDir := t.TempDir()
 	runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--list", "--out-dir", planDir)
@@ -2505,16 +2520,39 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 			Command         string `json:"command"`
 			ReleaseCritical bool   `json:"release_critical"`
 		} `json:"runnable_checks"`
-		SkippedChecks        []string `json:"skipped_checks"`
-		ReleaseCriticalRuns  []string `json:"release_critical_runs"`
-		ReleaseCriticalNames []string `json:"release_critical_skip_names"`
-		ReleaseCriticalSkips []string `json:"release_critical_skips"`
+		SkippedChecks       []string `json:"skipped_checks"`
+		SkippedCheckDetails []struct {
+			Name            string `json:"name"`
+			Reason          string `json:"reason"`
+			ReleaseCritical bool   `json:"release_critical"`
+		} `json:"skipped_check_details"`
+		ReleaseCriticalRuns        []string `json:"release_critical_runs"`
+		ReleaseCriticalNames       []string `json:"release_critical_skip_names"`
+		ReleaseCriticalSkips       []string `json:"release_critical_skips"`
+		ReleaseCriticalSkipDetails []struct {
+			Name            string `json:"name"`
+			Reason          string `json:"reason"`
+			ReleaseCritical bool   `json:"release_critical"`
+		} `json:"release_critical_skip_details"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("production plan JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Status != "pass" || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || report.OutputDir != "" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.CriticalRunCount != len(report.ReleaseCriticalRuns) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) || report.CriticalNameCount != len(report.ReleaseCriticalNames) {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.Mode != "full" || !report.ReleaseProfile || report.ReleaseVersion != "vX.Y.Z" || report.OutputDir != "" || !report.ListOnly || report.RunCount != len(report.RunnableChecks) || report.SkipCount != len(report.SkippedChecks) || report.SkipCount != len(report.SkippedCheckDetails) || report.CriticalRunCount != len(report.ReleaseCriticalRuns) || report.CriticalSkipCount != len(report.ReleaseCriticalSkips) || report.CriticalSkipCount != len(report.ReleaseCriticalSkipDetails) || report.CriticalNameCount != len(report.ReleaseCriticalNames) {
 		t.Fatalf("production plan JSON = %+v, want release profile schema v1 plan", report)
+	}
+	for i, detail := range report.SkippedCheckDetails {
+		if detail.Name == "" || detail.Reason == "" || report.SkippedChecks[i] != detail.Name+": "+detail.Reason {
+			t.Fatalf("production plan skip detail %d = %+v, skipped_checks=%+v", i, detail, report.SkippedChecks)
+		}
+		if detail.ReleaseCritical != stringSliceContains(report.ReleaseCriticalNames, detail.Name) {
+			t.Fatalf("production plan skip detail %q release_critical=%v, release critical names=%+v", detail.Name, detail.ReleaseCritical, report.ReleaseCriticalNames)
+		}
+	}
+	for i, detail := range report.ReleaseCriticalSkipDetails {
+		if detail.Name == "" || detail.Reason == "" || !detail.ReleaseCritical || report.ReleaseCriticalSkips[i] != detail.Name+": "+detail.Reason {
+			t.Fatalf("production plan critical skip detail %d = %+v, release_critical_skips=%+v", i, detail, report.ReleaseCriticalSkips)
+		}
 	}
 	for _, want := range []string{"Correctness", "Performance Gate", "Public Release Blockers", "Release Smoke", "Release Distribution", "Release Notes", "Release Artifacts"} {
 		if !stringSliceContains(report.ReleaseCriticalNames, want) {
