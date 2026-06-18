@@ -151,6 +151,18 @@ release_critical_skips() {
     done
 }
 
+release_critical_runs() {
+    if [ "${#RUN_NAMES[@]}" -eq 0 ]; then
+        return
+    fi
+    local name
+    for name in "${RUN_NAMES[@]}"; do
+        if is_release_critical_skip "$name"; then
+            printf '%s\n' "$name"
+        fi
+    done
+}
+
 have_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
@@ -187,6 +199,12 @@ print_json_string_array() {
 }
 
 print_plan_json() {
+    local critical_runs=()
+    local run_name
+    while IFS= read -r run_name; do
+        [ -n "$run_name" ] || continue
+        critical_runs+=("$run_name")
+    done < <(release_critical_runs)
     local critical=()
     local reason
     while IFS= read -r reason; do
@@ -208,12 +226,17 @@ print_plan_json() {
     printf '  "list_only": %s,\n' "$([ "$LIST_ONLY" -eq 1 ] && echo true || echo false)"
     printf '  "run_count": %d,\n' "${#RUN_NAMES[@]}"
     printf '  "skip_count": %d,\n' "${#SKIP_REASONS[@]}"
+    printf '  "release_critical_run_count": %d,\n' "${#critical_runs[@]}"
     printf '  "critical_skip_count": %d,\n' "${#critical[@]}"
     printf '  "release_critical_skip_name_count": %d,\n' "${#RELEASE_CRITICAL_SKIP_NAMES[@]}"
     printf '  "runnable_checks": [\n'
     local i=0
     while [ "$i" -lt "${#RUN_NAMES[@]}" ]; do
-        printf '    {"name": "%s", "command": "%s"}' "$(json_escape "${RUN_NAMES[$i]}")" "$(json_escape "${RUN_CMDS[$i]}")"
+        local release_critical=false
+        if is_release_critical_skip "${RUN_NAMES[$i]}"; then
+            release_critical=true
+        fi
+        printf '    {"name": "%s", "command": "%s", "release_critical": %s}' "$(json_escape "${RUN_NAMES[$i]}")" "$(json_escape "${RUN_CMDS[$i]}")" "$release_critical"
         if [ "$i" -lt $((${#RUN_NAMES[@]} - 1)) ]; then
             printf ','
         fi
@@ -226,6 +249,13 @@ print_plan_json() {
         printf '[]'
     else
         print_json_string_array "  " "${SKIP_REASONS[@]}"
+    fi
+    printf ',\n'
+    printf '  "release_critical_runs": '
+    if [ "${#critical_runs[@]}" -eq 0 ]; then
+        printf '[]'
+    else
+        print_json_string_array "  " "${critical_runs[@]}"
     fi
     printf ',\n'
     printf '  "release_critical_skip_names": '
