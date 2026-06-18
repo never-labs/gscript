@@ -1730,6 +1730,11 @@ require example.com/unused v1.0.0
 	if err := os.WriteFile(filepath.Join(tidyModDir, "main.leia"), []byte("print(\"ok\")\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	missingModDir := t.TempDir()
+	invalidModDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(invalidModDir, "leia.mod"), []byte("not a module\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	diagOutDir := filepath.Join(t.TempDir(), "bundle")
 	remoteModDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(remoteModDir, "leia.mod"), []byte(`module example.com/remote-demo
@@ -1759,6 +1764,7 @@ require github.com/acme/toolkit v1.2.3
 		fields        []string
 		itemFields    []string
 		matches       []releaseReportCountMatch
+		wantFailure   bool
 	}{
 		{reportCommand: "leia capabilities --json", args: []string{"go", "run", "./cmd/leia", "capabilities", "--json"}, counts: []string{"command_count", "stdlib_module_count", "stdlib_layer_count", "default_import_count", "dialect_count", "tooling.report_count"}, fields: []string{"commands", "stdlib_modules", "stdlib_layers", "default_imports", "dialects", "tooling.reports"}, itemFields: []string{"tooling.reports[].command", "tooling.reports[].formats", "tooling.reports[].schema_version", "tooling.reports[].status_field"}, matches: []releaseReportCountMatch{{"command_count", "commands"}, {"stdlib_module_count", "stdlib_modules"}, {"stdlib_layer_count", "stdlib_layers"}, {"default_import_count", "default_imports"}, {"dialect_count", "dialects"}, {"tooling.report_count", "tooling.reports"}}},
 		{reportCommand: "leia check --json", args: []string{"go", "run", "./cmd/leia", "check", "--json", "--quick", testDir}, counts: []string{"step_count", "failed_count", "skipped_count"}, fields: []string{"steps"}, itemFields: []string{"steps[].name", "steps[].ok", "steps[].exit_code"}, matches: []releaseReportCountMatch{{"step_count", "steps"}}},
@@ -1779,7 +1785,9 @@ require github.com/acme/toolkit v1.2.3
 		{reportCommand: "leia mod check --json", args: []string{"go", "run", "./cmd/leia", "mod", "check", "--json", richModDir}, counts: []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}, fields: []string{"graph.files", "diagnostics"}, itemFields: []string{"graph.files[].file"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}, {"graph.file_count", "graph.files"}}},
 		{reportCommand: "leia mod download --json", args: []string{"go", "run", "./cmd/leia", "mod", "download", "--json", "--cache", remoteCache, "--github-base", remoteServer.URL, remoteModDir}, counts: []string{"module_count", "diagnostic_count"}, fields: []string{"modules", "diagnostics"}, itemFields: []string{"modules[].path", "modules[].version", "modules[].repo", "modules[].url", "modules[].zip", "modules[].extract_dir", "modules[].downloaded", "modules[].extracted"}, matches: []releaseReportCountMatch{{"module_count", "modules"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod explain --json", args: []string{"go", "run", "./cmd/leia", "mod", "explain", "--json", "--dir", richModDir, "example.com/lib"}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}},
+		{reportCommand: "leia mod explain --json", args: []string{"go", "run", "./cmd/leia", "mod", "explain", "--json", "--dir", missingModDir, "example.com/missing"}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, itemFields: []string{"diagnostics[].severity", "diagnostics[].code", "diagnostics[].message", "diagnostics[].file"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}, wantFailure: true},
 		{reportCommand: "leia mod gomod --json", args: []string{"go", "run", "./cmd/leia", "mod", "gomod", "--json", richModDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}},
+		{reportCommand: "leia mod gomod --json", args: []string{"go", "run", "./cmd/leia", "mod", "gomod", "--json", invalidModDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, itemFields: []string{"diagnostics[].severity", "diagnostics[].code", "diagnostics[].message", "diagnostics[].file"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}, wantFailure: true},
 		{reportCommand: "leia mod graph --json", args: []string{"go", "run", "./cmd/leia", "mod", "graph", "--json", modDir}, counts: []string{"file_count", "diagnostic_count"}, fields: []string{"files", "diagnostics"}, itemFields: []string{"files[].file"}, matches: []releaseReportCountMatch{{"file_count", "files"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod list --json", args: []string{"go", "run", "./cmd/leia", "mod", "list", "--json", richModDir}, counts: []string{"require_count", "replace_count", "collection_count", "diagnostic_count"}, fields: []string{"requires", "replaces", "collections", "diagnostics"}, itemFields: []string{"requires[].path", "requires[].version", "requires[].kind", "requires[].source", "requires[].file", "replaces[].path", "replaces[].new_path", "replaces[].local", "replaces[].root", "collections[].name", "collections[].path", "collections[].root"}, matches: []releaseReportCountMatch{{"require_count", "requires"}, {"replace_count", "replaces"}, {"collection_count", "collections"}, {"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia mod lock --json", args: []string{"go", "run", "./cmd/leia", "mod", "lock", "--json", richModDir}, counts: []string{"entry_count", "diagnostic_count"}, fields: []string{"entries", "diagnostics"}, itemFields: []string{"entries[].kind", "entries[].path", "entries[].target", "entries[].hash"}, matches: []releaseReportCountMatch{{"entry_count", "entries"}, {"diagnostic_count", "diagnostics"}}},
@@ -1851,6 +1859,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		fields        []string
 		itemFields    []string
 		matches       []releaseReportCountMatch
+		wantFailure   bool
 	}{
 		{reportCommand: "scripts/arch_check.sh --json", args: []string{"bash", "scripts/arch_check.sh", "--json"}, scalars: []string{"module"}, counts: []string{"source_file_count", "source_line_count", "test_file_count", "test_line_count", "test_ratio_pct", "top_file_count", "large_file_count", "pass_pipeline_line_count", "debt_marker_count", "missing_test_count"}, fields: []string{"top_file_details", "large_file_details", "pass_pipeline_lines", "debt_marker_details", "missing_test_files"}, matches: []releaseReportCountMatch{{"top_file_count", "top_file_details"}, {"large_file_count", "large_file_details"}, {"pass_pipeline_line_count", "pass_pipeline_lines"}, {"debt_marker_count", "debt_marker_details"}, {"missing_test_count", "missing_test_files"}}},
 		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, itemFields: []string{"files[]"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
@@ -5351,6 +5360,7 @@ type releaseReportSmokeCase struct {
 	fields        []string
 	itemFields    []string
 	matches       []releaseReportCountMatch
+	wantFailure   bool
 }
 
 type releaseReportCountMatch struct {
@@ -5380,7 +5390,16 @@ func assertReleaseReportRegistrySmoke(t *testing.T, root string, registry map[st
 				t.Fatalf("capabilities report %q collection_item_fields = %#v, want %q", tc.reportCommand, declared.CollectionItemFields, field)
 			}
 		}
-		out := runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+		var out string
+		if tc.wantFailure {
+			result := runCommandResult(root, 60*time.Second, tc.args[0], tc.args[1:]...)
+			if result.err == nil {
+				t.Fatalf("%s unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", tc.reportCommand, result.stdout, result.stderr)
+			}
+			out = result.stdout
+		} else {
+			out = runCommand(t, root, 60*time.Second, tc.args[0], tc.args[1:]...)
+		}
 		assertReleaseReportSchemaVersion(t, out, tc.reportCommand, declared.SchemaVersion)
 		if declared.StatusField != "" {
 			assertReleaseReportStatusField(t, out, tc.reportCommand, declared.StatusField)
