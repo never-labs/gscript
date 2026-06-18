@@ -338,6 +338,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		fields  []string
 	}{
 		{"leia capabilities --json", []string{"tooling.reports[].command", "tooling.reports[].formats", "tooling.reports[].schema_version", "tooling.reports[].status_field"}},
+		{"leia check --json", []string{"steps[].name", "steps[].ok", "steps[].exit_code"}},
+		{"leia ci --list --json", []string{"commands[].name", "commands[].command", "commands[].arg_count", "commands[].args"}},
 		{"leia env --json", []string{"capabilities.tooling.reports[].command", "capabilities.tooling.reports[].formats", "capabilities.tooling.reports[].schema_version", "capabilities.tooling.reports[].status_field"}},
 		{"scripts/install.sh --dry-run --json", []string{"install_entries[].role", "install_entries[].name", "install_entries[].path"}},
 		{"scripts/production_check.sh --list --json", []string{"runnable_checks[].name", "runnable_checks[].command", "runnable_checks[].release_critical"}},
