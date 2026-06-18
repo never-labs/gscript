@@ -10,6 +10,15 @@ JOBS="${JOBS:-6}"
 TIMEOUT="${TIMEOUT:-120}"
 TMPDIR="${TMPDIR:-$ROOT/.tmp/q-gate}"
 JSON_OUT="false"
+failure_kinds=()
+failure_messages=()
+failure_values=()
+failure_printed="false"
+q_tests=()
+q_examples=()
+q_benchmarks=()
+benchmark_json=""
+benchmark_markdown=""
 
 usage() {
   cat <<'USAGE'
@@ -121,6 +130,15 @@ json_escape() {
   printf '%s' "$value"
 }
 
+record_failure() {
+  local kind="$1"
+  local message="$2"
+  local value="${3:-}"
+  failure_kinds+=("$kind")
+  failure_messages+=("$message")
+  failure_values+=("$value")
+}
+
 print_json_string_array() {
   local indent="$1"
   shift
@@ -138,13 +156,65 @@ print_json_string_array() {
   printf '%s]' "$indent"
 }
 
+print_json_failure_details() {
+  local indent="$1"
+  printf '[\n'
+  local i=0
+  while [ "$i" -lt "${#failure_messages[@]}" ]; do
+    printf '%s  {"kind": "%s", "message": "%s", "value": "%s"}' "$indent" "$(json_escape "${failure_kinds[$i]}")" "$(json_escape "${failure_messages[$i]}")" "$(json_escape "${failure_values[$i]}")"
+    if [ "$i" -lt $((${#failure_messages[@]} - 1)) ]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
+print_json_array_var() {
+  local indent="$1"
+  shift
+  if [ "$#" -eq 0 ]; then
+    print_json_string_array "$indent"
+  else
+    print_json_string_array "$indent" "$@"
+  fi
+}
+
+fail() {
+  local kind="$1"
+  local message="$2"
+  local code="${3:-1}"
+  local value="${4:-}"
+  record_failure "$kind" "$message" "$value"
+  if [ "$JSON_OUT" == "true" ]; then
+    failure_printed="true"
+    print_json_report "fail"
+  else
+    echo "error: $message" >&2
+  fi
+  exit "$code"
+}
+
+on_error() {
+  local code="$1"
+  if [ "$JSON_OUT" == "true" ] && [ "$failure_printed" != "true" ]; then
+    record_failure "command_failed" "command failed: ${BASH_COMMAND}" "${BASH_COMMAND}"
+    failure_printed="true"
+    print_json_report "fail"
+  fi
+  exit "$code"
+}
+
 run_logged() {
   local log_path="$1"
   shift
   if [ "$JSON_OUT" == "true" ]; then
     if ! "$@" >"$log_path" 2>&1; then
-      cat "$log_path" >&2
-      return 1
+      record_failure "command_failed" "command failed: $*" "$log_path"
+      failure_printed="true"
+      print_json_report "fail"
+      exit 1
     fi
   else
     "$@"
@@ -169,8 +239,14 @@ run_leia_paths() {
   for path in "$@"; do
     total=$((total + 1))
     if ! "$bin" run "$path" >"$out" 2>&1; then
-      echo "[q-gate] failed $label case: $path" >&2
-      cat "$out" >&2
+      if [ "$JSON_OUT" == "true" ]; then
+        record_failure "q_case_failed" "failed $label case: $path" "$path"
+        failure_printed="true"
+        print_json_report "fail"
+      else
+        echo "[q-gate] failed $label case: $path" >&2
+        cat "$out" >&2
+      fi
       exit 1
     fi
   done
@@ -188,31 +264,60 @@ q_benchmark_args() {
 }
 
 print_json_report() {
-  local benchmark_json="$1"
-  local benchmark_markdown="$2"
+  local status="${1:-pass}"
+  local failure_kind_count="${#failure_kinds[@]}"
+  local language_case_count="${#q_tests[@]}"
+  local example_case_count="${#q_examples[@]}"
+  local benchmark_case_count="${#q_benchmarks[@]}"
   printf '{\n'
   printf '  "schema_version": 1,\n'
-  printf '  "status": "pass",\n'
+  printf '  "status": "%s",\n' "$(json_escape "$status")"
   printf '  "scope": "%s",\n' "$(json_escape "$Q_GATE_SCOPE")"
   printf '  "bench_mode": "%s",\n' "$(json_escape "$RUN_BENCH")"
   printf '  "jobs": %s,\n' "$JOBS"
   printf '  "timeout_seconds": %s,\n' "$TIMEOUT"
-  printf '  "language_case_count": %d,\n' "${#q_tests[@]}"
-  printf '  "example_case_count": %d,\n' "${#q_examples[@]}"
-  printf '  "benchmark_case_count": %d,\n' "${#q_benchmarks[@]}"
+  printf '  "failure_kind_count": %d,\n' "$failure_kind_count"
+  printf '  "failure_count": %d,\n' "${#failure_messages[@]}"
+  printf '  "language_case_count": %d,\n' "$language_case_count"
+  printf '  "example_case_count": %d,\n' "$example_case_count"
+  printf '  "benchmark_case_count": %d,\n' "$benchmark_case_count"
   printf '  "benchmark_json": "%s",\n' "$(json_escape "$benchmark_json")"
   printf '  "benchmark_markdown": "%s",\n' "$(json_escape "$benchmark_markdown")"
+  printf '  "failure_kinds": '
+  if [ "$failure_kind_count" -eq 0 ]; then
+    print_json_array_var "  "
+  else
+    print_json_array_var "  " "${failure_kinds[@]}"
+  fi
+  printf ',\n'
+  printf '  "failure_details": '
+  print_json_failure_details "  "
+  printf ',\n'
   printf '  "language_cases": '
-  print_json_string_array "  " "${q_tests[@]}"
+  if [ "$language_case_count" -eq 0 ]; then
+    print_json_array_var "  "
+  else
+    print_json_array_var "  " "${q_tests[@]}"
+  fi
   printf ',\n'
   printf '  "example_cases": '
-  print_json_string_array "  " "${q_examples[@]}"
+  if [ "$example_case_count" -eq 0 ]; then
+    print_json_array_var "  "
+  else
+    print_json_array_var "  " "${q_examples[@]}"
+  fi
   printf ',\n'
   printf '  "benchmark_cases": '
-  print_json_string_array "  " "${q_benchmarks[@]}"
+  if [ "$benchmark_case_count" -eq 0 ]; then
+    print_json_array_var "  "
+  else
+    print_json_array_var "  " "${q_benchmarks[@]}"
+  fi
   printf '\n'
   printf '}\n'
 }
+
+trap 'on_error "$?"' ERR
 
 log_info "[q-gate] manifest check"
 run_logged "$TMPDIR/leia-q-gate-manifest.out" python3 tests/manifest.py check tests benchmarks
@@ -230,11 +335,8 @@ trap cleanup EXIT
 log_info "[q-gate] build leia"
 run_logged "$TMPDIR/leia-q-gate-build.out" go build -o "$bin" ./cmd/leia
 
-q_tests=()
 while IFS= read -r path; do q_tests+=("$path"); done < <(read_q_paths tests)
-q_examples=()
 while IFS= read -r path; do q_examples+=("$path"); done < <(read_q_paths examples)
-q_benchmarks=()
 while IFS= read -r path; do q_benchmarks+=("$path"); done < <(read_q_paths benchmarks)
 
 log_info "[q-gate] language q/qsql cases"
@@ -305,13 +407,10 @@ case "$RUN_BENCH" in
     fi
     ;;
   *)
-    echo "RUN_BENCH must be one of: none, smoke, all" >&2
-    exit 2
+    fail "invalid_bench_mode" "RUN_BENCH must be one of: none, smoke, all" 2 "$RUN_BENCH"
     ;;
 esac
 
-benchmark_json=""
-benchmark_markdown=""
 case "$RUN_BENCH" in
   smoke)
     if [ "${#q_benchmarks[@]}" -gt 0 ]; then
@@ -328,7 +427,7 @@ case "$RUN_BENCH" in
 esac
 
 if [ "$JSON_OUT" == "true" ]; then
-  print_json_report "$benchmark_json" "$benchmark_markdown"
+  print_json_report "pass"
 else
   echo "[q-gate] ok"
 fi
