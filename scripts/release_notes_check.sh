@@ -69,8 +69,12 @@ failure_paths=()
 failure_values=()
 failure_kind_values=()
 checked_files=()
+checked_file_roles=()
 required_artifact_count=0
 artifact_checksum_count=0
+required_artifact_paths=()
+required_artifact_names=()
+required_artifact_checksum_present=()
 
 add_failure() {
   failures+=("$1")
@@ -82,6 +86,7 @@ add_failure() {
 
 add_checked_file() {
   checked_files+=("$1")
+  checked_file_roles+=("${2:-checked}")
 }
 
 json_escape() {
@@ -124,6 +129,42 @@ print_json_string_array() {
   printf '%s]' "$indent"
 }
 
+print_json_checked_file_details() {
+  local indent="$1"
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#checked_files[@]}" ]]; do
+    local path="${checked_files[$i]}"
+    local role="${checked_file_roles[$i]}"
+    local exists="false"
+    if [[ -f "$path" ]]; then
+      exists="true"
+    fi
+    printf '%s  {"path": "%s", "role": "%s", "required": true, "exists": %s}' "$indent" "$(json_escape "$path")" "$(json_escape "$role")" "$exists"
+    if [[ "$i" -lt $((${#checked_files[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
+print_json_required_artifact_details() {
+  local indent="$1"
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#required_artifact_names[@]}" ]]; do
+    printf '%s  {"path": "%s", "artifact": "%s", "checksum_present": %s}' "$indent" "$(json_escape "${required_artifact_paths[$i]}")" "$(json_escape "${required_artifact_names[$i]}")" "${required_artifact_checksum_present[$i]}"
+    if [[ "$i" -lt $((${#required_artifact_names[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
 print_json_report() {
   local status="pass"
   if [[ ${#failures[@]} -gt 0 ]]; then
@@ -140,6 +181,12 @@ print_json_report() {
   printf '  "failure_kind_count": %d,\n' "${#failure_kind_values[@]}"
   printf '  "checked_files": '
   print_json_string_array "  " "${checked_files[@]}"
+  printf ',\n'
+  printf '  "checked_file_details": '
+  print_json_checked_file_details "  "
+  printf ',\n'
+  printf '  "required_artifact_details": '
+  print_json_required_artifact_details "  "
   printf ',\n'
   printf '  "failure_count": %d,\n' "${#failures[@]}"
   printf '  "failure_kinds": '
@@ -219,9 +266,13 @@ require_archive_checksum() {
   local file="$1"
   local artifact="$2"
   required_artifact_count=$((required_artifact_count + 1))
+  required_artifact_paths+=("$file")
+  required_artifact_names+=("$artifact")
   if grep -E "\\|[[:space:]]*\`?${artifact}\`?[[:space:]]*\\|[[:space:]]*[[:xdigit:]]{64}[[:space:]]*\\|" "$file" >/dev/null; then
     artifact_checksum_count=$((artifact_checksum_count + 1))
+    required_artifact_checksum_present+=("true")
   else
+    required_artifact_checksum_present+=("false")
     add_failure "$file must include a 64-hex SHA256 checksum for $artifact" "missing_checksum" "$file" "$artifact"
   fi
 }
@@ -238,7 +289,7 @@ require_release_archive_checksums() {
 
 check_template() {
   local template="docs/release/notes-template.md"
-  add_checked_file "$template"
+  add_checked_file "$template" "template"
   if [[ ! -f "$template" ]]; then
     add_failure "missing $template" "missing_file" "$template"
     return
@@ -253,7 +304,7 @@ check_template() {
 
 check_version() {
   local notes="docs/release/notes/$version.md"
-  add_checked_file "$notes"
+  add_checked_file "$notes" "version_notes"
   if [[ ! -f "$notes" ]]; then
     add_failure "missing release notes for $version: $notes" "missing_file" "$notes" "$version"
     return

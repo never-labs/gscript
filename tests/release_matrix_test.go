@@ -1813,7 +1813,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files", "artifact_entries"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}}},
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "artifact_entries", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets", "install_target_details"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}, {"install_target_count", "install_target_details"}}},
-		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
+		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "checked_file_details", "required_artifact_details", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"checked_file_count", "checked_file_details"}, {"required_artifact_count", "required_artifact_details"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count", "finding_status_count"}, fields: []string{"findings", "finding_statuses"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}, {"finding_status_count", "finding_statuses"}}},
 	} {
 		assertReleaseReportRegistrySmoke(t, root, registry, releaseReportSmokeCase(tc))
@@ -1865,10 +1865,21 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 		ArtifactChecksumCount int      `json:"artifact_checksum_count"`
 		FailureKindCount      int      `json:"failure_kind_count"`
 		CheckedFiles          []string `json:"checked_files"`
-		FailureKinds          []string `json:"failure_kinds"`
-		FailureCount          int      `json:"failure_count"`
-		Failures              []string `json:"failures"`
-		FailureDetails        []struct {
+		CheckedFileDetails    []struct {
+			Path     string `json:"path"`
+			Role     string `json:"role"`
+			Required bool   `json:"required"`
+			Exists   bool   `json:"exists"`
+		} `json:"checked_file_details"`
+		RequiredArtifactDetails []struct {
+			Path            string `json:"path"`
+			Artifact        string `json:"artifact"`
+			ChecksumPresent bool   `json:"checksum_present"`
+		} `json:"required_artifact_details"`
+		FailureKinds   []string `json:"failure_kinds"`
+		FailureCount   int      `json:"failure_count"`
+		Failures       []string `json:"failures"`
+		FailureDetails []struct {
 			Message string `json:"message"`
 			Kind    string `json:"kind"`
 			Path    string `json:"path"`
@@ -1878,7 +1889,7 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &passReport); err != nil {
 		t.Fatalf("release notes JSON failed to decode: %v\n%s", err, out)
 	}
-	if passReport.SchemaVersion != 1 || passReport.Status != "pass" || passReport.RequireReady || passReport.Version != "" || passReport.CheckedFileCount != 1 || passReport.RequiredArtifactCount != 0 || passReport.ArtifactChecksumCount != 0 || passReport.FailureKindCount != 0 || len(passReport.CheckedFiles) != 1 || passReport.CheckedFiles[0] != "docs/release/notes-template.md" || len(passReport.FailureKinds) != 0 || passReport.FailureCount != 0 || len(passReport.Failures) != 0 || len(passReport.FailureDetails) != 0 {
+	if passReport.SchemaVersion != 1 || passReport.Status != "pass" || passReport.RequireReady || passReport.Version != "" || passReport.CheckedFileCount != 1 || passReport.RequiredArtifactCount != 0 || passReport.ArtifactChecksumCount != 0 || passReport.FailureKindCount != 0 || len(passReport.CheckedFiles) != 1 || passReport.CheckedFiles[0] != "docs/release/notes-template.md" || len(passReport.CheckedFileDetails) != 1 || passReport.CheckedFileDetails[0].Path != "docs/release/notes-template.md" || passReport.CheckedFileDetails[0].Role != "template" || !passReport.CheckedFileDetails[0].Required || !passReport.CheckedFileDetails[0].Exists || len(passReport.RequiredArtifactDetails) != 0 || len(passReport.FailureKinds) != 0 || passReport.FailureCount != 0 || len(passReport.Failures) != 0 || len(passReport.FailureDetails) != 0 {
 		t.Fatalf("release notes template JSON = %+v, want passing schema v1 report", passReport)
 	}
 
@@ -1893,10 +1904,21 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 		ArtifactChecksumCount int      `json:"artifact_checksum_count"`
 		FailureKindCount      int      `json:"failure_kind_count"`
 		CheckedFiles          []string `json:"checked_files"`
-		FailureKinds          []string `json:"failure_kinds"`
-		FailureCount          int      `json:"failure_count"`
-		Failures              []string `json:"failures"`
-		FailureDetails        []struct {
+		CheckedFileDetails    []struct {
+			Path     string `json:"path"`
+			Role     string `json:"role"`
+			Required bool   `json:"required"`
+			Exists   bool   `json:"exists"`
+		} `json:"checked_file_details"`
+		RequiredArtifactDetails []struct {
+			Path            string `json:"path"`
+			Artifact        string `json:"artifact"`
+			ChecksumPresent bool   `json:"checksum_present"`
+		} `json:"required_artifact_details"`
+		FailureKinds   []string `json:"failure_kinds"`
+		FailureCount   int      `json:"failure_count"`
+		Failures       []string `json:"failures"`
+		FailureDetails []struct {
 			Message string `json:"message"`
 			Kind    string `json:"kind"`
 			Path    string `json:"path"`
@@ -1906,11 +1928,29 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(missingOut), &missingReport); err != nil {
 		t.Fatalf("missing release notes JSON failed to decode: %v\n%s", err, missingOut)
 	}
-	if missingReport.SchemaVersion != 1 || missingReport.Status != "issues" || missingReport.RequireReady || missingReport.Version != "v9.9.9" || missingReport.CheckedFileCount != len(missingReport.CheckedFiles) || missingReport.CheckedFileCount != 2 || missingReport.RequiredArtifactCount != 0 || missingReport.ArtifactChecksumCount != 0 || missingReport.FailureKindCount != len(missingReport.FailureKinds) || missingReport.FailureKindCount != 1 || missingReport.FailureCount != len(missingReport.Failures) || missingReport.FailureCount != len(missingReport.FailureDetails) {
+	if missingReport.SchemaVersion != 1 || missingReport.Status != "issues" || missingReport.RequireReady || missingReport.Version != "v9.9.9" || missingReport.CheckedFileCount != len(missingReport.CheckedFiles) || missingReport.CheckedFileCount != len(missingReport.CheckedFileDetails) || missingReport.CheckedFileCount != 2 || missingReport.RequiredArtifactCount != 0 || len(missingReport.RequiredArtifactDetails) != 0 || missingReport.ArtifactChecksumCount != 0 || missingReport.FailureKindCount != len(missingReport.FailureKinds) || missingReport.FailureKindCount != 1 || missingReport.FailureCount != len(missingReport.Failures) || missingReport.FailureCount != len(missingReport.FailureDetails) {
 		t.Fatalf("missing release notes JSON = %+v, want issues schema v1 report", missingReport)
 	}
 	if !stringSliceContains(missingReport.CheckedFiles, "docs/release/notes-template.md") || !stringSliceContains(missingReport.CheckedFiles, "docs/release/notes/v9.9.9.md") {
 		t.Fatalf("missing release notes JSON checked files = %+v, want template and version notes", missingReport.CheckedFiles)
+	}
+	checkedDetails := map[string]struct {
+		Role     string
+		Required bool
+		Exists   bool
+	}{}
+	for _, detail := range missingReport.CheckedFileDetails {
+		checkedDetails[detail.Path] = struct {
+			Role     string
+			Required bool
+			Exists   bool
+		}{Role: detail.Role, Required: detail.Required, Exists: detail.Exists}
+	}
+	if checkedDetails["docs/release/notes-template.md"].Role != "template" || !checkedDetails["docs/release/notes-template.md"].Required || !checkedDetails["docs/release/notes-template.md"].Exists {
+		t.Fatalf("missing release notes template detail = %+v", checkedDetails["docs/release/notes-template.md"])
+	}
+	if checkedDetails["docs/release/notes/v9.9.9.md"].Role != "version_notes" || !checkedDetails["docs/release/notes/v9.9.9.md"].Required || checkedDetails["docs/release/notes/v9.9.9.md"].Exists {
+		t.Fatalf("missing release notes version detail = %+v", checkedDetails["docs/release/notes/v9.9.9.md"])
 	}
 	if !stringSliceContains(missingReport.Failures, "missing release notes for v9.9.9: docs/release/notes/v9.9.9.md") {
 		t.Fatalf("missing release notes JSON missing actionable failure: %+v", missingReport.Failures)
@@ -2036,14 +2076,19 @@ Each archive includes leia and leia-lsp.
 		t.Fatalf("release notes with missing archive checksum unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", badChecksumOut.stdout, badChecksumOut.stderr)
 	}
 	var badChecksumReport struct {
-		Status                string   `json:"status"`
-		Version               string   `json:"version"`
-		RequiredArtifactCount int      `json:"required_artifact_count"`
-		ArtifactChecksumCount int      `json:"artifact_checksum_count"`
-		FailureKindCount      int      `json:"failure_kind_count"`
-		FailureKinds          []string `json:"failure_kinds"`
-		Failures              []string `json:"failures"`
-		FailureDetails        []struct {
+		Status                  string `json:"status"`
+		Version                 string `json:"version"`
+		RequiredArtifactCount   int    `json:"required_artifact_count"`
+		ArtifactChecksumCount   int    `json:"artifact_checksum_count"`
+		RequiredArtifactDetails []struct {
+			Path            string `json:"path"`
+			Artifact        string `json:"artifact"`
+			ChecksumPresent bool   `json:"checksum_present"`
+		} `json:"required_artifact_details"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		Failures         []string `json:"failures"`
+		FailureDetails   []struct {
 			Message string `json:"message"`
 			Kind    string `json:"kind"`
 			Path    string `json:"path"`
@@ -2059,6 +2104,22 @@ Each archive includes leia and leia-lsp.
 	}
 	if badChecksumReport.RequiredArtifactCount != 7 || badChecksumReport.ArtifactChecksumCount != 6 {
 		t.Fatalf("bad-checksum artifact counts = %d/%d, want 6 valid checksums across 7 required artifacts", badChecksumReport.ArtifactChecksumCount, badChecksumReport.RequiredArtifactCount)
+	}
+	if badChecksumReport.RequiredArtifactCount != len(badChecksumReport.RequiredArtifactDetails) {
+		t.Fatalf("bad-checksum required artifact details = %d/%d", badChecksumReport.RequiredArtifactCount, len(badChecksumReport.RequiredArtifactDetails))
+	}
+	var checksumPresentCount int
+	var foundMissingArtifactDetail bool
+	for _, detail := range badChecksumReport.RequiredArtifactDetails {
+		if detail.ChecksumPresent {
+			checksumPresentCount++
+		}
+		if detail.Path == "docs/release/notes/"+badChecksumVersion+".md" && detail.Artifact == "leia_"+badChecksumVersion+"_linux_amd64.tar.gz" && !detail.ChecksumPresent {
+			foundMissingArtifactDetail = true
+		}
+	}
+	if checksumPresentCount != badChecksumReport.ArtifactChecksumCount || !foundMissingArtifactDetail {
+		t.Fatalf("bad-checksum required artifact details = %+v, want one missing linux amd64 checksum", badChecksumReport.RequiredArtifactDetails)
 	}
 	if badChecksumReport.FailureKindCount != len(badChecksumReport.FailureKinds) || !stringSliceContains(badChecksumReport.FailureKinds, "missing_checksum") {
 		t.Fatalf("bad-checksum failure kinds = %+v, want missing_checksum", badChecksumReport)

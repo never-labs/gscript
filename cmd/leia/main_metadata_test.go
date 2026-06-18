@@ -306,6 +306,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/release_distribution_check.sh --json", "failure_kinds"},
 		{"scripts/release_distribution_check.sh --json", "failure_details"},
 		{"scripts/release_distribution_check.sh --json", "install_target_details"},
+		{"scripts/release_notes_check.sh --json", "checked_file_details"},
+		{"scripts/release_notes_check.sh --json", "required_artifact_details"},
 		{"scripts/worktree_audit.sh --json", "finding_statuses"},
 		{"scripts/worktree_audit.sh --json", "findings"},
 	} {
