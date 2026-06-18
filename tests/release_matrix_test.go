@@ -1802,7 +1802,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
-		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count"}, fields: []string{"findings"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}}},
+		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count", "finding_status_count"}, fields: []string{"findings", "finding_statuses"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}, {"finding_status_count", "finding_statuses"}}},
 	} {
 		assertReleaseReportRegistrySmoke(t, root, registry, releaseReportSmokeCase(tc))
 	}
@@ -2733,19 +2733,25 @@ func TestReleaseMatrixWorktreeAuditReportIsMachineReadable(t *testing.T) {
 	if !ok {
 		t.Fatal("capabilities report registry missing scripts/worktree_audit.sh --json")
 	}
-	if !stringSliceContains(declared.CountFields, "finding_count") || !stringSliceContains(declared.CollectionFields, "findings") {
-		t.Fatalf("worktree audit registry = %+v, want finding_count and findings", declared)
+	if !stringSliceContains(declared.CountFields, "finding_count") || !stringSliceContains(declared.CountFields, "finding_status_count") || !stringSliceContains(declared.CollectionFields, "findings") || !stringSliceContains(declared.CollectionFields, "finding_statuses") {
+		t.Fatalf("worktree audit registry = %+v, want finding and status count fields", declared)
 	}
 	out := runCommand(t, root, 60*time.Second, "bash", "scripts/worktree_audit.sh", "--json")
 	assertReleaseReportSchemaVersion(t, out, "scripts/worktree_audit.sh --json", declared.SchemaVersion)
 	assertReleaseReportStatusField(t, out, "scripts/worktree_audit.sh --json", declared.StatusField)
 	assertNestedJSONCountMatchesCollection(t, out, "scripts/worktree_audit.sh --json", []string{"finding_count"}, []string{"findings"})
+	assertNestedJSONCountMatchesCollection(t, out, "scripts/worktree_audit.sh --json", []string{"finding_status_count"}, []string{"finding_statuses"})
 	var report struct {
-		SchemaVersion  int    `json:"schema_version"`
-		Status         string `json:"status"`
-		FailOnFindings bool   `json:"fail_on_findings"`
-		FindingCount   int    `json:"finding_count"`
-		Findings       []struct {
+		SchemaVersion      int    `json:"schema_version"`
+		Status             string `json:"status"`
+		FailOnFindings     bool   `json:"fail_on_findings"`
+		FindingCount       int    `json:"finding_count"`
+		FindingStatusCount int    `json:"finding_status_count"`
+		FindingStatuses    []struct {
+			Status string `json:"status"`
+			Count  int    `json:"count"`
+		} `json:"finding_statuses"`
+		Findings []struct {
 			Status string `json:"status"`
 			Path   string `json:"path"`
 			Branch string `json:"branch"`
@@ -2767,9 +2773,19 @@ func TestReleaseMatrixWorktreeAuditReportIsMachineReadable(t *testing.T) {
 	if report.Status == "findings" && report.FindingCount == 0 {
 		t.Fatalf("worktree audit findings report must include findings: %+v", report)
 	}
+	statusCounts := map[string]int{}
 	for _, finding := range report.Findings {
 		if finding.Status == "" || finding.Path == "" || finding.Branch == "" || finding.Detail == "" {
 			t.Fatalf("worktree audit finding must include status/path/branch/detail: %+v", finding)
+		}
+		statusCounts[finding.Status]++
+	}
+	if report.FindingStatusCount != len(report.FindingStatuses) || report.FindingStatusCount != len(statusCounts) {
+		t.Fatalf("worktree audit status counts = %d/%d actual %d", report.FindingStatusCount, len(report.FindingStatuses), len(statusCounts))
+	}
+	for _, status := range report.FindingStatuses {
+		if status.Status == "" || status.Count <= 0 || statusCounts[status.Status] != status.Count {
+			t.Fatalf("worktree audit status summary = %+v actual=%+v", report.FindingStatuses, statusCounts)
 		}
 	}
 }

@@ -291,6 +291,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/release_artifacts_check.sh --json", "failure_details"},
 		{"scripts/release_distribution_check.sh --json", "failure_kinds"},
 		{"scripts/release_distribution_check.sh --json", "failure_details"},
+		{"scripts/worktree_audit.sh --json", "finding_statuses"},
 		{"scripts/worktree_audit.sh --json", "findings"},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
@@ -345,6 +346,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/release_artifacts_check.sh --json", []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}},
 		{"scripts/release_distribution_check.sh --json", []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}},
 		{"scripts/release_notes_check.sh --json", []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}},
+		{"scripts/worktree_audit.sh --json", []string{"finding_count", "finding_status_count"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		for _, want := range tc.fields {

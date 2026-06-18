@@ -12,6 +12,8 @@ FINDING_STATUS=()
 FINDING_PATH=()
 FINDING_BRANCH=()
 FINDING_DETAIL=()
+FINDING_STATUS_KEYS=()
+FINDING_STATUS_COUNTS=()
 
 usage() {
     cat <<'EOF'
@@ -75,6 +77,20 @@ print_json_report() {
     printf '  "status": "%s",\n' "$status"
     printf '  "fail_on_findings": %s,\n' "$(if [ "$FAIL_ON_FINDINGS" -eq 1 ]; then printf true; else printf false; fi)"
     printf '  "finding_count": %d,\n' "${#FINDING_STATUS[@]}"
+    printf '  "finding_status_count": %d,\n' "${#FINDING_STATUS_KEYS[@]}"
+    printf '  "finding_statuses": [\n'
+    local status_i=0
+    while [ "$status_i" -lt "${#FINDING_STATUS_KEYS[@]}" ]; do
+        printf '    {"status": "%s", "count": %d}' \
+            "$(json_escape "${FINDING_STATUS_KEYS[$status_i]}")" \
+            "${FINDING_STATUS_COUNTS[$status_i]}"
+        if [ "$status_i" -lt $((${#FINDING_STATUS_KEYS[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        status_i=$((status_i + 1))
+    done
+    printf '  ],\n'
     printf '  "findings": [\n'
     local i=0
     while [ "$i" -lt "${#FINDING_STATUS[@]}" ]; do
@@ -91,6 +107,20 @@ print_json_report() {
     done
     printf '  ]\n'
     printf '}\n'
+}
+
+record_status_count() {
+    local status="$1"
+    local i=0
+    while [ "$i" -lt "${#FINDING_STATUS_KEYS[@]}" ]; do
+        if [ "${FINDING_STATUS_KEYS[$i]}" = "$status" ]; then
+            FINDING_STATUS_COUNTS[$i]=$((FINDING_STATUS_COUNTS[$i] + 1))
+            return
+        fi
+        i=$((i + 1))
+    done
+    FINDING_STATUS_KEYS+=("$status")
+    FINDING_STATUS_COUNTS+=(1)
 }
 
 print_header() {
@@ -112,6 +142,7 @@ print_finding() {
     FINDING_PATH+=("$path")
     FINDING_BRANCH+=("$branch")
     FINDING_DETAIL+=("$detail")
+    record_status_count "$status"
     if [ "$JSON_OUT" -ne 1 ]; then
         printf '%-13s %-48s %-36s %s\n' "$status" "$path" "$branch" "$detail"
     fi
