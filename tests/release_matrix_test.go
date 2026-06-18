@@ -1802,6 +1802,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		fields        []string
 		matches       []releaseReportCountMatch
 	}{
+		{reportCommand: "scripts/arch_check.sh --json", args: []string{"bash", "scripts/arch_check.sh", "--json"}, scalars: []string{"module"}, counts: []string{"source_file_count", "source_line_count", "test_file_count", "test_line_count", "test_ratio_pct", "top_file_count", "large_file_count", "pass_pipeline_line_count", "debt_marker_count", "missing_test_count"}, fields: []string{"top_file_details", "large_file_details", "pass_pipeline_lines", "debt_marker_details", "missing_test_files"}, matches: []releaseReportCountMatch{{"top_file_count", "top_file_details"}, {"large_file_count", "large_file_details"}, {"pass_pipeline_line_count", "pass_pipeline_lines"}, {"debt_marker_count", "debt_marker_details"}, {"missing_test_count", "missing_test_files"}}},
 		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
 		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"failure_kinds", "failure_details", "textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
@@ -1849,6 +1850,72 @@ func TestReleaseMatrixCoversEveryAdvertisedReportRegistryEntry(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Fatalf("tests/release_matrix_test.go must keep smoke or schema evidence for every capabilities report registry entry; missing: %s", strings.Join(missing, ", "))
+	}
+}
+
+func TestReleaseMatrixArchitectureReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/arch_check.sh", "--json")
+	var report struct {
+		SchemaVersion         int    `json:"schema_version"`
+		Status                string `json:"status"`
+		Module                string `json:"module"`
+		SourceFileCount       int    `json:"source_file_count"`
+		SourceLineCount       int    `json:"source_line_count"`
+		TestFileCount         int    `json:"test_file_count"`
+		TestLineCount         int    `json:"test_line_count"`
+		TestRatioPct          int    `json:"test_ratio_pct"`
+		TopFileCount          int    `json:"top_file_count"`
+		LargeFileCount        int    `json:"large_file_count"`
+		PassPipelineLineCount int    `json:"pass_pipeline_line_count"`
+		DebtMarkerCount       int    `json:"debt_marker_count"`
+		MissingTestCount      int    `json:"missing_test_count"`
+		TopFileDetails        []struct {
+			Path  string `json:"path"`
+			Lines int    `json:"lines"`
+		} `json:"top_file_details"`
+		LargeFileDetails []struct {
+			Path     string `json:"path"`
+			Lines    int    `json:"lines"`
+			Severity string `json:"severity"`
+		} `json:"large_file_details"`
+		PassPipelineLines []string `json:"pass_pipeline_lines"`
+		DebtMarkerDetails []struct {
+			Path string `json:"path"`
+			Line int    `json:"line"`
+			Text string `json:"text"`
+		} `json:"debt_marker_details"`
+		MissingTestFiles []string `json:"missing_test_files"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("architecture JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Module != "internal/methodjit" || (report.Status != "pass" && report.Status != "issues") {
+		t.Fatalf("architecture JSON = %+v, want schema v1 methodjit report", report)
+	}
+	if report.SourceFileCount <= 0 || report.SourceLineCount <= 0 || report.TestFileCount <= 0 || report.TestLineCount <= 0 || report.TestRatioPct < 0 {
+		t.Fatalf("architecture summary counts = %+v, want positive source/test summary", report)
+	}
+	if report.TopFileCount != len(report.TopFileDetails) || report.LargeFileCount != len(report.LargeFileDetails) || report.PassPipelineLineCount != len(report.PassPipelineLines) || report.DebtMarkerCount != len(report.DebtMarkerDetails) || report.MissingTestCount != len(report.MissingTestFiles) {
+		t.Fatalf("architecture JSON count mismatch: top %d/%d large %d/%d pass %d/%d debt %d/%d missing %d/%d", report.TopFileCount, len(report.TopFileDetails), report.LargeFileCount, len(report.LargeFileDetails), report.PassPipelineLineCount, len(report.PassPipelineLines), report.DebtMarkerCount, len(report.DebtMarkerDetails), report.MissingTestCount, len(report.MissingTestFiles))
+	}
+	if report.TopFileCount == 0 || !strings.HasPrefix(report.TopFileDetails[0].Path, "internal/methodjit/") || report.TopFileDetails[0].Lines <= 0 {
+		t.Fatalf("architecture top file details = %+v, want methodjit file entries", report.TopFileDetails)
+	}
+	for _, detail := range report.LargeFileDetails {
+		if !strings.HasPrefix(detail.Path, "internal/methodjit/") || detail.Lines <= 800 || (detail.Severity != "split" && detail.Severity != "over_limit") {
+			t.Fatalf("architecture large file detail = %+v, want methodjit split/over-limit entry", detail)
+		}
+	}
+	for _, detail := range report.DebtMarkerDetails {
+		if !strings.HasPrefix(detail.Path, "internal/methodjit/") || detail.Line <= 0 || detail.Text == "" {
+			t.Fatalf("architecture debt marker detail = %+v, want methodjit marker entry", detail)
+		}
+	}
+	for _, path := range report.MissingTestFiles {
+		if !strings.HasPrefix(path, "internal/methodjit/") || !strings.HasSuffix(path, ".go") {
+			t.Fatalf("architecture missing test path = %q, want methodjit Go source", path)
+		}
 	}
 }
 

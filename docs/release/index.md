@@ -127,6 +127,7 @@ release-critical:
 | Gate | Evidence |
 |---|---|
 | Correctness | Go tests, release matrix, spec examples, and stdlib contracts. |
+| Architecture Health | methodjit file size, pass-pipeline, debt marker, and test-gap scan. |
 | Manifest Coverage | Test and benchmark manifest coverage. |
 | Module Path Gate | Published module path validation. |
 | Shell Script Syntax | Bash syntax parsing for release and benchmark scripts. |
@@ -152,6 +153,9 @@ machine-readable.
 `scripts/release_artifacts_check.sh --json` uses the same failure fields for
 version, tag, clean-worktree, checksum, artifact, and local install failures,
 and reports `artifact_entries` for the verified release artifact roles.
+`scripts/arch_check.sh --json` reports methodjit source/test size,
+`large_file_details`, `debt_marker_details`, and `missing_test_files` so
+architecture debt is visible to release dashboards.
 
 ## Release Compatibility Checklist
 
