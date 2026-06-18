@@ -1739,7 +1739,7 @@ require github.com/acme/toolkit v1.2.3
 		{reportCommand: "leia ci --list --json", args: []string{"go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json"}, counts: []string{"command_count", "commands[].arg_count"}, fields: []string{"commands", "commands[].args"}, matches: []releaseReportCountMatch{{"command_count", "commands"}, {"commands[].arg_count", "commands[].args"}}},
 		{reportCommand: "leia config --json", args: []string{"go", "run", "./cmd/leia", "config", "--json", configDir}, counts: []string{"diagnostic_count"}, fields: []string{"diagnostics"}, matches: []releaseReportCountMatch{{"diagnostic_count", "diagnostics"}}},
 		{reportCommand: "leia diag bundle --json", args: []string{"go", "run", "./cmd/leia", "diag", "bundle", "--output", diagOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
-		{reportCommand: "leia doc check --json", args: []string{"go", "run", "./cmd/leia", "doc", "check", "--json"}, counts: []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}}},
+		{reportCommand: "leia doc check --json", args: []string{"go", "run", "./cmd/leia", "doc", "check", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
 		{reportCommand: "leia doc generate --format=json", args: []string{"go", "run", "./cmd/leia", "doc", "generate", "--format=json"}, counts: []string{"cli.command_count", "stdlib.layer_count", "stdlib.default_import_count", "dialects.dialect_count"}, fields: []string{"cli.commands", "stdlib.layers", "stdlib.default_imports", "dialects.dialects"}, matches: []releaseReportCountMatch{{"cli.command_count", "cli.commands"}, {"stdlib.layer_count", "stdlib.layers"}, {"stdlib.default_import_count", "stdlib.default_imports"}, {"dialects.dialect_count", "dialects.dialects"}}},
 		{reportCommand: "leia env --json", args: []string{"go", "run", "./cmd/leia", "env", "--json"}, counts: []string{"capabilities.command_count", "capabilities.stdlib_module_count", "capabilities.stdlib_layer_count", "capabilities.default_import_count", "capabilities.dialect_count", "capabilities.tooling.report_count"}, fields: []string{"capabilities.commands", "capabilities.stdlib_modules", "capabilities.stdlib_layers", "capabilities.default_imports", "capabilities.dialects", "capabilities.tooling.reports"}, matches: []releaseReportCountMatch{{"capabilities.command_count", "capabilities.commands"}, {"capabilities.stdlib_module_count", "capabilities.stdlib_modules"}, {"capabilities.stdlib_layer_count", "capabilities.stdlib_layers"}, {"capabilities.default_import_count", "capabilities.default_imports"}, {"capabilities.dialect_count", "capabilities.dialects"}, {"capabilities.tooling.report_count", "capabilities.tooling.reports"}}},
 		{reportCommand: "leia evaluate --json", args: []string{"go", "run", "./cmd/leia", "evaluate", "--json", "examples/evaluate/corpus_metrics.leia"}, counts: []string{"summary.files", "summary.evaluate_blocks", "summary.cases_selected", "summary.cases_passed", "summary.cases_failed", "summary.cases_listed", "summary.cases_skipped", "summary.assertions", "summary.todos", "metrics[].count"}, fields: []string{"inputs", "cases", "metrics", "findings", "notes"}},
@@ -1803,7 +1803,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		matches       []releaseReportCountMatch
 	}{
 		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
-		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}}},
+		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
 		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}, matches: []releaseReportCountMatch{{"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
 		{reportCommand: "scripts/performance_gate.sh --json", args: []string{"bash", "scripts/performance_gate.sh", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
@@ -2211,11 +2211,17 @@ func TestReleaseMatrixDocsCheckReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 120*time.Second, "bash", "scripts/docs_check.sh", "--json")
 	var report struct {
-		SchemaVersion int      `json:"schema_version"`
-		Status        string   `json:"status"`
-		FailureCount  int      `json:"failure_count"`
-		Failures      []string `json:"failures"`
-		Counts        struct {
+		SchemaVersion    int      `json:"schema_version"`
+		Status           string   `json:"status"`
+		FailureCount     int      `json:"failure_count"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		Failures         []string `json:"failures"`
+		FailureDetails   []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"failure_details"`
+		Counts struct {
 			MarkdownFiles                     int `json:"markdown_files"`
 			RelativeDocumentationLinks        int `json:"relative_documentation_links"`
 			RepositoryScriptCodeBlockMentions int `json:"repository_script_code_block_mentions"`
@@ -2233,7 +2239,7 @@ func TestReleaseMatrixDocsCheckReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("docs check JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Status != "pass" || report.FailureCount != 0 || len(report.Failures) != 0 {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.FailureCount != 0 || len(report.Failures) != 0 || report.FailureKindCount != 0 || len(report.FailureKinds) != 0 || len(report.FailureDetails) != 0 {
 		t.Fatalf("docs check JSON = %+v, want passing schema v1 report", report)
 	}
 	if report.Counts.MarkdownFiles == 0 || report.Counts.RelativeDocumentationLinks == 0 || report.Counts.RepositoryScriptCodeBlockMentions == 0 {

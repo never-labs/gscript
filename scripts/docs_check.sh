@@ -696,6 +696,50 @@ def check_readme_user_facing_gates() -> None:
                     f"{path.relative_to(root)}: missing README user-facing gate snippet: {snippet}"
                 )
 
+def failure_kind(message: str) -> str:
+    if "missing local anchor" in message:
+        return "missing_anchor"
+    if "link escapes repository" in message:
+        return "link_escape"
+    if "missing linked file" in message:
+        return "missing_linked_file"
+    if "missing repository-script mention" in message:
+        return "missing_script_mention"
+    if "mentioned script is not executable" in message:
+        return "script_not_executable"
+    if "references retired docs path" in message:
+        return "retired_path"
+    if "references retired project naming" in message:
+        return "retired_name"
+    if "unclosed fenced code block" in message:
+        return "unclosed_fence"
+    if "missing reference entrypoint link" in message:
+        return "missing_reference_entrypoint"
+    if "missing release gate snippet" in message:
+        return "missing_release_gate_snippet"
+    if "runnable Leia example" in message or "spec runnable" in message:
+        return "spec_runnable"
+    if "missing spec/stable-contract snippet" in message:
+        return "missing_spec_contract"
+    if "missing examples index entry" in message:
+        return "missing_examples_index"
+    if "missing examples capability drift gate" in message:
+        return "missing_examples_capability_gate"
+    if "missing README user-facing gate snippet" in message:
+        return "missing_readme_gate"
+    return "general"
+
+def failure_kinds(messages: list[str]) -> list[str]:
+    kinds: list[str] = []
+    for message in messages:
+        kind = failure_kind(message)
+        if kind not in kinds:
+            kinds.append(kind)
+    return kinds
+
+def failure_details(messages: list[str]) -> list[dict[str, str]]:
+    return [{"kind": failure_kind(message), "message": message} for message in messages]
+
 for doc_file in doc_files:
     if doc_file.is_file():
         check_markdown_links(doc_file)
@@ -712,11 +756,15 @@ check_examples_capability_drift_gates()
 check_readme_user_facing_gates()
 
 def report() -> dict:
+    kinds = failure_kinds(errors)
     return {
         "schema_version": 1,
         "status": "issues" if errors else "pass",
         "failure_count": len(errors),
+        "failure_kind_count": len(kinds),
+        "failure_kinds": kinds,
         "failures": errors,
+        "failure_details": failure_details(errors),
         "counts": {
             "markdown_files": len(doc_files),
             "relative_documentation_links": checked_links,

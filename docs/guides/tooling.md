@@ -124,7 +124,7 @@ Generated reference pages are checked in. `leia doc check` verifies
 generated CLI/stdlib/dialect references, spec HTML freshness, spec runnable examples,
 Markdown links, release reference coverage, retired naming, and documented
 repository script entrypoints. Use `--json` for machine-readable documentation
-evidence.
+evidence with `failure_kinds` and `failure_details`.
 
 GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`. The
 workflow runs `go run ./cmd/leia doc check` before building the site.
