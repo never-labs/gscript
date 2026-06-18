@@ -134,6 +134,11 @@ release-critical:
 | Release Notes | Candidate notes for the tag, including all archive targets and checksums. |
 | Release Artifacts | Local artifact build, tag, cleanliness, and install archive checks. |
 
+`scripts/release_distribution_check.sh --json` reports
+`failure_kind_count`, `failure_count`, `workflow_count`, and
+`install_target_count`. Its `failure_kinds` and `failure_details` fields make
+missing workflow, install-plan, fixture, and local tool failures machine-readable.
+
 ## Release Compatibility Checklist
 
 Every public tag must have release notes. The notes must identify:

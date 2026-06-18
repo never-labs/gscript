@@ -1800,7 +1800,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/q_conformance_gate.sh --json", args: []string{"bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json"}, scalars: []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}, counts: []string{"language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"language_cases", "example_cases", "benchmark_cases"}, matches: []releaseReportCountMatch{{"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
 		{reportCommand: "scripts/release_artifacts.sh --dry-run --json", args: []string{"bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count"}, fields: []string{"artifact_files"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}}},
-		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"workflow_count", "install_target_count"}, fields: []string{"workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
+		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count"}, fields: []string{"findings"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}}},
 	} {
@@ -2074,16 +2074,26 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 		RequireWorkflows    bool     `json:"require_workflows"`
 		GoreleaserAvailable bool     `json:"goreleaser_available"`
 		LocalInstallFixture string   `json:"local_install_fixture"`
-		WorkflowCount       int      `json:"workflow_count"`
-		WorkflowFiles       []string `json:"workflow_files"`
-		InstallTargetCount  int      `json:"install_target_count"`
-		InstallTargets      []string `json:"install_targets"`
+		FailureKindCount    int      `json:"failure_kind_count"`
+		FailureKinds        []string `json:"failure_kinds"`
+		FailureCount        int      `json:"failure_count"`
+		FailureDetails      []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"failure_details"`
+		WorkflowCount      int      `json:"workflow_count"`
+		WorkflowFiles      []string `json:"workflow_files"`
+		InstallTargetCount int      `json:"install_target_count"`
+		InstallTargets     []string `json:"install_targets"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("release distribution JSON failed to decode: %v\n%s", err, out)
 	}
 	if report.SchemaVersion != 1 || report.Status != "pass" || report.RequireGoreleaser || report.RequireWorkflows || report.LocalInstallFixture != "verified" {
 		t.Fatalf("release distribution JSON = %+v, want passing schema v1 report", report)
+	}
+	if report.FailureKindCount != 0 || len(report.FailureKinds) != 0 || report.FailureCount != 0 || len(report.FailureDetails) != 0 {
+		t.Fatalf("release distribution JSON failures = kinds %d/%d details %d/%d, want none", report.FailureKindCount, len(report.FailureKinds), report.FailureCount, len(report.FailureDetails))
 	}
 	if report.WorkflowCount != len(report.WorkflowFiles) || report.InstallTargetCount != len(report.InstallTargets) {
 		t.Fatalf("release distribution JSON counts = workflows %d/%d targets %d/%d", report.WorkflowCount, len(report.WorkflowFiles), report.InstallTargetCount, len(report.InstallTargets))
@@ -2100,6 +2110,35 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 		if !stringSliceContains(report.WorkflowFiles, workflow) {
 			t.Fatalf("release distribution JSON missing workflow %q: %+v", workflow, report.WorkflowFiles)
 		}
+	}
+	if _, err := exec.LookPath("goreleaser"); err == nil {
+		t.Skip("goreleaser is installed locally; missing-command JSON failure path is not applicable")
+	}
+	failed := runCommandResult(root, 30*time.Second, "bash", "scripts/release_distribution_check.sh", "--require-goreleaser", "--json")
+	if failed.err == nil {
+		t.Fatalf("release_distribution_check.sh --require-goreleaser unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", failed.stdout, failed.stderr)
+	}
+	var failedReport struct {
+		SchemaVersion       int      `json:"schema_version"`
+		Status              string   `json:"status"`
+		RequireGoreleaser   bool     `json:"require_goreleaser"`
+		GoreleaserAvailable bool     `json:"goreleaser_available"`
+		FailureKindCount    int      `json:"failure_kind_count"`
+		FailureKinds        []string `json:"failure_kinds"`
+		FailureCount        int      `json:"failure_count"`
+		FailureDetails      []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(failed.stdout), &failedReport); err != nil {
+		t.Fatalf("release distribution failure JSON failed to decode: %v\nstdout:\n%s\nstderr:\n%s", err, failed.stdout, failed.stderr)
+	}
+	if failedReport.SchemaVersion != 1 || failedReport.Status != "fail" || !failedReport.RequireGoreleaser || failedReport.GoreleaserAvailable {
+		t.Fatalf("release distribution failure JSON = %+v, want require-goreleaser failure report", failedReport)
+	}
+	if failedReport.FailureKindCount != 1 || failedReport.FailureCount != 1 || !stringSliceContains(failedReport.FailureKinds, "missing_command") || len(failedReport.FailureDetails) != 1 || failedReport.FailureDetails[0].Kind != "missing_command" || !strings.Contains(failedReport.FailureDetails[0].Message, "goreleaser CLI is required") {
+		t.Fatalf("release distribution failure details = %+v, want missing goreleaser detail", failedReport)
 	}
 }
 

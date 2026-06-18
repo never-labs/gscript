@@ -8,8 +8,11 @@ require_workflows="false"
 json_out="false"
 workflow_files=()
 install_targets=()
+failure_kinds=()
+failure_messages=()
 goreleaser_available="false"
 local_install_fixture="pending"
+failure_printed="false"
 
 usage() {
   cat <<'USAGE'
@@ -69,6 +72,13 @@ json_escape() {
   printf '%s' "$value"
 }
 
+record_failure() {
+  local kind="$1"
+  local message="$2"
+  failure_kinds+=("$kind")
+  failure_messages+=("$message")
+}
+
 print_json_string_array() {
   local indent="$1"
   shift
@@ -87,29 +97,93 @@ print_json_string_array() {
   printf '%s]' "$indent"
 }
 
+print_json_failure_details() {
+  local indent="$1"
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#failure_messages[@]}" ]]; do
+    printf '%s  {"kind": "%s", "message": "%s"}' "$indent" "$(json_escape "${failure_kinds[$i]}")" "$(json_escape "${failure_messages[$i]}")"
+    if [[ "$i" -lt $((${#failure_messages[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
 print_json_report() {
+  local status="${1:-pass}"
+  local failure_kind_count="${#failure_kinds[@]}"
+  local workflow_count="${#workflow_files[@]}"
+  local install_target_count="${#install_targets[@]}"
   printf '{\n'
   printf '  "schema_version": 1,\n'
-  printf '  "status": "pass",\n'
+  printf '  "status": "%s",\n' "$(json_escape "$status")"
   printf '  "require_goreleaser": %s,\n' "$require_goreleaser"
   printf '  "require_workflows": %s,\n' "$require_workflows"
   printf '  "goreleaser_available": %s,\n' "$goreleaser_available"
   printf '  "local_install_fixture": "%s",\n' "$local_install_fixture"
-  printf '  "workflow_count": %d,\n' "${#workflow_files[@]}"
-  printf '  "workflow_files": '
-  print_json_string_array "  " "${workflow_files[@]}"
+  printf '  "failure_kind_count": %d,\n' "$failure_kind_count"
+  printf '  "failure_kinds": '
+  if [[ "$failure_kind_count" -eq 0 ]]; then
+    print_json_string_array "  "
+  else
+    print_json_string_array "  " "${failure_kinds[@]}"
+  fi
   printf ',\n'
-  printf '  "install_target_count": %d,\n' "${#install_targets[@]}"
+  printf '  "failure_count": %d,\n' "${#failure_messages[@]}"
+  printf '  "failure_details": '
+  print_json_failure_details "  "
+  printf ',\n'
+  printf '  "workflow_count": %d,\n' "$workflow_count"
+  printf '  "workflow_files": '
+  if [[ "$workflow_count" -eq 0 ]]; then
+    print_json_string_array "  "
+  else
+    print_json_string_array "  " "${workflow_files[@]}"
+  fi
+  printf ',\n'
+  printf '  "install_target_count": %d,\n' "$install_target_count"
   printf '  "install_targets": '
-  print_json_string_array "  " "${install_targets[@]}"
+  if [[ "$install_target_count" -eq 0 ]]; then
+    print_json_string_array "  "
+  else
+    print_json_string_array "  " "${install_targets[@]}"
+  fi
   printf '\n'
   printf '}\n'
 }
 
+fail() {
+  local kind="$1"
+  local message="$2"
+  local code="${3:-1}"
+  record_failure "$kind" "$message"
+  if [[ "$json_out" == "true" ]]; then
+    failure_printed="true"
+    print_json_report "fail"
+  else
+    echo "error: $message" >&2
+  fi
+  exit "$code"
+}
+
+on_error() {
+  local code="$1"
+  if [[ "$json_out" == "true" && "$failure_printed" != "true" ]]; then
+    record_failure "command_failed" "command failed: ${BASH_COMMAND}"
+    failure_printed="true"
+    print_json_report "fail"
+  fi
+  exit "$code"
+}
+
+trap 'on_error "$?"' ERR
+
 require_file() {
   if [[ ! -f "$1" ]]; then
-    echo "error: missing required file: $1" >&2
-    exit 1
+    fail "missing_file" "missing required file: $1"
   fi
 }
 
@@ -117,8 +191,7 @@ require_contains() {
   local file="$1"
   local text="$2"
   if ! grep -Fq -- "$text" "$file"; then
-    echo "error: $file does not contain expected text: $text" >&2
-    exit 1
+    fail "missing_text" "$file does not contain expected text: $text"
   fi
 }
 
@@ -130,8 +203,7 @@ sha256_file() {
   elif command -v openssl >/dev/null 2>&1; then
     openssl dgst -sha256 -r "$1" | awk '{print $1}'
   else
-    echo "error: need sha256sum, shasum, or openssl for checksum verification" >&2
-    exit 1
+    fail "missing_command" "need sha256sum, shasum, or openssl for checksum verification"
   fi
 }
 
@@ -168,16 +240,13 @@ check_local_install_fixture() {
     --base-url "file://$release_dir" >/dev/null
 
   if [[ ! -x "$bin_dir/leia" || ! -x "$bin_dir/leia-lsp" ]]; then
-    echo "error: local install fixture did not install both executables" >&2
-    exit 1
+    fail "install_fixture" "local install fixture did not install both executables"
   fi
   if [[ "$("$bin_dir/leia")" != "fixture leia" ]]; then
-    echo "error: installed leia fixture did not execute as expected" >&2
-    exit 1
+    fail "install_fixture" "installed leia fixture did not execute as expected"
   fi
   if [[ "$("$bin_dir/leia-lsp")" != "fixture leia-lsp" ]]; then
-    echo "error: installed leia-lsp fixture did not execute as expected" >&2
-    exit 1
+    fail "install_fixture" "installed leia-lsp fixture did not execute as expected"
   fi
 
   local bad_release_dir="$tmp_dir/bad-release"
@@ -195,8 +264,7 @@ check_local_install_fixture() {
     --arch amd64 \
     --bin-dir "$bad_bin_dir" \
     --base-url "file://$bad_release_dir" >/dev/null 2>&1; then
-    echo "error: install accepted archive with unexpected entry" >&2
-    exit 1
+    fail "install_fixture" "install accepted archive with unexpected entry"
   fi
 
   if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
@@ -219,8 +287,7 @@ check_local_install_fixture() {
       --bin-dir "$bin_dir" \
       --base-url "file://$release_dir" >/dev/null
     if [[ ! -x "$bin_dir/leia.exe" || ! -x "$bin_dir/leia-lsp.exe" ]]; then
-      echo "error: local zip install fixture did not install both Windows executables" >&2
-      exit 1
+      fail "install_fixture" "local zip install fixture did not install both Windows executables"
     fi
     rm -rf "$bad_release_dir" "$bad_bin_dir"
     mkdir -p "$bad_release_dir" "$bad_bin_dir" "$archive_dir/windows-bad"
@@ -241,8 +308,7 @@ check_local_install_fixture() {
       --arch amd64 \
       --bin-dir "$bad_bin_dir" \
       --base-url "file://$bad_release_dir" >/dev/null 2>&1; then
-      echo "error: install accepted zip archive with unexpected entry" >&2
-      exit 1
+      fail "install_fixture" "install accepted zip archive with unexpected entry"
     fi
   else
     log_info "release_distribution_check.sh: zip or unzip not installed; skipping local zip install fixture"
@@ -262,8 +328,7 @@ optional_workflow() {
     workflow_files+=("$file")
     log_info "release_distribution_check.sh: found $file"
   elif [[ "$require_workflows" == "true" ]]; then
-    echo "error: required hosted workflow not found: $file" >&2
-    exit 1
+    fail "missing_workflow" "required hosted workflow not found: $file"
   else
     echo "release_distribution_check.sh: $file not present; skipping hosted workflow check"
   fi
@@ -330,19 +395,13 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 wi
       ;;
   esac
   if ! grep -Fq -- "$expected_asset" <<<"$output"; then
-    echo "error: install dry-run for $target did not plan $expected_asset" >&2
-    echo "$output" >&2
-    exit 1
+    fail "install_plan" "install dry-run for $target did not plan $expected_asset"
   fi
   if ! grep -Fq -- "$expected_path" <<<"$output"; then
-    echo "error: install dry-run for $target did not plan $expected_path" >&2
-    echo "$output" >&2
-    exit 1
+    fail "install_plan" "install dry-run for $target did not plan $expected_path"
   fi
   if ! grep -Fq -- "$expected_lsp_path" <<<"$output"; then
-    echo "error: install dry-run for $target did not plan $expected_lsp_path" >&2
-    echo "$output" >&2
-    exit 1
+    fail "install_plan" "install dry-run for $target did not plan $expected_lsp_path"
   fi
 done
 
@@ -359,8 +418,7 @@ if command -v goreleaser >/dev/null 2>&1; then
     goreleaser check
   fi
 elif [[ "$require_goreleaser" == "true" ]]; then
-  echo "error: goreleaser CLI is required for release distribution profile" >&2
-  exit 1
+  fail "missing_command" "goreleaser CLI is required for release distribution profile"
 else
   log_info "release_distribution_check.sh: goreleaser not installed; skipping local goreleaser check"
 fi
