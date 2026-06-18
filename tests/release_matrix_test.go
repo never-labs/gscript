@@ -863,6 +863,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"actions/jekyll-build-pages",
 				"source: ./docs",
 				"destination: ./_site",
+				"bash scripts/site_check.sh --site-dir ./_site",
 				"actions/deploy-pages",
 			},
 		},
@@ -1773,6 +1774,19 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 	registry := releaseReportRegistry(t, root)
 	installBinDir := filepath.Join(t.TempDir(), "bin")
 	diagScriptOutDir := filepath.Join(t.TempDir(), "script-bundle")
+	siteDir := filepath.Join(t.TempDir(), "site")
+	if err := os.MkdirAll(filepath.Join(siteDir, "guide"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "style.css"), []byte("body{font-family:sans-serif}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "index.html"), []byte(`<!doctype html><html><head><link rel="stylesheet" href="/style.css"></head><body><h1 id="top">Leia</h1><a href="/guide/">Guide</a><a href="#top">Top</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "guide", "index.html"), []byte(`<!doctype html><html><body><h1 id="intro">Guide</h1><a href="/index.html#top">Home</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	perfDir := t.TempDir()
 	perfTimingJSON := filepath.Join(perfDir, "timing.json")
 	if err := os.WriteFile(perfTimingJSON, []byte(`{
@@ -1815,6 +1829,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/release_artifacts_check.sh --json", args: []string{"bash", "scripts/release_artifacts_check.sh", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "artifact_entries", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/release_distribution_check.sh --json", args: []string{"bash", "scripts/release_distribution_check.sh", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets", "install_target_details"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}, {"install_target_count", "install_target_details"}}},
 		{reportCommand: "scripts/release_notes_check.sh --json", args: []string{"bash", "scripts/release_notes_check.sh", "--json"}, scalars: []string{"require_ready", "version"}, counts: []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"checked_files", "checked_file_details", "required_artifact_details", "failure_kinds", "failures", "failure_details"}, matches: []releaseReportCountMatch{{"checked_file_count", "checked_files"}, {"checked_file_count", "checked_file_details"}, {"required_artifact_count", "required_artifact_details"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failures"}, {"failure_count", "failure_details"}}},
+		{reportCommand: "scripts/site_check.sh --json", args: []string{"bash", "scripts/site_check.sh", "--site-dir", siteDir, "--json"}, scalars: []string{"site_dir"}, counts: []string{"html_file_count", "local_link_count", "asset_ref_count", "fragment_check_count", "failure_kind_count", "failure_count"}, fields: []string{"failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/worktree_audit.sh --json", args: []string{"bash", "scripts/worktree_audit.sh", "--json"}, scalars: []string{"fail_on_findings"}, counts: []string{"finding_count", "finding_status_count"}, fields: []string{"findings", "finding_statuses"}, matches: []releaseReportCountMatch{{"finding_count", "findings"}, {"finding_status_count", "finding_statuses"}}},
 	} {
 		assertReleaseReportRegistrySmoke(t, root, registry, releaseReportSmokeCase(tc))
@@ -1916,6 +1931,86 @@ func TestReleaseMatrixArchitectureReportIsMachineReadable(t *testing.T) {
 		if !strings.HasPrefix(path, "internal/methodjit/") || !strings.HasSuffix(path, ".go") {
 			t.Fatalf("architecture missing test path = %q, want methodjit Go source", path)
 		}
+	}
+}
+
+func TestReleaseMatrixSiteReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	siteDir := filepath.Join(t.TempDir(), "site")
+	if err := os.MkdirAll(filepath.Join(siteDir, "guide"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "style.css"), []byte("body{font-family:sans-serif}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "index.html"), []byte(`<!doctype html><html><head><link rel="stylesheet" href="/style.css"></head><body><h1 id="top">Leia</h1><a href="/guide/">Guide</a><a href="#top">Top</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "guide", "index.html"), []byte(`<!doctype html><html><body><h1 id="intro">Guide</h1><a href="/index.html#top">Home</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/site_check.sh", "--site-dir", siteDir, "--json")
+	var passReport struct {
+		SchemaVersion      int      `json:"schema_version"`
+		Status             string   `json:"status"`
+		SiteDir            string   `json:"site_dir"`
+		HTMLFileCount      int      `json:"html_file_count"`
+		LocalLinkCount     int      `json:"local_link_count"`
+		AssetRefCount      int      `json:"asset_ref_count"`
+		FragmentCheckCount int      `json:"fragment_check_count"`
+		FailureKindCount   int      `json:"failure_kind_count"`
+		FailureCount       int      `json:"failure_count"`
+		FailureKinds       []string `json:"failure_kinds"`
+		FailureDetails     []struct {
+			Kind      string `json:"kind"`
+			Path      string `json:"path"`
+			Attribute string `json:"attribute"`
+			Value     string `json:"value"`
+			Target    string `json:"target"`
+			Fragment  string `json:"fragment"`
+			Message   string `json:"message"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(out), &passReport); err != nil {
+		t.Fatalf("site JSON failed to decode: %v\n%s", err, out)
+	}
+	if passReport.SchemaVersion != 1 || passReport.Status != "pass" || passReport.HTMLFileCount != 2 || passReport.LocalLinkCount != 3 || passReport.AssetRefCount != 1 || passReport.FragmentCheckCount != 2 || passReport.FailureKindCount != 0 || passReport.FailureCount != 0 || len(passReport.FailureKinds) != 0 || len(passReport.FailureDetails) != 0 {
+		t.Fatalf("site JSON = %+v, want passing rendered-site report", passReport)
+	}
+
+	brokenDir := filepath.Join(t.TempDir(), "broken-site")
+	if err := os.MkdirAll(brokenDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(brokenDir, "index.html"), []byte(`<!doctype html><html><body><h1 id="top">Leia</h1><a href="/missing.html">Missing</a><a href="#absent">Bad anchor</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	broken := runCommandResult(root, 30*time.Second, "bash", "scripts/site_check.sh", "--site-dir", brokenDir, "--json")
+	if broken.err == nil {
+		t.Fatalf("broken site unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", broken.stdout, broken.stderr)
+	}
+	var brokenReport struct {
+		Status           string   `json:"status"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureCount     int      `json:"failure_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		FailureDetails   []struct {
+			Kind     string `json:"kind"`
+			Path     string `json:"path"`
+			Value    string `json:"value"`
+			Target   string `json:"target"`
+			Fragment string `json:"fragment"`
+			Message  string `json:"message"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(broken.stdout), &brokenReport); err != nil {
+		t.Fatalf("broken site JSON failed to decode: %v\nstdout:\n%s\nstderr:\n%s", err, broken.stdout, broken.stderr)
+	}
+	if brokenReport.Status != "issues" || brokenReport.FailureKindCount != len(brokenReport.FailureKinds) || brokenReport.FailureCount != len(brokenReport.FailureDetails) || brokenReport.FailureCount != 2 {
+		t.Fatalf("broken site JSON = %+v, want two structured failures", brokenReport)
+	}
+	if !stringSliceContains(brokenReport.FailureKinds, "missing_target") || !stringSliceContains(brokenReport.FailureKinds, "missing_anchor") {
+		t.Fatalf("broken site failure kinds = %+v, want missing target and anchor", brokenReport.FailureKinds)
 	}
 }
 

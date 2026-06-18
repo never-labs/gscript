@@ -32,6 +32,7 @@ jobs:
         with:
           source: ./docs
           destination: ./_site
+      - run: bash scripts/site_check.sh --site-dir ./_site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./_site

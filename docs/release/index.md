@@ -156,6 +156,8 @@ and reports `artifact_entries` for the verified release artifact roles.
 `scripts/arch_check.sh --json` reports methodjit source/test size,
 `large_file_details`, `debt_marker_details`, and `missing_test_files` so
 architecture debt is visible to release dashboards.
+`scripts/site_check.sh --json` reports rendered-site HTML, local link, asset,
+fragment-anchor, and failure details after the GitHub Pages build.
 
 ## Release Compatibility Checklist
 
