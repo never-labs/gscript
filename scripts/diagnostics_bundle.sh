@@ -137,6 +137,30 @@ print_json_string_array_from_file() {
     printf '%s]' "$indent"
 }
 
+print_failure_details_json() {
+    printf '['
+    local i=0
+    while [ "$i" -lt "${#FAILURE_NAMES[@]}" ]; do
+        if [ "$i" -eq 0 ]; then
+            printf '\n'
+        fi
+        printf '    {"name": "%s", "log": "%s", "status_file": "%s", "exit_status": %s}' \
+            "$(json_escape "${FAILURE_NAMES[$i]}")" \
+            "$(json_escape "${FAILURE_LOGS[$i]}")" \
+            "$(json_escape "${FAILURE_STATUS_FILES[$i]}")" \
+            "${FAILURE_EXIT_STATUSES[$i]}"
+        if [ "$i" -lt $((${#FAILURE_NAMES[@]} - 1)) ]; then
+            printf ','
+        fi
+        printf '\n'
+        i=$((i + 1))
+    done
+    if [ "${#FAILURE_NAMES[@]}" -gt 0 ]; then
+        printf '  '
+    fi
+    printf ']'
+}
+
 print_json_report() {
     local status="pass"
     if [ "$failures" -gt 0 ]; then
@@ -154,6 +178,9 @@ print_json_report() {
     printf '  "file_count": %d,\n' "$file_count"
     printf '  "summary": "%s",\n' "$(json_escape "${SUMMARY#$OUT_DIR/}")"
     printf '  "manifest": "%s",\n' "$(json_escape "${MANIFEST#$OUT_DIR/}")"
+    printf '  "failure_details": '
+    print_failure_details_json
+    printf ',\n'
     printf '  "files": '
     print_json_string_array_from_file "  " "$MANIFEST"
     printf '\n'
@@ -182,6 +209,10 @@ run_logged() {
         printf '%s\n' "$status" >"$status_file"
         printf 'Result: FAIL (exit %s)\n\n' "$status" >>"$SUMMARY"
         log_info "=== FAIL $name (exit $status) ==="
+        FAILURE_NAMES+=("$name")
+        FAILURE_LOGS+=("${logfile#$OUT_DIR/}")
+        FAILURE_STATUS_FILES+=("${status_file#$OUT_DIR/}")
+        FAILURE_EXIT_STATUSES+=("$status")
         return "$status"
     fi
 }
@@ -199,6 +230,10 @@ write_skip() {
 }
 
 failures=0
+FAILURE_NAMES=()
+FAILURE_LOGS=()
+FAILURE_STATUS_FILES=()
+FAILURE_EXIT_STATUSES=()
 
 {
     printf '# Leia Diagnostics Bundle\n\n'

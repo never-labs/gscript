@@ -1790,7 +1790,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		fields        []string
 		matches       []releaseReportCountMatch
 	}{
-		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"files"}, matches: []releaseReportCountMatch{{"file_count", "files"}}},
+		{reportCommand: "scripts/diagnostics_bundle.sh --json", args: []string{"bash", "scripts/diagnostics_bundle.sh", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
 		{reportCommand: "scripts/docs_check.sh --json", args: []string{"bash", "scripts/docs_check.sh", "--json"}, counts: []string{"failure_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}}},
 		{reportCommand: "scripts/editor_check.sh --json", args: []string{"bash", "scripts/editor_check.sh", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, matches: []releaseReportCountMatch{{"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
 		{reportCommand: "scripts/install.sh --dry-run --json", args: []string{"bash", "scripts/install.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--os", "darwin", "--arch", "arm64", "--bin-dir", installBinDir, "--json"}, scalars: []string{"dry_run", "verify", "repo", "version", "goos", "goarch", "archive_ext", "asset", "url", "checksums", "bin_dir", "binary", "lsp_binary", "install_path", "lsp_install_path"}, counts: []string{"install_count", "binary_count", "install_path_count"}, fields: []string{"binaries", "install_paths"}, matches: []releaseReportCountMatch{{"binary_count", "binaries"}, {"install_path_count", "install_paths"}}},
@@ -2600,21 +2600,27 @@ func TestReleaseMatrixDiagnosticsBundleReportIsMachineReadable(t *testing.T) {
 	outDir := filepath.Join(tmp, "diag")
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "diag", "bundle", "--output", outDir, "--skip-go-tests", "--skip-benchmarks", "--json")
 	var report struct {
-		SchemaVersion int      `json:"schema_version"`
-		Status        string   `json:"status"`
-		OutputDir     string   `json:"output_dir"`
-		RunGoTests    bool     `json:"run_go_tests"`
-		RunBenchmarks bool     `json:"run_benchmarks"`
-		FailureCount  int      `json:"failure_count"`
-		FileCount     int      `json:"file_count"`
-		Summary       string   `json:"summary"`
-		Manifest      string   `json:"manifest"`
-		Files         []string `json:"files"`
+		SchemaVersion  int    `json:"schema_version"`
+		Status         string `json:"status"`
+		OutputDir      string `json:"output_dir"`
+		RunGoTests     bool   `json:"run_go_tests"`
+		RunBenchmarks  bool   `json:"run_benchmarks"`
+		FailureCount   int    `json:"failure_count"`
+		FileCount      int    `json:"file_count"`
+		Summary        string `json:"summary"`
+		Manifest       string `json:"manifest"`
+		FailureDetails []struct {
+			Name       string `json:"name"`
+			Log        string `json:"log"`
+			StatusFile string `json:"status_file"`
+			ExitStatus int    `json:"exit_status"`
+		} `json:"failure_details"`
+		Files []string `json:"files"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("diagnostics bundle JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Status != "pass" || report.OutputDir != outDir || report.RunGoTests || report.RunBenchmarks || report.FailureCount != 0 {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.OutputDir != outDir || report.RunGoTests || report.RunBenchmarks || report.FailureCount != 0 || len(report.FailureDetails) != 0 {
 		t.Fatalf("diagnostics bundle JSON = %+v, want passing no-test/no-benchmark schema v1 report", report)
 	}
 	if report.FileCount != len(report.Files) {

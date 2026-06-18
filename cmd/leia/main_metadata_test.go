@@ -280,6 +280,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod vendor --json", "modules"},
 		{"leia mod vendor --json", "diagnostics"},
 		{"leia test --json", "files"},
+		{"scripts/diagnostics_bundle.sh --json", "failure_details"},
 		{"scripts/diagnostics_bundle.sh --json", "files"},
 		{"scripts/docs_check.sh --json", "failures"},
 		{"scripts/production_check.sh --list --json", "release_critical_skip_names"},
