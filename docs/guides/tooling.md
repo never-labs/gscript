@@ -81,6 +81,10 @@ go run ./cmd/leia ci release --release-version vX.Y.Z --list --json
 bash scripts/worktree_audit.sh --json
 ```
 
+`scripts/worktree_audit.sh --json` reports `finding_status_count` and
+`finding_statuses` for dirty, prunable, missing, unreadable, and ahead/behind
+worktree summaries.
+
 Run `smoke` before small changes, `pr` before review, and `release` only when
 preparing a tag or release candidate.
 
