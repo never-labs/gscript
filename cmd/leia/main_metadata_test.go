@@ -342,6 +342,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia ci --list --json", []string{"commands[].name", "commands[].command", "commands[].arg_count", "commands[].args"}},
 		{"leia doc generate --format=json", []string{"cli.commands[].name", "cli.commands[].usage", "cli.commands[].summary", "stdlib.layers[].name", "stdlib.default_imports[].name", "stdlib.default_imports[].module", "stdlib.default_imports[].member", "dialects.dialects[].name", "dialects.dialects[].category", "dialects.dialects[].builtin", "dialects.dialects[].eval", "dialects.dialects[].block"}},
 		{"leia env --json", []string{"capabilities.tooling.reports[].command", "capabilities.tooling.reports[].formats", "capabilities.tooling.reports[].schema_version", "capabilities.tooling.reports[].status_field"}},
+		{"leia evaluate --json", []string{"inputs[].path", "inputs[].status", "cases[].case_id", "cases[].name", "cases[].source_path", "cases[].status", "metrics[].name", "metrics[].type", "metrics[].count"}},
 		{"leia examples check --json", []string{"results[].id", "results[].path", "results[].status", "results[].duration"}},
 		{"leia examples list --json", []string{"examples[].id", "examples[].title", "examples[].section", "examples[].path", "examples[].runnable", "examples[].runner"}},
 		{"leia fmt --json", []string{"files[].path", "files[].changed", "files[].written"}},
