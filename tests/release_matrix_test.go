@@ -2554,12 +2554,20 @@ func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 60*time.Second, "bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json")
 	var report struct {
-		SchemaVersion     int      `json:"schema_version"`
-		Status            string   `json:"status"`
-		Scope             string   `json:"scope"`
-		BenchMode         string   `json:"bench_mode"`
-		Jobs              int      `json:"jobs"`
-		TimeoutSeconds    int      `json:"timeout_seconds"`
+		SchemaVersion    int      `json:"schema_version"`
+		Status           string   `json:"status"`
+		Scope            string   `json:"scope"`
+		BenchMode        string   `json:"bench_mode"`
+		Jobs             int      `json:"jobs"`
+		TimeoutSeconds   int      `json:"timeout_seconds"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureCount     int      `json:"failure_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		FailureDetails   []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+			Value   string `json:"value"`
+		} `json:"failure_details"`
 		LanguageCaseCount int      `json:"language_case_count"`
 		ExampleCaseCount  int      `json:"example_case_count"`
 		BenchmarkCount    int      `json:"benchmark_case_count"`
@@ -2578,6 +2586,9 @@ func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
 	if report.Jobs <= 0 || report.TimeoutSeconds <= 0 {
 		t.Fatalf("q conformance JSON missing execution parameters: %+v", report)
 	}
+	if report.FailureKindCount != 0 || len(report.FailureKinds) != 0 || report.FailureCount != 0 || len(report.FailureDetails) != 0 {
+		t.Fatalf("q conformance JSON failures = kinds %d/%d details %d/%d, want none", report.FailureKindCount, len(report.FailureKinds), report.FailureCount, len(report.FailureDetails))
+	}
 	if report.LanguageCaseCount != len(report.LanguageCases) || report.ExampleCaseCount != len(report.ExampleCases) || report.BenchmarkCount != len(report.BenchmarkCases) {
 		t.Fatalf("q conformance JSON counts do not match arrays: %+v", report)
 	}
@@ -2586,6 +2597,33 @@ func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
 	}
 	if report.BenchmarkJSON != "" || report.BenchmarkMarkdown != "" {
 		t.Fatalf("q conformance no-bench JSON should not report benchmark artifacts: %+v", report)
+	}
+
+	failed := runCommandResult(root, 30*time.Second, "bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--jobs", "0", "--json")
+	if failed.err == nil {
+		t.Fatalf("q conformance invalid jobs unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", failed.stdout, failed.stderr)
+	}
+	var failedReport struct {
+		SchemaVersion    int      `json:"schema_version"`
+		Status           string   `json:"status"`
+		Jobs             int      `json:"jobs"`
+		FailureKindCount int      `json:"failure_kind_count"`
+		FailureCount     int      `json:"failure_count"`
+		FailureKinds     []string `json:"failure_kinds"`
+		FailureDetails   []struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+			Value   string `json:"value"`
+		} `json:"failure_details"`
+	}
+	if err := json.Unmarshal([]byte(failed.stdout), &failedReport); err != nil {
+		t.Fatalf("q conformance invalid jobs JSON failed to decode: %v\nstdout:\n%s\nstderr:\n%s", err, failed.stdout, failed.stderr)
+	}
+	if failedReport.SchemaVersion != 1 || failedReport.Status != "fail" || failedReport.Jobs != 0 {
+		t.Fatalf("q conformance invalid jobs JSON = %+v, want failed schema v1 report", failedReport)
+	}
+	if failedReport.FailureKindCount != 1 || failedReport.FailureCount != 1 || !stringSliceContains(failedReport.FailureKinds, "invalid_jobs") || len(failedReport.FailureDetails) != 1 || failedReport.FailureDetails[0].Kind != "invalid_jobs" || failedReport.FailureDetails[0].Value != "0" {
+		t.Fatalf("q conformance invalid jobs failure details = %+v, want invalid_jobs", failedReport)
 	}
 }
 

@@ -101,19 +101,6 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-mkdir -p "$TMPDIR"
-export GOCACHE="${GOCACHE:-$TMPDIR/go-cache}"
-mkdir -p "$GOCACHE"
-
-if ! [[ "$JOBS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "error: --jobs must be a positive integer: $JOBS" >&2
-  exit 2
-fi
-if ! [[ "$TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
-  echo "error: --timeout must be a positive integer: $TIMEOUT" >&2
-  exit 2
-fi
-
 log_info() {
   if [ "$JSON_OUT" != "true" ]; then
     echo "$1"
@@ -318,6 +305,17 @@ print_json_report() {
 }
 
 trap 'on_error "$?"' ERR
+
+if ! [[ "$JOBS" =~ ^[1-9][0-9]*$ ]]; then
+  fail "invalid_jobs" "--jobs must be a positive integer: $JOBS" 2 "$JOBS"
+fi
+if ! [[ "$TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
+  fail "invalid_timeout" "--timeout must be a positive integer: $TIMEOUT" 2 "$TIMEOUT"
+fi
+
+mkdir -p "$TMPDIR"
+export GOCACHE="${GOCACHE:-$TMPDIR/go-cache}"
+mkdir -p "$GOCACHE"
 
 log_info "[q-gate] manifest check"
 run_logged "$TMPDIR/leia-q-gate-manifest.out" python3 tests/manifest.py check tests benchmarks
