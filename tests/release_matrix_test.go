@@ -814,6 +814,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"--base-url \"file://$release_dir\"",
 				"local install fixture verified",
 				`go run ./cmd/leia ci release --release-version "${GITHUB_REF_NAME}"`,
+				"bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin",
 			},
 		},
 		{
@@ -855,6 +856,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"LEIA_RELEASE_ARTIFACT_VERSION=\"${GITHUB_REF_NAME}\"",
 				`bash scripts/release_notes_check.sh --require-ready --version "${GITHUB_REF_NAME}"`,
 				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
+				"bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin",
 				`"$(go env GOPATH)/bin/goreleaser" release --clean`,
 				`--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"`,
 				"secrets.GITHUB_TOKEN",

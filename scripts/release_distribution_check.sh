@@ -394,6 +394,7 @@ if [[ -f .github/workflows/release.yml ]]; then
   require_contains .github/workflows/release.yml 'go run ./cmd/leia ci release --release-version "${GITHUB_REF_NAME}"'
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" --version'
   require_contains .github/workflows/release.yml 'bash scripts/release_notes_check.sh --require-ready --version "${GITHUB_REF_NAME}"'
+  require_contains .github/workflows/release.yml "bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" release --clean'
   require_contains .github/workflows/release.yml '--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"'
 fi
