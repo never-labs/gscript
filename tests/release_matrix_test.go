@@ -813,6 +813,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"install accepted zip archive with unexpected entry",
 				"--base-url \"file://$release_dir\"",
 				"local install fixture verified",
+				`go run ./cmd/leia ci release --release-version "${GITHUB_REF_NAME}"`,
 			},
 		},
 		{
