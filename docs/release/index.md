@@ -148,7 +148,8 @@ release-critical:
 `install_target_count`. Its `failure_kinds` and `failure_details` fields make
 missing workflow, install-plan, fixture, and local tool failures machine-readable.
 `scripts/release_artifacts_check.sh --json` uses the same failure fields for
-version, tag, clean-worktree, checksum, artifact, and local install failures.
+version, tag, clean-worktree, checksum, artifact, and local install failures,
+and reports `artifact_entries` for the verified release artifact roles.
 
 ## Release Compatibility Checklist
 

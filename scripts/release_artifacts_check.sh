@@ -164,6 +164,28 @@ print_json_failure_details() {
   printf '%s]' "$indent"
 }
 
+print_json_artifact_entries() {
+  local indent="$1"
+  local report_out_dir="$2"
+  local roles=("cli" "lsp" "metadata" "checksums")
+  local names=("$binary_name" "$lsp_binary_name" "$metadata_name" "SHA256SUMS")
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#names[@]}" ]]; do
+    printf '%s  {"role": "%s", "name": "%s"' "$indent" "$(json_escape "${roles[$i]}")" "$(json_escape "${names[$i]}")"
+    if [[ -n "$report_out_dir" ]]; then
+      printf ', "path": "%s/%s"' "$(json_escape "$report_out_dir")" "$(json_escape "${names[$i]}")"
+    fi
+    printf '}'
+    if [[ "$i" -lt $((${#names[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
 print_json_report() {
   local status="${1:-pass}"
   local report_out_dir="$out_dir"
@@ -206,6 +228,9 @@ print_json_report() {
   else
     print_json_string_array "  " "${artifact_files[@]}"
   fi
+  printf ',\n'
+  printf '  "artifact_entries": '
+  print_json_artifact_entries "  " "$report_out_dir"
   printf ',\n'
   printf '  "dry_run_verified": %s,\n' "$dry_run_verified"
   printf '  "build_verified": %s,\n' "$build_verified"
