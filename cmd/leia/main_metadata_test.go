@@ -340,6 +340,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia capabilities --json", []string{"tooling.reports[].command", "tooling.reports[].formats", "tooling.reports[].schema_version", "tooling.reports[].status_field"}},
 		{"leia check --json", []string{"steps[].name", "steps[].ok", "steps[].exit_code"}},
 		{"leia ci --list --json", []string{"commands[].name", "commands[].command", "commands[].arg_count", "commands[].args"}},
+		{"leia diag bundle --json", []string{"files[]"}},
 		{"leia doc generate --format=json", []string{"cli.commands[].name", "cli.commands[].usage", "cli.commands[].summary", "stdlib.layers[].name", "stdlib.default_imports[].name", "stdlib.default_imports[].module", "stdlib.default_imports[].member", "dialects.dialects[].name", "dialects.dialects[].category", "dialects.dialects[].builtin", "dialects.dialects[].eval", "dialects.dialects[].block"}},
 		{"leia env --json", []string{"capabilities.tooling.reports[].command", "capabilities.tooling.reports[].formats", "capabilities.tooling.reports[].schema_version", "capabilities.tooling.reports[].status_field"}},
 		{"leia evaluate --json", []string{"inputs[].path", "inputs[].status", "cases[].case_id", "cases[].name", "cases[].source_path", "cases[].status", "metrics[].name", "metrics[].type", "metrics[].count"}},
@@ -355,8 +356,12 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod lock --json", []string{"entries[].kind", "entries[].path", "entries[].target", "entries[].hash"}},
 		{"leia mod verify --json", []string{"graph.files[].file"}},
 		{"leia test --json", []string{"files[].file", "files[].ok"}},
+		{"leia test --list --json", []string{"files[]"}},
+		{"scripts/diagnostics_bundle.sh --json", []string{"files[]"}},
+		{"scripts/editor_check.sh --json", []string{"textmate_grammars[]", "vscode_assets[]", "tree_sitter_assets[]", "smoke_tests[]"}},
 		{"scripts/install.sh --dry-run --json", []string{"install_entries[].role", "install_entries[].name", "install_entries[].path"}},
 		{"scripts/production_check.sh --list --json", []string{"runnable_checks[].name", "runnable_checks[].command", "runnable_checks[].release_critical"}},
+		{"scripts/q_conformance_gate.sh --json", []string{"language_cases[]", "example_cases[]", "benchmark_cases[]"}},
 		{"scripts/release_distribution_check.sh --json", []string{"install_target_details[].target", "install_target_details[].goos", "install_target_details[].goarch"}},
 		{"scripts/release_notes_check.sh --json", []string{"checked_file_details[].path", "checked_file_details[].role", "checked_file_details[].required", "checked_file_details[].exists"}},
 	} {
@@ -708,6 +713,13 @@ func containsString(values []string, want string) bool {
 }
 
 func collectionItemFieldCollection(field string) string {
+	if strings.HasSuffix(field, "[]") {
+		collection := strings.TrimSuffix(field, "[]")
+		if collection == "" {
+			return ""
+		}
+		return collection
+	}
 	const marker = "[]."
 	index := strings.Index(field, marker)
 	if index <= 0 || index+len(marker) >= len(field) {
