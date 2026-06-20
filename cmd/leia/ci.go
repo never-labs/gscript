@@ -145,7 +145,7 @@ func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]
 			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
 			{Name: "Module path gate", Args: modulePathGateCommand()},
 			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/leia", "check", "--no-test", "--no-docs", "--no-editor", ciSmokeScriptPath}},
-			{Name: "Worktree audit", Args: []string{"bash", "scripts/worktree_audit.sh"}},
+			{Name: "Worktree audit", Args: []string{"scripts/run.sh", "worktree"}},
 		}, nil
 	case "pr":
 		return []ciCommand{
@@ -153,15 +153,15 @@ func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]
 			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
 			{Name: "Module path gate", Args: modulePathGateCommand()},
 			{Name: "Example projects check", Args: []string{"go", "run", "./cmd/leia", "examples", "check", "--jobs=6"}},
-			{Name: "Docs check", Args: []string{"bash", "scripts/docs_check.sh"}},
-			{Name: "Performance smoke", Args: appendNoLuaJIT([]string{"bash", "scripts/performance_gate.sh", "--smoke"}, noLuaJIT)},
+			{Name: "Docs check", Args: []string{"scripts/run.sh", "docs"}},
+			{Name: "Performance smoke", Args: appendNoLuaJIT([]string{"scripts/run.sh", "perf", "--smoke"}, noLuaJIT)},
 		}, nil
 	case "perf":
 		return []ciCommand{
-			{Name: "Performance gate", Args: appendNoLuaJIT([]string{"bash", "scripts/performance_gate.sh", "--full"}, noLuaJIT)},
+			{Name: "Performance gate", Args: appendNoLuaJIT([]string{"scripts/run.sh", "perf", "--full"}, noLuaJIT)},
 		}, nil
 	case "release":
-		args := []string{"bash", "scripts/production_check.sh", "--full", "--release-profile"}
+		args := []string{"scripts/run.sh", "production", "--full", "--release-profile"}
 		if releaseVersion != "" {
 			args = append(args, "--release-version", releaseVersion)
 		}

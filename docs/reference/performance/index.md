@@ -40,6 +40,15 @@ leia bench strict --runs 3 --warmup 1 \
 leia diagnose table/table_array_access --out-dir /tmp/leia-diag
 ```
 
+The shell gate wraps the same harnesses with repository defaults:
+
+```bash
+scripts/run.sh perf --syntax-smoke --no-luajit
+scripts/run.sh perf --smoke
+scripts/run.sh perf --feature-smoke
+scripts/run.sh perf --full
+```
+
 Use `--no-luajit` when LuaJIT is not installed or the workload has no useful
 Lua reference. Without `--no-luajit`, script-timed current/LuaJIT rows are
 validated against `--luajit-threshold` (default `0.80`).
@@ -88,10 +97,16 @@ operations must fall back to the VM/runtime without changing visible results,
 errors, capability checks, resource-budget behavior, or deoptimization behavior.
 
 The LuaJIT comparison is a validation baseline, not a marketing claim. For
-script-timed rows with a Lua reference, `leia bench --full` and strict reports
-record the configured `--luajit-threshold` (default `0.80`). Use `--no-luajit`
-only when LuaJIT is unavailable or the selected workload has no meaningful Lua
-reference, and record that limitation with the benchmark artifact.
+script-timed rows with a Lua reference, `scripts/run.sh perf --full` runs the
+performance submit guard and fails when `current / LuaJIT` exceeds the configured
+`--luajit-threshold` (default `0.80`). Use `--no-luajit` only when LuaJIT is
+unavailable or the selected workload has no meaningful Lua reference, and record
+that limitation in release evidence.
+
+Production and release plans keep this bottom line active through
+`scripts/run.sh production --full --release-profile`,
+`go run ./cmd/leia ci release --list`, and
+`scripts/run.sh perf --full`.
 
 ## Artifacts
 

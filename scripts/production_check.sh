@@ -377,7 +377,7 @@ add_go_test() {
 }
 
 add_performance_gate() {
-    local cmd="bash scripts/performance_gate.sh --full"
+    local cmd="scripts/run.sh perf --full"
 
     if ! have_cmd python3; then
         add_skip "Performance Gate" "missing python3"
@@ -399,7 +399,7 @@ add_performance_gate() {
 }
 
 add_performance_smoke() {
-    local cmd="bash scripts/performance_gate.sh --smoke --runs 2 --warmup 1"
+    local cmd="scripts/run.sh perf --smoke --runs 2 --warmup 1"
 
     if ! have_cmd python3; then
         add_skip "Performance Smoke" "missing python3"
@@ -458,7 +458,7 @@ add_documentation_references() {
         add_skip "Documentation References" "missing python3"
         return
     fi
-    add_run "Documentation References" "bash scripts/docs_check.sh"
+    add_run "Documentation References" "scripts/run.sh docs"
 }
 
 add_architecture_health_gate() {
@@ -508,7 +508,7 @@ add_editor_assets() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Editor Assets" "bash scripts/editor_check.sh --require-tree-sitter"
+        add_run "Editor Assets" "scripts/run.sh editor --require-tree-sitter"
         return
     fi
     if ! have_cmd python3; then
@@ -519,7 +519,7 @@ add_editor_assets() {
         add_skip "Editor Assets" "missing node"
         return
     fi
-    add_run "Editor Assets" "bash scripts/editor_check.sh"
+    add_run "Editor Assets" "scripts/run.sh editor"
 }
 
 add_release_distribution_gate() {
@@ -528,9 +528,9 @@ add_release_distribution_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Distribution" "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
+        add_run "Release Distribution" "scripts/run.sh release-dist --require-goreleaser"
     else
-        add_run "Release Distribution" "bash scripts/release_distribution_check.sh"
+        add_run "Release Distribution" "scripts/run.sh release-dist"
     fi
 }
 
@@ -540,14 +540,14 @@ add_release_artifacts_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Artifacts" "artifact_args=(--build --require-clean); if [ -n \"$RELEASE_VERSION\" ]; then artifact_args+=(--require-tag --version \"$RELEASE_VERSION\"); elif [ -n \"\${LEIA_RELEASE_REQUIRE_TAG:-}\" ]; then artifact_args+=(--require-tag --version \"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"); fi; bash scripts/release_artifacts_check.sh \"\${artifact_args[@]}\""
+        add_run "Release Artifacts" "artifact_args=(--build --require-clean); if [ -n \"$RELEASE_VERSION\" ]; then artifact_args+=(--require-tag --version \"$RELEASE_VERSION\"); elif [ -n \"\${LEIA_RELEASE_REQUIRE_TAG:-}\" ]; then artifact_args+=(--require-tag --version \"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"); fi; scripts/run.sh release-check \"\${artifact_args[@]}\""
         return
     fi
     if ! have_cmd go; then
         add_skip "Release Artifacts" "missing go"
         return
     fi
-    add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh"
+    add_run "Release Artifacts" "scripts/run.sh release-check"
 }
 
 add_release_notes_gate() {

@@ -335,6 +335,13 @@ func TestExamplesDocsIndexCoversTopLevelExampleDirectories(t *testing.T) {
 		if !entry.IsDir() {
 			continue
 		}
+		children, err := os.ReadDir(filepath.Join(root, "examples", entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(children) == 0 {
+			continue
+		}
 		dir := "examples/" + entry.Name() + "/"
 		if !strings.Contains(index, "`"+dir+"`") {
 			t.Fatalf("docs/examples/index.md is missing top-level example directory %s", dir)

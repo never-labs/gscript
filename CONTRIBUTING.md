@@ -21,7 +21,7 @@ Focused loops:
 go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
 go run ./cmd/leia lint tests/smoke/01_basic.leia
 go run ./cmd/leia test tests/smoke/01_basic.leia
-bash scripts/docs_check.sh
+scripts/run.sh docs
 ```
 
 CI profiles are inspectable and reproducible locally:
@@ -42,7 +42,7 @@ go run ./cmd/leia ci smoke
 - Standard-library module changes need `internal/stdlib/catalog` metadata when
   module visibility, capabilities, or safety defaults change.
 - Performance-sensitive changes should run an appropriate benchmark or
-  `bash scripts/performance_gate.sh --feature-smoke`. See
+  `scripts/run.sh perf --feature-smoke`. See
   [`docs/contributing/performance.md`](docs/contributing/performance.md) for
   the evidence format.
 

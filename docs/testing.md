@@ -23,13 +23,13 @@ Important inputs:
 Release validation commands:
 
 ```bash
-time bash scripts/performance_gate.sh --syntax-smoke --no-luajit
-go test ./tests -run 'TestReleaseMatrix' -count=1
+time scripts/run.sh perf --syntax-smoke --no-luajit
+go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1
 go test ./tests -run 'TestLanguageConformanceTranslatedCases' -count=1
 go test ./...
-bash scripts/docs_check.sh
-bash scripts/performance_gate.sh --feature-smoke
+scripts/run.sh docs
+scripts/run.sh perf --feature-smoke
 ```
 
 Use the `--syntax-smoke` command first after syntax-only language changes when

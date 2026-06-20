@@ -17,7 +17,7 @@ func TestCICommandListsProfiles(t *testing.T) {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"go test", "./cmd/leia-lsp", "./internal/tooling/lsp", "tests/manifest.py", "github.com/never-labs/leia", "leia check", "--no-docs", "--no-editor", "tests/smoke/01_basic.leia", "worktree_audit.sh"} {
+	for _, want := range []string{"go test", "./cmd/leia-lsp", "./internal/tooling/lsp", "tests/manifest.py", "github.com/never-labs/leia", "leia check", "--no-docs", "--no-editor", "tests/smoke/01_basic.leia", "scripts/run.sh worktree"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}
@@ -31,7 +31,7 @@ func TestCICommandPRProfileIncludesExampleCheck(t *testing.T) {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"leia examples check", "--jobs=6", "bash scripts/docs_check.sh", "performance_gate.sh"} {
+	for _, want := range []string{"leia examples check", "--jobs=6", "scripts/run.sh docs", "scripts/run.sh perf"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}
@@ -46,7 +46,7 @@ func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
 	}
 	out := stdout.String()
 	for _, want := range []string{
-		"bash scripts/production_check.sh --full --release-profile",
+		"scripts/run.sh production --full --release-profile",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
@@ -70,7 +70,7 @@ func TestCICommandReleaseProfilePassesReleaseVersion(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if got := strings.TrimSpace(stdout.String()); got != "bash scripts/production_check.sh --full --release-profile --release-version v1.2.3" {
+	if got := strings.TrimSpace(stdout.String()); got != "scripts/run.sh production --full --release-profile --release-version v1.2.3" {
 		t.Fatalf("stdout = %q, want versioned release production check", stdout.String())
 	}
 }
@@ -81,7 +81,7 @@ func TestCICommandReleaseProfileAllowsPlaceholderVersionForList(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if got := strings.TrimSpace(stdout.String()); got != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+	if got := strings.TrimSpace(stdout.String()); got != "scripts/run.sh production --full --release-profile --release-version vX.Y.Z" {
 		t.Fatalf("stdout = %q, want placeholder versioned release production check", stdout.String())
 	}
 }
@@ -107,13 +107,13 @@ func TestCICommandListJSONReportsProfilePlan(t *testing.T) {
 	if command.Name != "Production check" {
 		t.Fatalf("command name = %q, want Production check", command.Name)
 	}
-	if got := command.Command; got != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+	if got := command.Command; got != "scripts/run.sh production --full --release-profile --release-version vX.Y.Z" {
 		t.Fatalf("command = %q, want versioned production check", got)
 	}
 	if command.ArgCount != len(command.Args) || command.ArgCount != 6 {
 		t.Fatalf("command arg_count = %d args = %#v, want count 6 matching args", command.ArgCount, command.Args)
 	}
-	for _, want := range []string{"bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
+	for _, want := range []string{"scripts/run.sh", "production", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
 		if !containsString(command.Args, want) {
 			t.Fatalf("args = %#v, want %q", command.Args, want)
 		}
@@ -202,7 +202,7 @@ func TestCICommandRunsProfileCommands(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(commands) != 1 || !strings.Contains(commands[0], "performance_gate.sh") || !strings.Contains(commands[0], "--no-luajit") {
+	if len(commands) != 1 || !strings.Contains(commands[0], "scripts/run.sh perf") || !strings.Contains(commands[0], "--no-luajit") {
 		t.Fatalf("commands = %#v, want performance gate with --no-luajit", commands)
 	}
 	if !strings.Contains(stdout.String(), "ci helper ok") {
@@ -225,7 +225,7 @@ func TestCICommandRunsReleaseDistributionCheck(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(commands) != 1 || !containsCommand(commands, "bash scripts/production_check.sh --full --release-profile --release-version v1.2.3") {
+	if len(commands) != 1 || !containsCommand(commands, "scripts/run.sh production --full --release-profile --release-version v1.2.3") {
 		t.Fatalf("commands = %#v, want only versioned production release profile", commands)
 	}
 }

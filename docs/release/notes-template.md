@@ -46,19 +46,19 @@ Include command, platform, CPU, Go version, LuaJIT availability, artifact path,
 and caveats.
 
 ```bash
-bash scripts/performance_gate.sh --full
+scripts/run.sh perf --full
 ```
 
 ## Validation
 
 ```bash
 go run ./cmd/leia ci release --release-version vX.Y.Z --list
-bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z
-go test ./tests -run 'TestReleaseMatrix' -count=1
-bash scripts/docs_check.sh
-bash scripts/performance_gate.sh --full
+scripts/run.sh production --full --release-profile --release-version vX.Y.Z
+go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
+scripts/run.sh docs
+scripts/run.sh perf --full
 bash scripts/public_release_blockers_check.sh --require-resolved
-bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
+scripts/run.sh release-dist --require-goreleaser
 bash scripts/release_notes_check.sh --require-ready --version vX.Y.Z
 bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version vX.Y.Z
 ```

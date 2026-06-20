@@ -103,9 +103,9 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         ci = (ROOT / "cmd" / "leia" / "ci.go").read_text()
 
         self.assertIn("--release-profile", production)
-        self.assertIn("bash scripts/editor_check.sh --require-tree-sitter", production)
-        self.assertIn("bash scripts/release_distribution_check.sh --require-goreleaser", production)
-        self.assertIn("bash scripts/release_artifacts_check.sh", production)
+        self.assertIn("scripts/run.sh editor --require-tree-sitter", production)
+        self.assertIn("scripts/run.sh release-dist --require-goreleaser", production)
+        self.assertIn("scripts/run.sh release-check", production)
         self.assertIn("--require-goreleaser", distribution)
         self.assertIn("goreleaser CLI is required for release distribution profile", distribution)
         self.assertIn('"--full", "--release-profile"', ci)
@@ -122,9 +122,9 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         )
 
         self.assertIn("Release profile: critical release tool skips are treated as failures.", proc.stdout)
-        self.assertIn("bash scripts/editor_check.sh --require-tree-sitter", proc.stdout)
-        self.assertIn("bash scripts/release_distribution_check.sh --require-goreleaser", proc.stdout)
-        self.assertIn("bash scripts/release_artifacts_check.sh", proc.stdout)
+        self.assertIn("scripts/run.sh editor --require-tree-sitter", proc.stdout)
+        self.assertIn("scripts/run.sh release-dist --require-goreleaser", proc.stdout)
+        self.assertIn("scripts/run.sh release-check", proc.stdout)
 
     def test_release_distribution_require_goreleaser_fails_without_cli(self):
         env = os.environ.copy()

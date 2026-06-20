@@ -104,7 +104,7 @@ Use local tooling checks before sending a change for review.
 ```bash
 go run ./cmd/leia env
 go run ./cmd/leia check --no-docs .
-bash scripts/production_check.sh --quick
+scripts/run.sh production --quick
 ```
 
 Related guide:

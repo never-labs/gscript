@@ -409,10 +409,10 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 
 
 def check_release_gate_docs() -> None:
-    release_matrix_cmd = "go test ./tests -run 'TestReleaseMatrix' -count=1"
-    release_profile_cmd = "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z"
+    release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
+    release_profile_cmd = "scripts/run.sh production --full --release-profile --release-version vX.Y.Z"
     ci_release_version_cmd = "go run ./cmd/leia ci release --release-version vX.Y.Z --list"
-    release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
+    release_distribution_cmd = "scripts/run.sh release-dist --require-goreleaser"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
         root / "docs" / "release" / "index.md",
@@ -424,6 +424,10 @@ def check_release_gate_docs() -> None:
             "q conformance",
             "local artifact installation evidence",
             "feature coverage records under `tests/`",
+            release_matrix_cmd,
+            "scripts/run.sh perf --full",
+            release_distribution_cmd,
+            "scripts/run.sh release-check --build",
             "docs/spec/index.md",
             "tests/language/MISSING_CAPABILITIES.md",
             "docs/reference/stdlib/index.md",
@@ -443,6 +447,10 @@ def check_release_gate_docs() -> None:
             release_profile_cmd,
             "go run ./cmd/leia doc check --json",
             release_distribution_cmd,
+            release_matrix_cmd,
+            "scripts/run.sh docs",
+            "scripts/run.sh perf --full",
+            "scripts/run.sh release-check --build",
             "tests/language/MANIFEST.md",
             "tests/language/KNOWN_FAILURES.md",
             "docs/reference/hot-reload/index.md",
@@ -481,8 +489,8 @@ def check_release_gate_docs() -> None:
             "Runnable examples embedded in `docs/spec/*.md`",
             release_matrix_cmd,
             spec_examples_cmd,
-            "bash scripts/docs_check.sh",
             "feature coverage records under `tests/`",
+            "scripts/run.sh docs",
             "docs/spec/index.md",
         ],
     )
@@ -545,7 +553,7 @@ def check_spec_contract_docs() -> None:
     spec_index = (root / "docs" / "spec" / "index.md").read_text(encoding="utf-8")
     for path, text, snippets in [
         (
-            "scripts/docs_check.sh",
+            "scripts/run.sh docs",
             docs_check,
             [
                 "go test ./tests/docs/spec -count=1",

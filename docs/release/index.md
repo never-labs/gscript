@@ -7,9 +7,13 @@ Leia releases need machine-checkable evidence, not hand-written claims.
 Run at least:
 
 ```bash
-bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z
 go run ./cmd/leia ci release --release-version vX.Y.Z --list
-bash scripts/performance_gate.sh --full
+scripts/run.sh production --full --release-profile --release-version vX.Y.Z
+go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
+scripts/run.sh docs
+scripts/run.sh perf --full
+scripts/run.sh release-dist --require-goreleaser
+scripts/run.sh release-check --build
 ```
 
 Machine-readable release evidence:
@@ -99,8 +103,8 @@ dry-run combinations, and local `file://` tar.gz/zip install fixtures even when
 GitHub workflow files are intentionally absent:
 
 ```bash
-bash scripts/public_release_blockers_check.sh --require-resolved
-bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
+scripts/public_release_blockers_check.sh --require-resolved
+scripts/run.sh release-dist --require-goreleaser
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
 bash scripts/install.sh --version v0.1.0 --base-url file:///tmp/leia-release --bin-dir /tmp/leia-bin
 ```

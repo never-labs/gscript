@@ -1106,7 +1106,7 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 		}
 	}
 	for _, snippet := range []string{
-		"bash scripts/performance_gate.sh --full",
+		"scripts/run.sh perf --full",
 		"state tested platforms and execution modes",
 		"document any experimental language, stdlib, AI, package, or JIT behavior",
 	} {
@@ -1125,8 +1125,8 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 		}
 	}
 	for _, snippet := range []string{
-		`local cmd="bash scripts/performance_gate.sh --smoke --runs 2 --warmup 1"`,
-		`local cmd="bash scripts/performance_gate.sh --full"`,
+		`local cmd="scripts/run.sh perf --smoke --runs 2 --warmup 1"`,
+		`local cmd="scripts/run.sh perf --full"`,
 		"add_performance_smoke",
 		"add_performance_gate",
 	} {

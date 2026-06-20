@@ -192,6 +192,7 @@ Run:
 ```bash
 leia bench --bench data/soa_affine_many --runs 5 --warmup 1
 leia bench --quick --bench data
+scripts/run.sh perf --feature-smoke
 ```
 
 ## Related Modules

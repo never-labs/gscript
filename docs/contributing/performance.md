@@ -9,7 +9,7 @@ For small performance-sensitive changes, include:
 
 ```bash
 go run ./cmd/leia bench compare --bench selector/name --runs 5 --warmup 1
-bash scripts/performance_gate.sh --feature-smoke
+scripts/run.sh perf --feature-smoke
 ```
 
 For JIT, VM, table, call, concurrency, stdlib hot-path, or benchmark harness
@@ -34,8 +34,8 @@ go run ./cmd/leia bench compare --bench numeric/matmul_dense --runs 5 --warmup 1
 go run ./cmd/leia bench strict --bench table/table_array_access --runs 5 --warmup 1 \
   --json /tmp/leia-strict.json \
   --markdown /tmp/leia-strict.md
-bash scripts/performance_gate.sh --feature-smoke
-bash scripts/performance_gate.sh --full --no-luajit
+scripts/run.sh perf --feature-smoke
+scripts/run.sh perf --full --no-luajit
 ```
 
 Use `--no-luajit` only when LuaJIT is not installed or the workload has no

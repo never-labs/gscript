@@ -128,7 +128,7 @@ evidence. Benchmark output is not a substitute for semantic coverage.
 Performance-sensitive changes must use the repository performance gate relevant
 to the touched path. The repository provides `scripts/performance_gate.sh`,
 which wraps `benchmarks/timing_compare.py` and `benchmarks/strict_guard.py`.
-Release documentation also references `bash scripts/performance_gate.sh
+Release documentation also references `scripts/run.sh perf
 --feature-smoke` for feature-smoke performance evidence.
 
 ## Architecture And Package Boundaries

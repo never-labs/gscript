@@ -93,6 +93,7 @@ preparing a tag or release candidate.
 
 ```bash
 python3 tests/manifest.py check tests benchmarks
+scripts/run.sh worktree
 ```
 
 The manifest check keeps test and benchmark discovery explicit so local and
@@ -119,9 +120,10 @@ go run ./cmd/leia doc generate --layout site --output docs
 go run ./cmd/leia doc generate --format json
 go run ./cmd/leia doc check
 go run ./cmd/leia doc check --json
+scripts/run.sh docs
 ```
 
-Generated reference pages are checked in. `leia doc check` verifies
+Generated reference pages are checked in. `scripts/run.sh docs` verifies
 generated CLI/stdlib/dialect references, spec HTML freshness, spec runnable examples,
 Markdown links, release reference coverage, retired naming, and documented
 repository script entrypoints. Use `--json` for machine-readable documentation
@@ -133,8 +135,8 @@ workflow runs `bash scripts/docs_check.sh` before building the site.
 ## Editors
 
 ```bash
-bash scripts/editor_check.sh
-bash scripts/editor_check.sh --require-tree-sitter
+scripts/run.sh editor
+scripts/run.sh editor --require-tree-sitter
 python3 -m unittest tools.editor.smoke.editor_check_test
 ```
 
@@ -182,8 +184,8 @@ go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3
 go run ./cmd/leia bench strict --bench table/table_array_access --runs 3 --warmup 1 \
   --json /tmp/leia-strict.json \
   --markdown /tmp/leia-strict.md
-bash scripts/performance_gate.sh --feature-smoke
-bash scripts/performance_gate.sh --validate-only /tmp/leia_performance_gate/timing_gate.json --json
+scripts/run.sh perf --feature-smoke
+scripts/run.sh perf --validate-only /tmp/leia_performance_gate/timing_gate.json --json
 ```
 
 Use `--no-luajit` when LuaJIT is not installed or when a benchmark has no useful
@@ -197,7 +199,7 @@ measured validation instead of report-only comparisons. See the
 ```bash
 go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks
 go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
-bash scripts/diag.sh table/table_array_access
+scripts/run.sh diag table/table_array_access
 ```
 
 Use diagnostics bundles when filing performance or correctness issues. They
@@ -207,15 +209,15 @@ collect environment, docs/test status, and optional benchmark summaries.
 
 ```bash
 go run ./cmd/leia capabilities --json
-bash scripts/production_check.sh --quick
-bash scripts/production_check.sh --quick --list --json
-bash scripts/production_check.sh --quick --list --out-dir /tmp/leia-release-plan
-go test ./tests -run 'TestReleaseMatrix' -count=1
+scripts/run.sh production --quick
+scripts/run.sh production --quick --list --json
+scripts/run.sh production --quick --list --out-dir /tmp/leia-release-plan
+go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/q_conformance_gate.sh --scope core --bench none --json
-bash scripts/editor_check.sh --json
-bash scripts/release_distribution_check.sh --json
-bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
-bash scripts/release_artifacts_check.sh --build
+scripts/run.sh editor --json
+scripts/run.sh release-dist --json
+scripts/run.sh release-check --json --version vX.Y.Z
+scripts/run.sh release-check --build
 ```
 
 The release process is documented in [Release Process](../release/index.md).

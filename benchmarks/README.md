@@ -21,10 +21,10 @@ LuaJIT references live under `benchmarks/lua_ref/<domain>/`.
 
 ```bash
 # Fast grammar-change hot-path gate; writes reports under /tmp by default.
-bash scripts/performance_gate.sh --syntax-smoke --no-luajit
+scripts/run.sh perf --syntax-smoke --no-luajit
 
 # Current worktree vs clean HEAD vs LuaJIT.
-bash scripts/performance_gate.sh --full
+scripts/run.sh perf --full
 
 # Investigation-only current worktree vs clean HEAD vs LuaJIT.
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \

@@ -49,15 +49,15 @@ Two syntax asset families are maintained:
 Run the editor guard locally:
 
 ```bash
-bash scripts/editor_check.sh
-bash scripts/editor_check.sh --json
+scripts/run.sh editor
+scripts/run.sh editor --json
 ```
 
 If the tree-sitter CLI is available and you want the full corpus check:
 
 ```bash
 npm --prefix tools/tree-sitter-leia ci
-bash scripts/editor_check.sh --require-tree-sitter
+scripts/run.sh editor --require-tree-sitter
 ```
 
 ## VS Code
@@ -107,7 +107,7 @@ These should point to the local tree-sitter grammar until a public
 
 Before a public release:
 
-- `bash scripts/editor_check.sh` should pass.
+- `scripts/run.sh editor` should pass.
 - release archives and `scripts/install.sh` should install both `leia` and
   `leia-lsp`.
 - VS Code metadata should be marketplace-ready even if publication is delayed.
