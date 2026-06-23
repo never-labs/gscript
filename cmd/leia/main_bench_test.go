@@ -269,6 +269,56 @@ func TestBenchCommandDispatchesQSuiteHarness(t *testing.T) {
 	}
 }
 
+func TestBenchCommandDispatchesQColumnarHarness(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotName string
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"q-columnar", "--runs=1"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "bash" {
+		t.Fatalf("command = %q, want bash", gotName)
+	}
+	if len(gotArgs) != 2 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "q_columnar_suite.sh")) || gotArgs[1] != "--runs=1" {
+		t.Fatalf("args = %#v, want q_columnar_suite.sh --runs=1", gotArgs)
+	}
+}
+
+func TestBenchCommandDispatchesQGeneralHarness(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotName string
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"q-general"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "bash" {
+		t.Fatalf("command = %q, want bash", gotName)
+	}
+	if len(gotArgs) != 1 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "q_general_compute_suite.sh")) {
+		t.Fatalf("args = %#v, want q_general_compute_suite.sh", gotArgs)
+	}
+}
+
 func TestBenchAuditCommandReportsSections(t *testing.T) {
 	payload := map[string]any{
 		"results": []map[string]any{

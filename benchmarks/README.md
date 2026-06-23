@@ -44,7 +44,7 @@ go run ./cmd/leia bench strict --runs=3 --warmup=0 --max-repeat=8 \
   --bench=table/json_table_walk
 
 # q in-memory columnar analytics suite.
-bash benchmarks/q_columnar_suite.sh --runs=3 --warmup=1 \
+go run ./cmd/leia bench q-columnar --runs=3 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --json /tmp/leia_q_columnar_timing.json \
   --markdown /tmp/leia_q_columnar_timing.md
@@ -61,7 +61,7 @@ go run ./cmd/leia bench q-report --benchtime=100x \
   --markdown benchmarks/data/q_perf_report_latest.md
 
 # q stateful eval ordinary compute vs hand-written Go with reusable buffers.
-BENCHTIME=100x bash benchmarks/q_general_compute_suite.sh
+BENCHTIME=100x go run ./cmd/leia bench q-general
 
 # q.eval vector/list compute microbenchmarks with Go baselines and allocs/op.
 go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
@@ -75,7 +75,7 @@ go run ./cmd/leia bench compare --runs=5 --warmup=1 \
   --markdown /tmp/leia_hot_timing.md
 
 # Semantic-family performance coverage audit.
-bash benchmarks/coverage_guard.sh
+go run ./cmd/leia bench coverage
 ```
 
 Use `--syntax-smoke` after lexer/parser/grammar-only work when you need a
@@ -127,7 +127,7 @@ benchmark coverage audit. That document maps semantic q coverage from
 `eval_test.go`, `parser_test.go`, and `bind/q_test.go` to the benchmark
 dimensions that still need performance rows.
 
-`benchmarks/q_columnar_suite.sh` runs the focused q analytics baseline for
+`leia bench q-columnar` runs the focused q analytics baseline for
 runtime and JIT work. The script suite is Leia-only and compares the current
 worktree against a clean HEAD build over these stable shapes:
 
@@ -202,7 +202,7 @@ Read the q performance baseline through these ratios:
 
 | Signal | How to read it |
 |---|---|
-| Current Leia vs old Leia | `benchmarks/q_columnar_suite.sh` reports current worktree vs clean `HEAD`; compare `Current`, `HEAD`, and `HEAD delta` |
+| Current Leia vs old Leia | `leia bench q-columnar` reports current worktree vs clean `HEAD`; compare `Current`, `HEAD`, and `HEAD delta` |
 | Current Leia vs hand-written Go | compare `BenchmarkQSQLBind...` rows with `BenchmarkQSQLNativeGo...` rows for qSQL; compare `BenchmarkQSessionEvalVectorWarmExecution/...` with `BenchmarkQEvalVectorGoBaseline/...` for ordinary q compute |
 | Warm vs cold | compare `BenchmarkQSQLBindRunSQLWarmCache...` with `BenchmarkQSQLBindRunSQLColdCache...` |
 | Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in bind benchmark output; use `typed_kernel_hit_pct` and `typed_kernel_fallbacks/op` in ordinary q session rows |
@@ -415,7 +415,7 @@ bridge, allocation, and dynamic dispatch overhead; use `QEvalJITScriptWarm`
 rows to confirm the JIT script layer is still taking the planned q session
 op-exit route instead of the shell fallback route.
 
-`benchmarks/q_general_compute_suite.sh` is the short wrapper for this ordinary
+`leia bench q-general` is the short wrapper for this ordinary
 q compute suite. It keeps the benchmarks under `benchmarks/` while still
 exercising q result-cache warm, session warm execution, cold parse/lower, and
 hand-written Go baseline rows in one command.

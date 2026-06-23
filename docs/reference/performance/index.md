@@ -145,5 +145,5 @@ Rules:
 - add a Lua reference only when the workload maps naturally to Lua;
 - avoid benchmark-specific implementation hooks in runtime or JIT code.
 
-Use `bash benchmarks/coverage_guard.sh` to audit semantic-family performance
+Use `leia bench coverage` to audit semantic-family performance
 coverage.

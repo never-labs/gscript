@@ -69,6 +69,12 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "q-suite" {
 		return runBenchShellScript("q_performance_suite.sh", harnessArgs, outw, errw)
 	}
+	if mode == "q-columnar" {
+		return runBenchShellScript("q_columnar_suite.sh", harnessArgs, outw, errw)
+	}
+	if mode == "q-general" {
+		return runBenchShellScript("q_general_compute_suite.sh", harnessArgs, outw, errw)
+	}
 
 	return runBenchHarness(mode, harnessArgs, outw, errw)
 }
@@ -161,7 +167,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "q-suite", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "q-suite", "q-columnar", "q-general", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
 		return false
 	default:
 		return true
@@ -183,7 +189,7 @@ func benchScriptForMode(mode string) (string, error) {
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-report, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-columnar, q-general, q-report, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
 	}
 }
 
