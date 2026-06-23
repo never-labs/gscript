@@ -287,3 +287,79 @@ func TestBenchAuditRejectsPreviousSchemaResultsMap(t *testing.T) {
 		t.Fatalf("stderr = %q, want schema error", stderr.String())
 	}
 }
+
+func TestBenchRankLuaJITGapsReportsMarkdownAndCSV(t *testing.T) {
+	path := writeBenchRankFixture(t)
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"rank-luajit-gaps", path, "--top", "1"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand rank-luajit-gaps code = %d, stderr = %q", code, stderr.String())
+	}
+	report := stdout.String()
+	if !strings.Contains(report, "| 1 | slow | 0.120s | 0.060s | 0.090s | 0.030s | 2.00x | 3.00x | 2.00x | 4/3/1 | 7 |") {
+		t.Fatalf("markdown report = %s", report)
+	}
+	if strings.Contains(report, "fast") {
+		t.Fatalf("top=1 report included lower-ranked row: %s", report)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runBenchCommand([]string{"rank-luajit-gaps", path, "--format", "csv"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand rank-luajit-gaps csv code = %d, stderr = %q", code, stderr.String())
+	}
+	csv := stdout.String()
+	if !strings.Contains(csv, "rank,benchmark,vm_seconds,default_seconds,no_filter_seconds,luajit_seconds,default_luajit_ratio") ||
+		!strings.Contains(csv, "1,slow,0.12,0.06,0.09,0.03,2") ||
+		!strings.Contains(csv, "2,fast,0.03,0.02,,0.04,0.5") {
+		t.Fatalf("csv report = %s", csv)
+	}
+}
+
+func TestBenchRankLuaJITGapsRejectsUnknownFormat(t *testing.T) {
+	path := writeBenchRankFixture(t)
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"rank-luajit-gaps", path, "--format", "json"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runBenchCommand rank-luajit-gaps code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "unknown format") {
+		t.Fatalf("stderr = %q, want format error", stderr.String())
+	}
+}
+
+func writeBenchRankFixture(t *testing.T) string {
+	t.Helper()
+	payload := map[string]any{
+		"results": []map[string]any{
+			{
+				"benchmark": "fast",
+				"vm":        map[string]any{"status": "ok", "seconds": 0.030},
+				"default":   map[string]any{"status": "ok", "seconds": 0.020, "exit_total": 1},
+				"luajit":    map[string]any{"status": "ok", "seconds": 0.040},
+			},
+			{
+				"benchmark": "slow",
+				"vm":        map[string]any{"status": "ok", "seconds": 0.120},
+				"default":   map[string]any{"status": "ok", "seconds": 0.060, "t2_attempted": 4, "t2_entered": 3, "t2_failed": 1, "exit_total": 7},
+				"no_filter": map[string]any{"status": "ok", "seconds": 0.090},
+				"luajit":    map[string]any{"status": "ok", "seconds": 0.030},
+			},
+			{
+				"benchmark": "missing_luajit",
+				"default":   map[string]any{"status": "ok", "seconds": 0.010},
+				"luajit":    map[string]any{"status": "missing"},
+			},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "regression.json")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
