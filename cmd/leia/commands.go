@@ -17,7 +17,7 @@ type cliCommandSpec struct {
 
 func cliCommands() []cliCommandSpec {
 	return []cliCommandSpec{
-		{Name: "bench", Usage: "usage: leia bench [--manifest-check|--quick|--full|--guard|BENCH|compare [--quick]|strict|diagnose|audit|rank-luajit-gaps|debug-artifact|coverage|profile-exits|validate-lua-refs|submit-guard|jit-addr-map|regression-guard] [benchmark-harness-flags...]", Summary: "Run benchmark and benchmark-diagnostic harnesses.", Run: runBenchCommand},
+		{Name: "bench", Usage: "usage: leia bench [--manifest-check|--quick|--full|--guard|BENCH|compare [--quick]|strict|diagnose|q-report|audit|rank-luajit-gaps|debug-artifact|coverage|profile-exits|validate-lua-refs|submit-guard|jit-addr-map|regression-guard] [benchmark-harness-flags...]", Summary: "Run benchmark and benchmark-diagnostic harnesses.", Run: runBenchCommand},
 		{Name: "capabilities", Usage: "usage: leia capabilities [--json]", Summary: "Report binary capabilities, stdlib modules, and supported tooling formats.", Run: runCapabilitiesCommand},
 		{Name: "check", Usage: "usage: leia check [--json] [--quick|--full] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [--no-examples] [path-or-dir]", Summary: "Run formatter, linter, manifest, tests, docs, editor, and example checks as one local gate.", Run: runCheckCommand},
 		{Name: "ci", Usage: ciUsage, Summary: "Run canonical local CI profiles.", Run: runCICommand},

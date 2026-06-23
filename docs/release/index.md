@@ -26,7 +26,7 @@ scripts/run.sh production --full --release-profile --release-version vX.Y.Z --li
 go run ./cmd/leia doc check --json
 bash scripts/q_conformance_gate.sh --scope core --bench smoke --json
 LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh > /tmp/leia-q-perf-output.txt
-python3 benchmarks/q_perf_report.py --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md
+go run ./cmd/leia bench q-report --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md
 scripts/run.sh editor --json
 bash scripts/public_release_blockers_check.sh --json
 bash scripts/release_notes_check.sh --json --version vX.Y.Z

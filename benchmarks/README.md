@@ -56,7 +56,7 @@ LEIA_GO_BENCHTIME=100x bash benchmarks/q_performance_suite.sh --runs=3 --warmup=
 
 # q performance completeness report: qSQL plus ordinary q.eval/list/vector
 # workloads against hand-written Go, with warm/cold, cache/fallback, and allocs.
-python3 benchmarks/q_perf_report.py --benchtime=100x \
+go run ./cmd/leia bench q-report --benchtime=100x \
   --json benchmarks/data/q_perf_report_latest.json \
   --markdown benchmarks/data/q_perf_report_latest.md
 
@@ -172,7 +172,7 @@ go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
 For the fuller q performance report, prefer:
 
 ```bash
-python3 benchmarks/q_perf_report.py --benchtime=100x \
+go run ./cmd/leia bench q-report --benchtime=100x \
   --json benchmarks/data/q_perf_report_latest.json \
   --markdown benchmarks/data/q_perf_report_latest.md
 ```
@@ -214,7 +214,7 @@ Generate a machine-readable q performance report from the focused qSQL and
 ordinary q benchmark rows:
 
 ```bash
-python3 benchmarks/q_perf_report.py --benchtime=100x
+go run ./cmd/leia bench q-report --benchtime=100x
 ```
 
 The report writes `benchmarks/data/q_perf_report_latest.md` and
@@ -240,7 +240,7 @@ failures for Leia-vs-Go, typed hit/fallback, pipeline fallback, JIT errors, and
 Use `--check` to turn the same report into a performance gate:
 
 ```bash
-python3 benchmarks/q_perf_report.py \
+go run ./cmd/leia bench q-report \
   --benchtime=100x \
   --check \
   --max-leia-go-ratio=5 \
@@ -269,7 +269,7 @@ python3 benchmarks/q_perf_report.py \
 For quick iteration on saved `go test -bench` output, skip rerunning benchmarks:
 
 ```bash
-python3 benchmarks/q_perf_report.py \
+go run ./cmd/leia bench q-report \
   --from-output /tmp/qbench.txt \
   --check
 ```
@@ -333,7 +333,7 @@ Use this stricter gate after bulk export, direct return, executable backend, or
 typed kernel changes:
 
 ```bash
-python3 benchmarks/q_perf_report.py \
+go run ./cmd/leia bench q-report \
   --from-output /tmp/qbench.txt \
   --check \
   --min-runtime-direct-bridge-share-pct=95 \
@@ -369,7 +369,7 @@ families first, then feed it to the report:
     -benchmem -benchtime=100x
 } | tee /tmp/qbench.txt
 
-python3 benchmarks/q_perf_report.py \
+go run ./cmd/leia bench q-report \
   --from-output /tmp/qbench.txt \
   --check \
   --min-runtime-direct-bridge-share-pct=95 \

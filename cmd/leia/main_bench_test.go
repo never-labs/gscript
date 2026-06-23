@@ -204,6 +204,26 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	}
 }
 
+func TestBenchCommandDispatchesQReportHarness(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"q-report", "--from-output", "/tmp/q.txt", "--check"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "q_perf_report.py")) || gotArgs[1] != "--from-output" || gotArgs[2] != "/tmp/q.txt" || gotArgs[3] != "--check" {
+		t.Fatalf("args = %#v, want q_perf_report.py --from-output /tmp/q.txt --check", gotArgs)
+	}
+}
+
 func TestBenchAuditCommandReportsSections(t *testing.T) {
 	payload := map[string]any{
 		"results": []map[string]any{
