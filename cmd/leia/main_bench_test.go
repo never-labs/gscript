@@ -552,6 +552,109 @@ func TestBenchCoverageReportsMissingFamilyAndRefs(t *testing.T) {
 	}
 }
 
+func TestBenchProfileExitsParsesTimeAndExitJSON(t *testing.T) {
+	output := "warmup\nTime: 0.125s\n{\n  \"total\": 2,\n  \"by_exit_code\": {\"ExitDeopt\": 2},\n  \"sites\": []\n}\n"
+	stats, err := benchProfileExtractExitJSON(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := benchDebugToInt(stats["total"]); got != 2 {
+		t.Fatalf("total = %d, want 2", got)
+	}
+	seconds := benchProfileParseTime(output)
+	if seconds == nil || *seconds != 0.125 {
+		t.Fatalf("seconds = %v, want 0.125", seconds)
+	}
+}
+
+func TestBenchProfileExitsMarkdownAggregates(t *testing.T) {
+	seconds := 0.125
+	report := benchProfileMarkdown([]benchProfileExitResult{
+		{
+			Benchmark: "numeric/spectral_norm",
+			Status:    "ok",
+			Seconds:   &seconds,
+			Stats: map[string]any{
+				"total":        3,
+				"by_exit_code": map[string]any{"ExitDeopt": 3},
+				"sites": []any{map[string]any{
+					"count":     3,
+					"proto":     "main",
+					"exit_name": "ExitDeopt",
+					"pc":        7,
+					"op_id":     11,
+					"reason":    "guard:type",
+				}},
+			},
+		},
+		{Benchmark: "missing/bench", Status: "missing"},
+	}, 10)
+	for _, want := range []string{
+		"| numeric/spectral_norm | 0.125s | 3 | ExitDeopt=3 |",
+		"| missing/bench | missing | - | - |",
+		"| ExitDeopt | 3 |",
+		"| guard:type | 3 |",
+		"| 3 | numeric/spectral_norm | main | ExitDeopt | 7 | 11 | guard:type |",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("profile report missing %q:\n%s", want, report)
+		}
+	}
+}
+
+func TestBenchProfileExitsCommandRunsSelectedBenchmark(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	td := t.TempDir()
+	benchDir := filepath.Join(td, "benchmarks", "numeric")
+	if err := os.MkdirAll(benchDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(benchDir, "unit.leia"), []byte("print(1)\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "go.mod"), filepath.Join(td, "go.mod")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "cmd"), filepath.Join(td, "cmd")); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(td)
+
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var calls [][]string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		calls = append(calls, append([]string{name}, args...))
+		switch name {
+		case "go":
+			return exec.Command("true")
+		default:
+			helper, helperArgs := testHelperCommand(t, "bench-exit-profile")
+			return exec.Command(helper, helperArgs...)
+		}
+	}
+
+	jsonPath := filepath.Join(td, "out", "profile.json")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"profile-exits", "--bench", "numeric/unit", "--json", jsonPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand profile-exits code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(calls) != 2 || calls[0][0] != "go" || calls[1][0] == "" || !strings.HasSuffix(calls[1][len(calls[1])-1], filepath.Join("benchmarks", "numeric", "unit.leia")) {
+		t.Fatalf("calls = %#v, want build then leia run on numeric/unit.leia", calls)
+	}
+	if !strings.Contains(stdout.String(), "| numeric/unit | 0.125s | 3 | ExitDeopt=3 |") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"mode": "default"`) || !strings.Contains(string(data), `"benchmark": "numeric/unit"`) {
+		t.Fatalf("json = %s", string(data))
+	}
+}
+
 func writeTestFile(t *testing.T, path string, value any) {
 	t.Helper()
 	data, err := json.Marshal(value)

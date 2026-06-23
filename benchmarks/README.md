@@ -86,7 +86,7 @@ change does not need VM/default/no-filter output stability evidence.
 ## Diagnostics
 
 ```bash
-python3 benchmarks/profile_exits.py --bench=numeric/spectral_norm --top=30
+go run ./cmd/leia bench profile-exits --bench=numeric/spectral_norm --top=30
 
 python3 benchmarks/triage.py --bench=numeric/spectral_norm \
   --scale=numeric/spectral_norm:N=2000 --time-source=script \

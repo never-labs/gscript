@@ -4,7 +4,7 @@
 This script orchestrates the existing tools instead of replacing them:
 
 1. timing_compare.py decides whether a gap is real and records timing source.
-2. profile_exits.py explains Tier 2 exit/deopt pressure for selected benchmarks.
+2. leia bench profile-exits explains Tier 2 exit/deopt pressure for selected benchmarks.
 3. scripts/diag.sh and pprof can be enabled when codegen/runtime detail is needed.
 4. -jit-dump-warm plus jit_addr_map.py can map sampled JIT PCs back to IR.
 
@@ -903,7 +903,7 @@ def main() -> int:
     if selected_benches:
         exit_md = out_dir / "exits.md"
         exit_json = out_dir / "exits.json"
-        exit_cmd = [sys.executable, "benchmarks/profile_exits.py", "--timeout", args.timeout, "--json", str(exit_json), "--markdown", str(exit_md)]
+        exit_cmd = ["go", "run", "./cmd/leia", "bench", "profile-exits", "--timeout", args.timeout, "--json", str(exit_json), "--markdown", str(exit_md)]
         for _, name, _ in selected_benches:
             exit_cmd += ["--bench", name]
         run(exit_cmd, root, int(args.timeout) * max(1, len(selected_benches)))

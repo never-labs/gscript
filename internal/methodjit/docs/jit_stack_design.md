@@ -223,7 +223,7 @@ measured A/B. All on Apple M4 Max, Go 1.25.7, same binary, flag A/B.
 
 ### Transition ranking (frequency × per-call overhead share)
 
-Measured with `benchmarks/profile_exits.py` (CLI `-exit-stats-json`, default
+Measured with `leia bench profile-exits` (CLI `-exit-stats-json`, default
 and `LEIA_TIER2_NO_FILTER=1` modes, all domains), plus a forced-Tier 2 sweep
 of the full q JIT script family (all 482 `qEvalVectorCases` × 64 iterations,
 aggregating `ExitStats` + `QKernelExecutionStats`):

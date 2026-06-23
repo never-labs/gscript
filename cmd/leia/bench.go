@@ -51,6 +51,9 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "coverage" {
 		return runBenchCoverageCommand(harnessArgs, outw, errw)
 	}
+	if mode == "profile-exits" || mode == "exits" {
+		return runBenchProfileExitsCommand(harnessArgs, outw, errw)
+	}
 
 	return runBenchHarness(mode, harnessArgs, outw, errw)
 }
@@ -122,7 +125,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "compare", "timing", "strict", "diagnose", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "compare", "timing", "strict", "diagnose", "help":
 		return false
 	default:
 		return true
@@ -140,7 +143,7 @@ func benchScriptForMode(mode string) (string, error) {
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, audit, rank-luajit-gaps, debug-artifact, or coverage)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, audit, rank-luajit-gaps, debug-artifact, coverage, or profile-exits)", mode)
 	}
 }
 

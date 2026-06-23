@@ -13,6 +13,10 @@ func TestHelperProcess(t *testing.T) {
 	case "bench":
 		_, _ = os.Stdout.WriteString("bench helper ok\n")
 		os.Exit(0)
+	case "bench-exit-profile":
+		_, _ = os.Stdout.WriteString("Time: 0.125s\n")
+		_, _ = os.Stdout.WriteString("{\n  \"total\": 3,\n  \"by_exit_code\": {\"ExitDeopt\": 3},\n  \"sites\": [{\"count\": 3, \"proto\": \"main\", \"exit_name\": \"ExitDeopt\", \"pc\": 7, \"op_id\": 11, \"reason\": \"guard:type\"}]\n}\n")
+		os.Exit(0)
 	case "ci":
 		_, _ = os.Stdout.WriteString("ci helper ok\n")
 		os.Exit(0)
