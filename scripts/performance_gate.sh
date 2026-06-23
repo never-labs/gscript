@@ -615,7 +615,7 @@ validate_luajit_artifact() {
         echo "LuaJIT performance submit guard skipped (--no-luajit)."
         return 0
     fi
-    python3 benchmarks/perf_submit_guard.py "$json_path" --ratio-threshold "$LUAJIT_THRESHOLD"
+    go run ./cmd/leia bench submit-guard "$json_path" --ratio-threshold "$LUAJIT_THRESHOLD"
 }
 
 if [ -n "$VALIDATE_ONLY" ]; then

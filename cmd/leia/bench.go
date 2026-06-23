@@ -57,6 +57,9 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "validate-lua-refs" || mode == "lua-refs" {
 		return runBenchValidateLuaRefsCommand(harnessArgs, outw, errw)
 	}
+	if mode == "submit-guard" {
+		return runBenchSubmitGuardCommand(harnessArgs, outw, errw)
+	}
 
 	return runBenchHarness(mode, harnessArgs, outw, errw)
 }
@@ -128,7 +131,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "compare", "timing", "strict", "diagnose", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "compare", "timing", "strict", "diagnose", "help":
 		return false
 	default:
 		return true
@@ -146,7 +149,7 @@ func benchScriptForMode(mode string) (string, error) {
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, or validate-lua-refs)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, or submit-guard)", mode)
 	}
 }
 

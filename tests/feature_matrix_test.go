@@ -1117,7 +1117,7 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	for _, snippet := range []string{
 		"LUAJIT_THRESHOLD=0.80",
 		"validate_luajit_artifact",
-		"benchmarks/perf_submit_guard.py",
+		"leia bench submit-guard",
 		"validate_strict_artifact",
 	} {
 		if !strings.Contains(gate, snippet) {

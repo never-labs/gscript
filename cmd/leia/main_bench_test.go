@@ -718,6 +718,97 @@ func TestBenchValidateLuaRefsReportsNoTime(t *testing.T) {
 	}
 }
 
+func TestBenchSubmitGuardRejectsLuaJITRatio(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	t.Chdir(root)
+	path := writeBenchTimingPayload(t, []benchTimingFixture{{Name: "numeric/matmul_dense", Current: 0.81, LuaJIT: 1.0}})
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"submit-guard", path, "--ratio-threshold", "0.8"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("submit-guard code = %d, want 1; stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "luajit") || !strings.Contains(stdout.String(), "numeric/matmul_dense") {
+		t.Fatalf("stdout = %q, want luajit violation", stdout.String())
+	}
+}
+
+func TestBenchSubmitGuardRejectsBaselineRegression(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	t.Chdir(root)
+	candidate := writeBenchTimingPayload(t, []benchTimingFixture{{Name: "numeric/matmul_dense", Current: 0.75, LuaJIT: 1.0}})
+	baseline := writeBenchTimingPayload(t, []benchTimingFixture{{Name: "numeric/matmul_dense", Current: 0.70, LuaJIT: 1.0}})
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"submit-guard", candidate, "--baseline", baseline, "--ratio-threshold", "0.8", "--regression-tolerance", "0.03"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("submit-guard code = %d, want 1; stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "regression") || !strings.Contains(stdout.String(), "+7.14%") {
+		t.Fatalf("stdout = %q, want regression violation", stdout.String())
+	}
+}
+
+func TestBenchSubmitGuardSkipsMixedSourcesAndLeiaOnlyLuaJIT(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	t.Chdir(root)
+	path := writeBenchTimingPayload(t, []benchTimingFixture{
+		{Name: "numeric/matmul_dense", Current: 0.02, LuaJIT: 0.01, CurrentSource: "wall_repeat", LuaJITSource: "script_repeat"},
+		{Name: "data/q_columnar_qsql_filter_project", Current: 0.42, LuaJITStatus: "missing", CurrentSource: "script_repeat"},
+	})
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"submit-guard", path, "--ratio-threshold", "0.8"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("submit-guard code = %d, want 0; stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Guard passed.") || strings.Contains(stdout.String(), "numeric/matmul_dense") {
+		t.Fatalf("stdout = %q, want mixed source omitted from ratio table and guard pass", stdout.String())
+	}
+}
+
+type benchTimingFixture struct {
+	Name          string
+	Current       float64
+	LuaJIT        float64
+	CurrentSource string
+	LuaJITSource  string
+	LuaJITStatus  string
+}
+
+func writeBenchTimingPayload(t *testing.T, rows []benchTimingFixture) string {
+	t.Helper()
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		group, bench, _ := strings.Cut(row.Name, "/")
+		current := map[string]any{"status": "ok", "stats": map[string]any{"median": row.Current}}
+		if row.CurrentSource != "" {
+			current["source"] = row.CurrentSource
+		}
+		luaStatus := row.LuaJITStatus
+		if luaStatus == "" {
+			luaStatus = "ok"
+		}
+		luajit := map[string]any{"status": luaStatus}
+		if row.LuaJIT > 0 {
+			luajit["stats"] = map[string]any{"median": row.LuaJIT}
+		}
+		if row.LuaJITSource != "" {
+			luajit["source"] = row.LuaJITSource
+		}
+		results = append(results, map[string]any{
+			"group":     group,
+			"benchmark": bench,
+			"modes": map[string]any{
+				"default": map[string]any{
+					"current": current,
+					"luajit":  luajit,
+				},
+			},
+		})
+	}
+	path := filepath.Join(t.TempDir(), "timing.json")
+	writeTestFile(t, path, map[string]any{"results": results})
+	return path
+}
+
 func writeTestFile(t *testing.T, path string, value any) {
 	t.Helper()
 	data, err := json.Marshal(value)
