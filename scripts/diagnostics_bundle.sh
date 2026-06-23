@@ -297,9 +297,9 @@ else
 fi
 
 if [ "$RUN_BENCHMARKS" -eq 1 ]; then
-    if have_cmd python3 && [ -f benchmarks/timing_compare.py ]; then
+    if have_cmd go; then
         if ! run_logged "Benchmark Quick Summary" "$OUT_DIR/benchmark_quick.log" \
-            "python3 benchmarks/timing_compare.py --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --bench=control/sieve --json '$OUT_DIR/benchmark_quick.json' --markdown '$OUT_DIR/benchmark_quick.md'" \
+            "go run ./cmd/leia bench compare --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --bench=control/sieve --json '$OUT_DIR/benchmark_quick.json' --markdown '$OUT_DIR/benchmark_quick.md'" \
             "$OUT_DIR/benchmark_quick.status"; then
             failures=$((failures + 1))
         fi
@@ -308,13 +308,13 @@ if [ "$RUN_BENCHMARKS" -eq 1 ]; then
         record_manifest "benchmark_quick.json"
         record_manifest "benchmark_quick.md"
     else
-        write_skip "Benchmark Quick Summary" "missing python3 or benchmarks/timing_compare.py" "$OUT_DIR/benchmark_quick.skipped"
+        write_skip "Benchmark Quick Summary" "missing go" "$OUT_DIR/benchmark_quick.skipped"
         record_manifest "benchmark_quick.skipped"
     fi
 
-    if have_cmd python3 && [ -f benchmarks/strict_guard.py ]; then
+    if have_cmd go; then
         if ! run_logged "Strict Guard Summary" "$OUT_DIR/strict_guard.log" \
-            "python3 benchmarks/strict_guard.py --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --mode=vm --mode=default --mode=no_filter --bench=control/sieve --json '$OUT_DIR/strict_guard.json' --markdown '$OUT_DIR/strict_guard.md'" \
+            "go run ./cmd/leia bench strict --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --mode=vm --mode=default --mode=no_filter --bench=control/sieve --json '$OUT_DIR/strict_guard.json' --markdown '$OUT_DIR/strict_guard.md'" \
             "$OUT_DIR/strict_guard.status"; then
             failures=$((failures + 1))
         fi
@@ -323,7 +323,7 @@ if [ "$RUN_BENCHMARKS" -eq 1 ]; then
         record_manifest "strict_guard.json"
         record_manifest "strict_guard.md"
     else
-        write_skip "Strict Guard Summary" "missing python3 or benchmarks/strict_guard.py" "$OUT_DIR/strict_guard.skipped"
+        write_skip "Strict Guard Summary" "missing go" "$OUT_DIR/strict_guard.skipped"
         record_manifest "strict_guard.skipped"
     fi
 else

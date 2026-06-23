@@ -27,19 +27,19 @@ scripts/run.sh perf --syntax-smoke --no-luajit
 scripts/run.sh perf --full
 
 # Investigation-only current worktree vs clean HEAD vs LuaJIT.
-python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
+go run ./cmd/leia bench compare --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --sort=luajit-gap \
   --json /tmp/leia_timing_compare.json \
   --markdown /tmp/leia_timing_compare.md
 
 # Strict truth pass across hot, script-timed groups.
-python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90 \
+go run ./cmd/leia bench strict --runs=3 --warmup=1 --timeout=90 \
   --json benchmarks/data/strict_guard_latest.json \
   --markdown benchmarks/data/strict_guard_latest.md
 
 # Representative subset while iterating.
-python3 benchmarks/strict_guard.py --runs=3 --warmup=0 --max-repeat=8 \
+go run ./cmd/leia bench strict --runs=3 --warmup=0 --max-repeat=8 \
   --bench=numeric/matmul --bench=numeric/matmul_row \
   --bench=table/json_table_walk
 
@@ -69,7 +69,7 @@ go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
   -benchmem
 
 # Hot-loop scaling profile for low-resolution workloads.
-python3 benchmarks/timing_compare.py --runs=5 --warmup=1 \
+go run ./cmd/leia bench compare --runs=5 --warmup=1 \
   --scale-profile=hot --sort=luajit-gap \
   --json /tmp/leia_hot_timing.json \
   --markdown /tmp/leia_hot_timing.md

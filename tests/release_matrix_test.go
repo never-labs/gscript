@@ -1083,7 +1083,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		{path: "scripts/docs_check.sh", snippet: `"release_distribution_check": root / "scripts" / "release_distribution_check.sh"`},
 		{path: "scripts/diagnostics_bundle.sh", snippet: "Collects git revision/status"},
 		{path: "scripts/worktree_audit.sh", snippet: "--json"},
-		{path: "scripts/performance_gate.sh", snippet: "benchmarks/timing_compare.py"},
+		{path: "scripts/performance_gate.sh", snippet: "go run ./cmd/leia bench compare"},
 		{path: "scripts/production_check.sh", snippet: "add_release_smoke"},
 		{path: "scripts/production_check.sh", snippet: "RELEASE_CRITICAL_SKIP_NAMES"},
 		{path: "scripts/production_check.sh", snippet: "Release profile requires these checks to run instead of skip:"},

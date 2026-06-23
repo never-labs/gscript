@@ -2654,7 +2654,7 @@ def build_coverage(rows: dict[str, BenchRow], current_vs_old: list[CurrentVsOldR
             "signal": "current Leia vs old Leia",
             "qSQL": "covered" if current_vs_old else "missing",
             "q.eval": "covered" if current_vs_old else "missing",
-            "gap": "" if current_vs_old else "provide --timing-json from benchmarks/timing_compare.py or q_columnar_suite JSON output",
+            "gap": "" if current_vs_old else "provide --timing-json from leia bench compare or q_columnar_suite JSON output",
         },
         {
             "signal": "current Leia vs hand-written Go",
@@ -3214,7 +3214,7 @@ def markdown_report(
             "",
             "- Add stable q.eval math-map coverage once unary/vector math expressions such as exp/log/sqrt have complete parser/eval support.",
             "- Add qSQL cold-cache counterparts for group and join if those paths are used to judge schema-stable cache value.",
-            "- Pass `--timing-json` from `benchmarks/timing_compare.py` / `q_columnar_suite.sh --json ...` when this report is used for current-vs-old decisions.",
+            "- Pass `--timing-json` from `leia bench compare` / `q_columnar_suite.sh --json ...` when this report is used for current-vs-old decisions.",
         ]
     )
     return "\n".join(lines) + "\n"

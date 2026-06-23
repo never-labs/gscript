@@ -365,7 +365,7 @@ case "$RUN_BENCH" in
     else
       log_info "[q-gate] q benchmark smoke cases: ${#q_benchmarks[@]}"
       if [ "$JSON_OUT" == "true" ]; then
-        run_logged "$TMPDIR/leia-q-gate-benchmark.out" python3 benchmarks/timing_compare.py \
+        run_logged "$TMPDIR/leia-q-gate-benchmark.out" go run ./cmd/leia bench compare \
           --runs=1 --warmup=0 --timeout="$TIMEOUT" \
           --min-sample-seconds=0.005 --max-repeat=1 \
           --no-luajit --jobs="$JOBS" \
@@ -374,7 +374,7 @@ case "$RUN_BENCH" in
           --markdown "$TMPDIR/leia_q_gate_smoke.md"
       else
         progress_args=(--progress)
-        run_logged "$TMPDIR/leia-q-gate-benchmark.out" python3 benchmarks/timing_compare.py \
+        run_logged "$TMPDIR/leia-q-gate-benchmark.out" go run ./cmd/leia bench compare \
           --runs=1 --warmup=0 --timeout="$TIMEOUT" \
           --min-sample-seconds=0.005 --max-repeat=1 \
           --no-luajit --jobs="$JOBS" \
@@ -391,7 +391,7 @@ case "$RUN_BENCH" in
     else
       log_info "[q-gate] all q benchmark cases: ${#q_benchmarks[@]}"
       if [ "$JSON_OUT" == "true" ]; then
-        run_logged "$TMPDIR/leia-q-gate-benchmark.out" python3 benchmarks/timing_compare.py \
+        run_logged "$TMPDIR/leia-q-gate-benchmark.out" go run ./cmd/leia bench compare \
           --runs=3 --warmup=1 --timeout="$TIMEOUT" \
           --min-sample-seconds=0.01 --max-repeat=3 \
           --no-luajit --jobs="$JOBS" \
@@ -400,7 +400,7 @@ case "$RUN_BENCH" in
           --markdown "$TMPDIR/leia_q_gate_all_smoke.md"
       else
         progress_args=(--progress)
-        run_logged "$TMPDIR/leia-q-gate-benchmark.out" python3 benchmarks/timing_compare.py \
+        run_logged "$TMPDIR/leia-q-gate-benchmark.out" go run ./cmd/leia bench compare \
           --runs=3 --warmup=1 --timeout="$TIMEOUT" \
           --min-sample-seconds=0.01 --max-repeat=3 \
           --no-luajit --jobs="$JOBS" \

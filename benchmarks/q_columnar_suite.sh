@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-exec python3 benchmarks/timing_compare.py \
+exec go run ./cmd/leia bench compare \
   --no-luajit \
   --bench=data/q_columnar_eval_primitives \
   --bench=data/q_columnar_qsql_filter_project \

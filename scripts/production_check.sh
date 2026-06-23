@@ -387,12 +387,8 @@ add_performance_gate() {
         add_skip "Performance Gate" "missing scripts/performance_gate.sh"
         return
     fi
-    if [ ! -f benchmarks/timing_compare.py ]; then
-        add_skip "Performance Gate" "missing benchmarks/timing_compare.py"
-        return
-    fi
-    if [ ! -f benchmarks/strict_guard.py ]; then
-        add_skip "Performance Gate" "missing benchmarks/strict_guard.py"
+    if ! have_cmd go; then
+        add_skip "Performance Gate" "missing go"
         return
     fi
     add_run "Performance Gate" "$cmd"
@@ -401,20 +397,12 @@ add_performance_gate() {
 add_performance_smoke() {
     local cmd="scripts/run.sh perf --smoke --runs 2 --warmup 1"
 
-    if ! have_cmd python3; then
-        add_skip "Performance Smoke" "missing python3"
+    if ! have_cmd go; then
+        add_skip "Performance Smoke" "missing go"
         return
     fi
     if [ ! -f scripts/performance_gate.sh ]; then
         add_skip "Performance Smoke" "missing scripts/performance_gate.sh"
-        return
-    fi
-    if [ ! -f benchmarks/timing_compare.py ]; then
-        add_skip "Performance Smoke" "missing benchmarks/timing_compare.py"
-        return
-    fi
-    if [ ! -f benchmarks/strict_guard.py ]; then
-        add_skip "Performance Smoke" "missing benchmarks/strict_guard.py"
         return
     fi
     add_run "Performance Smoke" "$cmd"

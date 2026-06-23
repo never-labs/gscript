@@ -9,4 +9,4 @@
 
 set -u
 cd "$(dirname "$0")/.."
-exec python3 benchmarks/strict_guard.py "$@"
+exec go run ./cmd/leia bench strict "$@"

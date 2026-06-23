@@ -222,7 +222,7 @@ func writeDiagDriftSummary(b *strings.Builder) {
 			fmt.Fprintln(b, "_reference.json not found_")
 		}
 		if !latestOK {
-			fmt.Fprintln(b, "_latest.json not found — run benchmarks/strict_guard.py or leia bench regression-guard first_")
+			fmt.Fprintln(b, "_latest.json not found — run go run ./cmd/leia bench strict or leia bench regression-guard first_")
 		}
 		return
 	}

@@ -33,11 +33,11 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         regression = (ROOT / "benchmarks" / "regression_guard.sh").read_text()
         self.assertIn('exec go run ./cmd/leia bench regression-guard "$@"', regression)
         strict = (ROOT / "benchmarks" / "strict_guard.sh").read_text()
-        self.assertIn('exec python3 benchmarks/strict_guard.py "$@"', strict)
+        self.assertIn('exec go run ./cmd/leia bench strict "$@"', strict)
 
     def test_q_columnar_suite_wraps_timing_compare(self):
         wrapper = (ROOT / "benchmarks" / "q_columnar_suite.sh").read_text()
-        self.assertIn("python3 benchmarks/timing_compare.py", wrapper)
+        self.assertIn("go run ./cmd/leia bench compare", wrapper)
         self.assertIn("--no-luajit", wrapper)
         for bench in (
             "data/q_columnar_eval_primitives",
@@ -50,8 +50,8 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
 
     def test_scripts_performance_gate_wraps_benchmark_python_tools(self):
         gate = (ROOT / "scripts" / "performance_gate.sh").read_text()
-        self.assertIn("python3 benchmarks/timing_compare.py", gate)
-        self.assertIn("python3 benchmarks/strict_guard.py", gate)
+        self.assertIn("go run ./cmd/leia bench compare", gate)
+        self.assertIn("go run ./cmd/leia bench strict", gate)
         self.assertIn("--progress", gate)
         self.assertIn('--jobs="$JOBS"', gate)
         self.assertIn("table/table_field_access", gate)

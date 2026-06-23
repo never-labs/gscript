@@ -588,8 +588,11 @@ def run_timing_compare(root: Path, specs: list[timing.BenchmarkSpec], args: argp
     if args.no_timing:
         return
     cmd = [
-        "python3",
-        "benchmarks/timing_compare.py",
+        "go",
+        "run",
+        "./cmd/leia",
+        "bench",
+        "compare",
         "--runs",
         str(args.runs),
         "--warmup",

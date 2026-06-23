@@ -858,8 +858,11 @@ def main() -> int:
     summary_json = out_dir / "triage.json"
 
     cmd = [
-        sys.executable,
-        "benchmarks/timing_compare.py",
+        "go",
+        "run",
+        "./cmd/leia",
+        "bench",
+        "compare",
         "--runs",
         args.runs,
         "--warmup",

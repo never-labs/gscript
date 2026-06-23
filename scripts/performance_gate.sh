@@ -1,8 +1,8 @@
 #!/bin/bash
 # Repeatable performance gate for core Leia hot paths.
 #
-# This is a thin wrapper around benchmarks/timing_compare.py plus an optional
-# strict_guard.py truth pass. It does not tune workloads in production code; it
+# This is a thin wrapper around go run ./cmd/leia bench compare plus an optional
+# go run ./cmd/leia bench strict truth pass. It does not tune workloads in production code; it
 # only chooses representative benchmark inputs, records artifacts, sorts
 # current-vs-HEAD deltas, and fails on clear regressions or unreliable samples.
 
@@ -123,7 +123,7 @@ Options:
   --phase-smoke           Run stage-end correctness + performance smoke.
   --quick-phase-smoke     Run an explicit fast phase smoke for local iteration.
   --feature-smoke         Run hot-path smoke coverage for newer language features.
-  --full                  Run all benchmark groups through timing_compare.py.
+  --full                  Run all benchmark groups through leia bench compare.
   --bench ID              Add one benchmark selector, e.g. numeric/spectral_norm.
   --runs N                Measured timing samples after calibration. Default: 5.
   --warmup N              Warmup samples after calibration. Default: 1.
@@ -132,11 +132,11 @@ Options:
   --wall-threshold F      Wall-timed current/HEAD regression limit. Default: 0.30.
   --luajit-threshold F    Script-timed current/LuaJIT limit. Default: 0.80.
   --out-dir DIR           Artifact directory. Default: ${TMPDIR:-/tmp}/leia_performance_gate.
-  --head-ref REF          Clean baseline ref for timing_compare.py. Default: HEAD.
+  --head-ref REF          Clean baseline ref for leia bench compare. Default: HEAD.
   --no-luajit             Skip LuaJIT timing.
   --jobs N                Run up to N benchmarks concurrently. Default: auto, capped by LEIA_PERF_MAX_JOBS or 8.
-  --strict / --no-strict  Enable or skip strict_guard.py truth pass. Default: --strict.
-  --validate-only JSON    Only validate an existing timing_compare JSON artifact.
+  --strict / --no-strict  Enable or skip leia bench strict truth pass. Default: --strict.
+  --validate-only JSON    Only validate an existing leia bench compare JSON artifact.
   --json                  Print a validate-only machine-readable report. Valid with --validate-only.
   -h, --help              Show this help.
 
@@ -685,7 +685,7 @@ ALL_BENCHMARK_GROUPS=(
 )
 
 TIMING_CMD=(
-    python3 benchmarks/timing_compare.py
+    go run ./cmd/leia bench compare
     --runs="$RUNS"
     --warmup="$WARMUP"
     --timeout="$TIMEOUT"
@@ -742,7 +742,7 @@ else
     fi
 fi
 
-echo "=== timing_compare performance gate ==="
+echo "=== leia bench compare performance gate ==="
 printf 'Command:'
 printf ' %q' "${TIMING_CMD[@]}"
 printf '\n'
@@ -754,7 +754,7 @@ validate_luajit_artifact "$TIMING_JSON"
 
 if [ "$STRICT" -eq 1 ]; then
     STRICT_CMD=(
-        python3 benchmarks/strict_guard.py
+        go run ./cmd/leia bench strict
         --runs="$RUNS"
         --warmup="$WARMUP"
         --timeout="$TIMEOUT"
@@ -807,7 +807,7 @@ if [ "$STRICT" -eq 1 ]; then
     fi
 
     echo
-    echo "=== strict_guard truth pass ==="
+    echo "=== leia bench strict truth pass ==="
     printf 'Command:'
     printf ' %q' "${STRICT_CMD[@]}"
     printf '\n'
