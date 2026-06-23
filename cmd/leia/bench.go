@@ -137,7 +137,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "compare", "timing", "strict", "diagnose", "q-report", "report", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
 		return false
 	default:
 		return true
@@ -152,18 +152,20 @@ func benchScriptForMode(mode string) (string, error) {
 		return "strict_guard.py", nil
 	case "diagnose":
 		return "diagnose.py", nil
+	case "triage":
+		return "triage.py", nil
 	case "q-report", "report":
 		return "q_perf_report.py", nil
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, q-report, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-report, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
 	}
 }
 
 func findBenchmarkScript(name string) (string, error) {
 	if name == "" {
-		return "", errors.New("usage: leia bench [--quick|--full|--guard|BENCH|compare|strict|diagnose|q-report] [benchmark-harness-flags...]")
+		return "", errors.New("usage: leia bench [--quick|--full|--guard|BENCH|compare|strict|diagnose|triage|q-report] [benchmark-harness-flags...]")
 	}
 	dir, err := os.Getwd()
 	if err != nil {

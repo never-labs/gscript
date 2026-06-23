@@ -88,11 +88,11 @@ change does not need VM/default/no-filter output stability evidence.
 ```bash
 go run ./cmd/leia bench profile-exits --bench=numeric/spectral_norm --top=30
 
-python3 benchmarks/triage.py --bench=numeric/spectral_norm \
+go run ./cmd/leia bench triage --bench=numeric/spectral_norm \
   --scale=numeric/spectral_norm:N=2000 --time-source=script \
   --diag --pprof --memprofile --warm-dump --out-dir=/tmp/leia-triage
 
-python3 benchmarks/diagnose.py \
+go run ./cmd/leia bench diagnose \
   --bench=calls/method_dispatch \
   --bench=table/groupby_nested_agg \
   --out-dir=/tmp/leia-diagnose
@@ -100,11 +100,11 @@ python3 benchmarks/diagnose.py \
 bash scripts/diag.sh table/table_array_access
 ```
 
-`timing_compare.py` is the primary local optimization harness. It records timing
+`leia bench compare` is the primary local optimization harness. It records timing
 source, repeat count, CI, parameter scaling, current-vs-HEAD deltas, and LuaJIT
 gaps.
 
-`strict_guard.py` is the release/regression truth pass for hot, script-timed
+`leia bench strict` is the release/regression truth pass for hot, script-timed
 workloads. It runs VM, default JIT, no-filter JIT, and LuaJIT where a reference
 exists, then checks output stability and timing quality. Concurrency benchmarks
 remain available via explicit `--group=concurrency` or `--bench=...`, but they

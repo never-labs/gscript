@@ -204,6 +204,26 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	}
 }
 
+func TestBenchCommandDispatchesTriageHarness(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"triage", "--bench", "numeric/spectral_norm", "--runs", "1"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 5 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "triage.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "numeric/spectral_norm" || gotArgs[3] != "--runs" || gotArgs[4] != "1" {
+		t.Fatalf("args = %#v, want triage.py --bench numeric/spectral_norm --runs 1", gotArgs)
+	}
+}
+
 func TestBenchCommandDispatchesQReportHarness(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })

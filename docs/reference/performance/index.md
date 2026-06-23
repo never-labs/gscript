@@ -60,7 +60,7 @@ contention is acceptable.
 
 ## Timing Modes
 
-`timing_compare.py` is the main optimization harness. It compares:
+`leia bench compare` is the main optimization harness. It compares:
 
 - the local checkout binary;
 - a clean baseline binary built from `--head-ref`;
