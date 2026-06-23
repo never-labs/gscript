@@ -363,3 +363,161 @@ func writeBenchRankFixture(t *testing.T) string {
 	}
 	return path
 }
+
+func TestBenchDebugArtifactAggregatesExistingOutputs(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	td := t.TempDir()
+	timing := filepath.Join(td, "timing.json")
+	writeTestFile(t, timing, map[string]any{
+		"results": []map[string]any{
+			{
+				"group":     "recursion",
+				"benchmark": "fib",
+				"modes": map[string]any{
+					"default": map[string]any{
+						"current": map[string]any{
+							"status":     "ok",
+							"source":     "script",
+							"repeat":     4,
+							"stats":      map[string]any{"median": 0.01},
+							"t2_entered": 1,
+							"exit_total": 2,
+						},
+					},
+				},
+			},
+		},
+	})
+	exits := filepath.Join(td, "exits.json")
+	writeTestFile(t, exits, map[string]any{
+		"results": []map[string]any{
+			{
+				"benchmark": "fib",
+				"status":    "ok",
+				"stats": map[string]any{
+					"by_exit_code": map[string]any{"ExitDeopt": 3},
+					"sites":        []map[string]any{{"count": 3, "reason": "deopt:GuardType"}},
+				},
+			},
+		},
+	})
+	runtimeStats := filepath.Join(td, "runtime.txt")
+	if err := os.WriteFile(runtimeStats, []byte("Runtime Path Statistics:\n  native_call:\n    fast: 7\n    fallback: 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	perfStats := filepath.Join(td, "perf.txt")
+	if err := os.WriteFile(perfStats, []byte("Tier 2 Performance Diagnostics:\n  enabled: true\n  rows:\n    tier2_native_execution: count=2 total=100ns avg=50ns\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	spec := filepath.Join(td, "spec.json")
+	writeTestFile(t, spec, []map[string]any{
+		{
+			"proto_name":       "fib",
+			"compiled":         true,
+			"version_hash":     "abc",
+			"guard_count":      3,
+			"suppressed_count": 2,
+			"suppressed_pcs":   []int{4, 9},
+			"suppressed_kinds": map[string]any{"GuardType": 1, "GuardConstString": 1},
+		},
+	})
+	warm := filepath.Join(td, "warm")
+	if err := os.MkdirAll(warm, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(warm, "manifest.json"), map[string]any{
+		"protos": []map[string]any{{"name": "fib", "status": "entered", "entered": true, "compiled": true, "code_bytes": 32}},
+	})
+	writeTestFile(t, filepath.Join(warm, "pcmap.json"), map[string]any{
+		"functions": []map[string]any{{"ranges": []map[string]any{{}, {}}}},
+	})
+
+	t.Chdir(root)
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"debug-artifact", "--benchmark-json", timing, "--exit-stats", exits, "--runtime-path-stats", runtimeStats, "--perf-stats", perfStats, "--spec-state", spec, "--warm-dump", warm, "--label", "unit"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand debug-artifact code = %d, stderr = %q", code, stderr.String())
+	}
+	var artifact map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &artifact); err != nil {
+		t.Fatalf("debug artifact JSON failed to decode: %v\n%s", err, stdout.String())
+	}
+	if intFromJSONPath(t, artifact, "schema_version") != 1 {
+		t.Fatalf("schema_version = %v, want 1", artifact["schema_version"])
+	}
+	if intFromJSONPath(t, artifact, "benchmark_summary.rows") != 1 ||
+		intFromJSONPath(t, artifact, "benchmark_summary.total_exits") != 2 ||
+		intFromJSONPath(t, artifact, "debug.exit_stats.total") != 3 ||
+		intFromJSONPath(t, artifact, "debug.runtime_path_stats.numbers.native_call.fast") != 7 ||
+		intFromJSONPath(t, artifact, "debug.tier2_perf_stats.total_nanos") != 100 ||
+		intFromJSONPath(t, artifact, "debug.tier2_speculation_state.suppressed") != 2 ||
+		intFromJSONPath(t, artifact, "debug.tier2_speculation_state.suppressed_kinds.GuardType") != 1 ||
+		intFromJSONPath(t, artifact, "specialization.compiled") != 1 ||
+		intFromJSONPath(t, artifact, "debug.warm_dump.pcmap_ranges") != 2 ||
+		intFromJSONPath(t, artifact, "timing.summary.rows") != 1 ||
+		intFromJSONPath(t, artifact, "tiering.t2_entered") != 1 ||
+		intFromJSONPath(t, artifact, "exits.total") != 3 ||
+		intFromJSONPath(t, artifact, "runtime_paths.numbers.native_call.fast") != 7 ||
+		intFromJSONPath(t, artifact, "profiles.pcmap_ranges") != 2 ||
+		intFromJSONPath(t, artifact, "gates.reason_counts.deopt:GuardType") != 3 {
+		t.Fatalf("debug artifact missing expected rollups:\n%s", stdout.String())
+	}
+}
+
+func TestBenchDebugArtifactWritesOutputFile(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	t.Chdir(root)
+	outPath := filepath.Join(t.TempDir(), "artifact.json")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"debug-artifact", "--out", outPath, "--label", "file"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand debug-artifact code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty when --out is used", stdout.String())
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"schema_version": 1`) || !strings.Contains(string(data), `"label": "file"`) {
+		t.Fatalf("artifact = %s", string(data))
+	}
+}
+
+func writeTestFile(t *testing.T, path string, value any) {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func intFromJSONPath(t *testing.T, root map[string]any, path string) int {
+	t.Helper()
+	var value any = root
+	parts := strings.Split(path, ".")
+	for i, part := range parts {
+		m, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("%s: %T is not object", path, value)
+		}
+		if joined := strings.Join(parts[i:], "."); m[joined] != nil {
+			value = m[joined]
+			break
+		}
+		value = m[part]
+	}
+	switch v := value.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		t.Fatalf("%s: %T=%v is not numeric", path, value, value)
+	}
+	return 0
+}

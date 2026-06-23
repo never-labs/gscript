@@ -45,6 +45,9 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "rank-luajit-gaps" || mode == "rank-luajit" {
 		return runBenchRankLuaJITGapsCommand(harnessArgs, outw, errw)
 	}
+	if mode == "debug-artifact" {
+		return runBenchDebugArtifactCommand(harnessArgs, outw, errw)
+	}
 
 	return runBenchHarness(mode, harnessArgs, outw, errw)
 }
@@ -116,7 +119,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "compare", "timing", "strict", "diagnose", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "compare", "timing", "strict", "diagnose", "help":
 		return false
 	default:
 		return true
@@ -134,7 +137,7 @@ func benchScriptForMode(mode string) (string, error) {
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, audit, or rank-luajit-gaps)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, audit, rank-luajit-gaps, or debug-artifact)", mode)
 	}
 }
 
