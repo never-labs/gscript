@@ -845,6 +845,120 @@ func TestBenchJITAddrMapAggregatesPprofRaw(t *testing.T) {
 	}
 }
 
+func TestBenchRegressionGuardParsesSampleAndBaseline(t *testing.T) {
+	sample := benchRegressionParseSample("Time: 0.010s\n  Tier 2 attempted: 3\n  Tier 2 entered:  1 functions\n  Tier 2 failed: 1 functions\n  total exits: 7\n", "ok", intPtr(0))
+	if sample.Seconds == nil || *sample.Seconds != 0.01 || sample.T2Attempted != 3 || sample.T2Entered != 1 || sample.T2Failed != 1 || sample.ExitTotal != 7 {
+		t.Fatalf("sample = %+v", sample)
+	}
+	if sec, ok := benchRegressionParseSeconds("2.5ms"); !ok || sec != 0.0025 {
+		t.Fatalf("parse seconds = %v %v, want 0.0025 true", sec, ok)
+	}
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	writeTestFile(t, path, map[string]any{"results": map[string]any{"fib": map[string]any{"jit": "Time: 1.500s"}}})
+	if got := benchRegressionLoadBaseline(path); got["fib"] != 1.5 {
+		t.Fatalf("baseline = %v, want fib=1.5", got)
+	}
+}
+
+func TestBenchRegressionGuardSummarizesPartialSuccess(t *testing.T) {
+	a, b := 0.3, 0.1
+	result := benchRegressionSummarizeSamples([]benchRegressionSample{
+		{Status: "timeout"},
+		{Status: "ok", Seconds: &a, T2Attempted: 2, T2Entered: 1},
+		{Status: "ok", Seconds: &b, T2Attempted: 4, T2Entered: 3},
+	})
+	if result.Status != "partial" || result.Seconds == nil || *result.Seconds != 0.2 || result.T2Attempted != 4 || result.T2Entered != 3 {
+		t.Fatalf("summary = %+v", result)
+	}
+}
+
+func TestBenchRegressionGuardWritesCSVAndMarkdown(t *testing.T) {
+	vm, def, lua, base, pct := 1.0, 0.5, 0.25, 0.4, 25.0
+	row := benchRegressionResult{
+		Benchmark:       "fib",
+		VM:              &benchRegressionMode{Status: "ok", Seconds: &vm},
+		Default:         &benchRegressionMode{Status: "ok", Seconds: &def, T2Attempted: 2, T2Entered: 1},
+		LuaJIT:          &benchRegressionMode{Status: "ok", Seconds: &lua},
+		BaselineSeconds: &base,
+		RegressionPct:   &pct,
+		Regression:      true,
+	}
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "guard.csv")
+	if err := benchRegressionWriteCSV(csvPath, []benchRegressionResult{row}); err != nil {
+		t.Fatal(err)
+	}
+	csvData, err := os.ReadFile(csvPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(csvData), "benchmark,vm_seconds") || !strings.Contains(string(csvData), "fib,1,0.5") {
+		t.Fatalf("csv = %s", string(csvData))
+	}
+	markdown := benchRegressionMarkdown([]benchRegressionResult{row}, 10.0)
+	if !strings.Contains(markdown, "| fib | 1.000s | 0.500s") || !strings.Contains(markdown, "REG +25.0%") {
+		t.Fatalf("markdown = %s", markdown)
+	}
+}
+
+func TestBenchRegressionGuardCommandRunsSelectedBenchmark(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	td := t.TempDir()
+	benchDir := filepath.Join(td, "benchmarks", "numeric")
+	luaDir := filepath.Join(td, "benchmarks", "lua_ref", "numeric")
+	if err := os.MkdirAll(benchDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(luaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(benchDir, "unit.leia"), []byte("print(1)\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(luaDir, "unit.lua"), []byte("print('Time: 0.1s')\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "go.mod"), filepath.Join(td, "go.mod")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "cmd"), filepath.Join(td, "cmd")); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(td)
+
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var runCalls int
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		if name == "go" {
+			return exec.Command("true")
+		}
+		runCalls++
+		helper, helperArgs := testHelperCommand(t, "bench-regression")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	jsonPath := filepath.Join(td, "out", "guard.json")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"regression-guard", "--bench", "numeric/unit", "--runs", "1", "--no-luajit", "--json", jsonPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("regression-guard code = %d, stderr=%q stdout=%q", code, stderr.String(), stdout.String())
+	}
+	if runCalls != 3 {
+		t.Fatalf("run calls = %d, want vm/default/no_filter", runCalls)
+	}
+	if !strings.Contains(stdout.String(), "numeric/unit") || !strings.Contains(stdout.String(), "Wrote JSON:") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"benchmark": "numeric/unit"`) || !strings.Contains(string(data), `"t2_attempted": 3`) {
+		t.Fatalf("json = %s", string(data))
+	}
+}
+
 type benchTimingFixture struct {
 	Name          string
 	Current       float64

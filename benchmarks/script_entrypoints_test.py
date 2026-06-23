@@ -31,10 +31,10 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertNotIn("domain_list_for()", diag)
 
     def test_benchmark_shell_wrappers_exec_matching_python(self):
-        for stem in ("regression_guard", "strict_guard"):
-            with self.subTest(stem=stem):
-                wrapper = (ROOT / "benchmarks" / f"{stem}.sh").read_text()
-                self.assertIn(f'exec python3 benchmarks/{stem}.py "$@"', wrapper)
+        regression = (ROOT / "benchmarks" / "regression_guard.sh").read_text()
+        self.assertIn('exec go run ./cmd/leia bench regression-guard "$@"', regression)
+        strict = (ROOT / "benchmarks" / "strict_guard.sh").read_text()
+        self.assertIn('exec python3 benchmarks/strict_guard.py "$@"', strict)
 
     def test_q_columnar_suite_wraps_timing_compare(self):
         wrapper = (ROOT / "benchmarks" / "q_columnar_suite.sh").read_text()
