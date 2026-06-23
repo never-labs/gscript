@@ -2,7 +2,7 @@
 """Strict benchmark harness for statistically meaningful Leia comparisons.
 
 Runs domain benchmarks in VM, default JIT, no-filter JIT, and optional LuaJIT
-modes. Unlike regression_guard.py, this harness keeps timing quality explicit:
+modes. Unlike the lighter `leia bench regression-guard` harness, this keeps timing quality explicit:
 zero/too-small script times are either calibrated with repeated invocations or
 reported as low_resolution instead of being treated as wins.
 """

@@ -7,7 +7,6 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 import benchmark_discovery as discovery
-import regression_guard
 import timing_compare
 
 
@@ -69,7 +68,6 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
 
     def test_python_benchmark_entrypoints_share_discovery_groups(self):
         expected = tuple(discovery.GROUPS)
-        self.assertEqual(regression_guard.BENCHMARK_GROUPS, expected)
         self.assertEqual(tuple(timing_compare.GROUPS), expected)
 
     def test_release_scripts_gate_current_module_path(self):
