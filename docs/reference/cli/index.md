@@ -4,7 +4,7 @@ Generated from the current `leia` binary capabilities.
 
 | Command | Usage | Summary |
 |---|---|---|
-| `bench` | `usage: leia bench [--manifest-check|--quick|--full|--guard|BENCH|compare [--quick]|strict|diagnose|audit|rank-luajit-gaps|debug-artifact|coverage|profile-exits] [benchmark-harness-flags...]` | Run benchmark and benchmark-diagnostic harnesses. |
+| `bench` | `usage: leia bench [--manifest-check|--quick|--full|--guard|BENCH|compare [--quick]|strict|diagnose|audit|rank-luajit-gaps|debug-artifact|coverage|profile-exits|validate-lua-refs] [benchmark-harness-flags...]` | Run benchmark and benchmark-diagnostic harnesses. |
 | `capabilities` | `usage: leia capabilities [--json]` | Report binary capabilities, stdlib modules, and supported tooling formats. |
 | `check` | `usage: leia check [--json] [--quick|--full] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [--no-editor] [--no-examples] [path-or-dir]` | Run formatter, linter, manifest, tests, docs, editor, and example checks as one local gate. |
 | `ci` | `usage: leia ci [smoke|pr|perf|release] [--list] [--json] [--no-luajit] [--release-version VERSION]` | Run canonical local CI profiles. |

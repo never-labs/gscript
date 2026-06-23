@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBenchCommandManifestCheckDispatchesBenchmarksManifest(t *testing.T) {
@@ -652,6 +653,68 @@ func TestBenchProfileExitsCommandRunsSelectedBenchmark(t *testing.T) {
 	}
 	if !strings.Contains(string(data), `"mode": "default"`) || !strings.Contains(string(data), `"benchmark": "numeric/unit"`) {
 		t.Fatalf("json = %s", string(data))
+	}
+}
+
+func TestBenchValidateLuaRefsCommandRunsReferences(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	td := t.TempDir()
+	luaDir := filepath.Join(td, "benchmarks", "lua_ref", "numeric")
+	if err := os.MkdirAll(luaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(luaDir, "unit.lua"), []byte("print('Time: 0.010s')\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "go.mod"), filepath.Join(td, "go.mod")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "cmd"), filepath.Join(td, "cmd")); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(td)
+
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotName string
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "lua-ref")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"validate-lua-refs", "--lua-bin", "luajit-test"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand validate-lua-refs code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "luajit-test" || len(gotArgs) != 1 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "lua_ref", "numeric", "unit.lua")) {
+		t.Fatalf("lua command = %q %#v, want luajit-test numeric/unit.lua", gotName, gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "numeric/unit: ok") || !strings.Contains(stdout.String(), "Validated 1 Lua references.") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestBenchValidateLuaRefsReportsNoTime(t *testing.T) {
+	td := t.TempDir()
+	luaDir := filepath.Join(td, "benchmarks", "lua_ref", "numeric")
+	if err := os.MkdirAll(luaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(luaDir, "unit.lua"), []byte("print('no timing')\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		return exec.Command("printf", "no timing\n")
+	}
+	status, message := benchValidateLuaRef(td, "lua", "numeric/unit", time.Second)
+	if status != "no_time" || !strings.Contains(message, "no parseable Time") {
+		t.Fatalf("status/message = %s %q, want no_time", status, message)
 	}
 }
 
