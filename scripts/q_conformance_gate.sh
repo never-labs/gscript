@@ -28,7 +28,7 @@ Checks q/qSQL manifest coverage, runtime packages, executable q cases, q
 examples, and optional q benchmark smoke coverage.
 
 Options:
-  --scope SCOPE       q manifest scope passed to tests/manifest.py (default: core)
+  --scope SCOPE       q manifest scope passed to scripts/manifest.leia (default: core)
   --bench MODE        Benchmark mode: none, smoke, or all (default: smoke)
   --jobs N            Benchmark worker count (default: 6)
   --timeout SECONDS   Per-benchmark timeout (default: 120)
@@ -214,7 +214,7 @@ read_q_paths() {
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     printf '%s\n' "$path"
-  done < <(python3 tests/manifest.py list-q --scope "$Q_GATE_SCOPE" "$kind")
+  done < <(go run ./cmd/leia run scripts/manifest.leia list-q --scope "$Q_GATE_SCOPE" "$kind")
 }
 
 run_leia_paths() {
@@ -325,7 +325,7 @@ export GOCACHE="${GOCACHE:-$TMPDIR/go-cache}"
 mkdir -p "$GOCACHE"
 
 log_info "[q-gate] manifest check"
-run_logged "$TMPDIR/leia-q-gate-manifest.out" python3 tests/manifest.py check tests benchmarks
+run_logged "$TMPDIR/leia-q-gate-manifest.out" go run ./cmd/leia run scripts/manifest.leia check tests benchmarks
 log_info "[q-gate] q gate scope: $Q_GATE_SCOPE"
 
 log_info "[q-gate] go test q/data/bind"

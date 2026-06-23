@@ -190,17 +190,22 @@ func runManifestCheck(outw, errw io.Writer) int {
 }
 
 func runManifestCheckRoots(roots []string, outw, errw io.Writer) int {
-	script, err := findScriptFromCWD(filepath.Join("tests", "manifest.py"))
+	script, err := findScriptFromCWD(filepath.Join("scripts", "manifest.leia"))
 	if err != nil {
 		fmt.Fprintf(errw, "leia check: %v\n", err)
 		return 1
 	}
-	python := os.Getenv("LEIA_CHECK_PYTHON")
-	if python == "" {
-		python = "python3"
+	runner := os.Getenv("LEIA_CHECK_LEIA")
+	var name string
+	var cmdArgs []string
+	if runner != "" {
+		name = runner
+		cmdArgs = append([]string{"run", script, "check"}, roots...)
+	} else {
+		name = "go"
+		cmdArgs = append([]string{"run", "./cmd/leia", "run", script, "check"}, roots...)
 	}
-	cmdArgs := append([]string{script, "check"}, roots...)
-	cmd := checkExecCommand(python, cmdArgs...)
+	cmd := checkExecCommand(name, cmdArgs...)
 	cmd.Stdout = outw
 	cmd.Stderr = errw
 	cmd.Dir = filepath.Dir(filepath.Dir(script))

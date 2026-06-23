@@ -579,8 +579,8 @@ add_public_release_blockers_gate() {
 }
 
 add_manifest_coverage() {
-    if [ ! -f tests/manifest.py ]; then
-        add_skip "Manifest Coverage" "missing tests/manifest.py"
+    if [ ! -f scripts/manifest.leia ]; then
+        add_skip "Manifest Coverage" "missing scripts/manifest.leia"
         return
     fi
     if [ ! -f tests/manifest.json ]; then
@@ -591,11 +591,11 @@ add_manifest_coverage() {
         add_skip "Manifest Coverage" "missing benchmarks/manifest.json"
         return
     fi
-    if ! have_cmd python3; then
-        add_skip "Manifest Coverage" "missing python3"
+    if ! have_cmd go; then
+        add_skip "Manifest Coverage" "missing go"
         return
     fi
-    add_run "Manifest Coverage" "python3 tests/manifest.py check tests benchmarks"
+    add_run "Manifest Coverage" "go run ./cmd/leia run scripts/manifest.leia check tests benchmarks"
 }
 
 add_module_path_gate() {

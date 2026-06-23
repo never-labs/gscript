@@ -12,7 +12,9 @@ func TestBenchCommandManifestCheckDispatchesBenchmarksManifest(t *testing.T) {
 	oldCheckExecCommand := checkExecCommand
 	t.Cleanup(func() { checkExecCommand = oldCheckExecCommand })
 	var gotArgs []string
+	var gotName string
 	checkExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
 		gotArgs = append([]string(nil), args...)
 		helper, helperArgs := testHelperCommand(t, "manifest")
 		return exec.Command(helper, helperArgs...)
@@ -23,8 +25,11 @@ func TestBenchCommandManifestCheckDispatchesBenchmarksManifest(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("tests", "manifest.py")) || gotArgs[1] != "check" || gotArgs[2] != "benchmarks" {
-		t.Fatalf("args = %#v, want tests/manifest.py check benchmarks", gotArgs)
+	if gotName != "go" {
+		t.Fatalf("manifest command = %q, want go", gotName)
+	}
+	if len(gotArgs) != 6 || gotArgs[0] != "run" || gotArgs[1] != "./cmd/leia" || gotArgs[2] != "run" || !strings.HasSuffix(gotArgs[3], filepath.Join("scripts", "manifest.leia")) || gotArgs[4] != "check" || gotArgs[5] != "benchmarks" {
+		t.Fatalf("args = %#v, want go run ./cmd/leia run scripts/manifest.leia check benchmarks", gotArgs)
 	}
 	if !strings.Contains(stdout.String(), "manifest helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())

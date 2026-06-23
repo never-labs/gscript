@@ -27,11 +27,11 @@ func TestTestCommandManifestCheckDispatchesTestsManifest(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if gotName != "python3" {
-		t.Fatalf("python command = %q, want python3", gotName)
+	if gotName != "go" {
+		t.Fatalf("manifest command = %q, want go", gotName)
 	}
-	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("tests", "manifest.py")) || gotArgs[1] != "check" || gotArgs[2] != "tests" {
-		t.Fatalf("args = %#v, want tests/manifest.py check tests", gotArgs)
+	if len(gotArgs) != 6 || gotArgs[0] != "run" || gotArgs[1] != "./cmd/leia" || gotArgs[2] != "run" || !strings.HasSuffix(gotArgs[3], filepath.Join("scripts", "manifest.leia")) || gotArgs[4] != "check" || gotArgs[5] != "tests" {
+		t.Fatalf("args = %#v, want go run ./cmd/leia run scripts/manifest.leia check tests", gotArgs)
 	}
 	if !strings.Contains(stdout.String(), "manifest helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())

@@ -17,7 +17,7 @@ func TestCICommandListsProfiles(t *testing.T) {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"go test", "./cmd/leia-lsp", "./internal/tooling/lsp", "tests/manifest.py", "github.com/never-labs/leia", "leia check", "--no-docs", "--no-editor", "tests/smoke/01_basic.leia", "scripts/run.sh worktree"} {
+	for _, want := range []string{"go test", "./cmd/leia-lsp", "./internal/tooling/lsp", "scripts/manifest.leia", "github.com/never-labs/leia", "leia check", "--no-docs", "--no-editor", "tests/smoke/01_basic.leia", "scripts/run.sh worktree"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}

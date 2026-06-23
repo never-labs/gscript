@@ -174,7 +174,7 @@ func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]
 }
 
 func manifestCoverageCommand() []string {
-	return []string{"python3", "tests/manifest.py", "check", "tests", "benchmarks"}
+	return []string{"go", "run", "./cmd/leia", "run", "scripts/manifest.leia", "check", "tests", "benchmarks"}
 }
 
 func modulePathGateCommand() []string {
