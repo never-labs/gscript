@@ -137,7 +137,7 @@ workflow runs `bash scripts/docs_check.sh` before building the site.
 ```bash
 scripts/run.sh editor
 scripts/run.sh editor --require-tree-sitter
-python3 -m unittest tools.editor.smoke.editor_check_test
+go run ./cmd/leia editor smoke
 ```
 
 The editor check validates shared TextMate grammars, VS Code syntax assets,
