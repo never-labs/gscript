@@ -24,7 +24,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "config", Usage: "usage: leia config [--json] [path]", Summary: "Discover and validate project configuration.", Run: runConfigCommand},
 		{Name: "diag", Usage: "usage: leia diag [dump|bundle] [diagnostic-flags...]", Summary: "Run production diagnostic dump and bundle tools.", Run: runDiagCommand},
 		{Name: "diagnose", Usage: "usage: leia diagnose <benchmark> [diagnose-flags...]", Summary: "Collect benchmark timing, exit, and Tier 2 diagnostics.", Run: runDiagnoseCommand},
-		{Name: "doc", Usage: "usage: leia doc generate [flags]; leia doc check [--json]", Summary: "Generate reference docs or validate repository docs.", Run: runDocCommand},
+		{Name: "doc", Usage: "usage: leia doc generate [flags]; leia doc check [--json]; leia doc site-check [--site-dir DIR] [--json]", Summary: "Generate reference docs or validate repository docs and rendered site output.", Run: runDocCommand},
 		{Name: "editor", Usage: "usage: leia editor smoke", Summary: "Validate editor-facing syntax, LSP, and packaging assets.", Run: runEditorCommand},
 		{Name: "eval", Usage: "usage: leia eval [--vm] [--jit=true|false] <source> [args...]", Summary: "Execute source passed on the command line.", Run: runEvalCommand},
 		{Name: "evaluate", Usage: "usage: leia evaluate [--json|--format=text|json|html] [--report FILE] [--gate] [--parallel N] [--baseline FILE|--compare OLD NEW] [--list] [--filter TEXT] [--replay FILE|--record FILE|--update-golden FILE] [path-or-dir...]", Summary: "Run evaluation checks and emit an agent evaluation report.", Run: runEvaluateCommand},

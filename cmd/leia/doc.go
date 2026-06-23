@@ -26,11 +26,13 @@ func runDocCommand(args []string, outw, errw io.Writer) int {
 		return runDocCheckCommand(args[1:], outw, errw)
 	case "spec-preview":
 		return runDocSpecPreviewCommand(args[1:], outw, errw)
+	case "site-check":
+		return runDocSiteCheckCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: leia doc [generate|check|spec-preview] [flags]")
+		fmt.Fprintln(outw, "usage: leia doc [generate|check|spec-preview|site-check] [flags]")
 		return 0
 	default:
-		fmt.Fprintf(errw, "leia doc: unknown mode %q (want generate, check, or spec-preview)\n", args[0])
+		fmt.Fprintf(errw, "leia doc: unknown mode %q (want generate, check, spec-preview, or site-check)\n", args[0])
 		return 2
 	}
 }

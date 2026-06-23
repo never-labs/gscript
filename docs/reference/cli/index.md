@@ -11,7 +11,7 @@ Generated from the current `leia` binary capabilities.
 | `config` | `usage: leia config [--json] [path]` | Discover and validate project configuration. |
 | `diag` | `usage: leia diag [dump|bundle] [diagnostic-flags...]` | Run production diagnostic dump and bundle tools. |
 | `diagnose` | `usage: leia diagnose <benchmark> [diagnose-flags...]` | Collect benchmark timing, exit, and Tier 2 diagnostics. |
-| `doc` | `usage: leia doc generate [flags]; leia doc check [--json]` | Generate reference docs or validate repository docs. |
+| `doc` | `usage: leia doc generate [flags]; leia doc check [--json]; leia doc site-check [--site-dir DIR] [--json]` | Generate reference docs or validate repository docs and rendered site output. |
 | `editor` | `usage: leia editor smoke` | Validate editor-facing syntax, LSP, and packaging assets. |
 | `env` | `usage: leia env [--json] [--path PATH]` | Report toolchain, project, cache, and platform environment. |
 | `eval` | `usage: leia eval [--vm] [--jit=true|false] <source> [args...]` | Execute source passed on the command line. |

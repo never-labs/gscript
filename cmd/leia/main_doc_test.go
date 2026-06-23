@@ -236,3 +236,57 @@ func TestDocCheckJSONDispatchesDocsScriptWithJSON(t *testing.T) {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())
 	}
 }
+
+func TestDocSiteCheckReportsRenderedSite(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	siteDir := filepath.Join(t.TempDir(), "site")
+	if err := os.MkdirAll(filepath.Join(siteDir, "guide"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "style.css"), []byte("body{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "index.html"), []byte(`<!doctype html><html><head><link rel="stylesheet" href="/style.css"></head><body><h1 id="top">Leia</h1><a href="/guide/">Guide</a><a href="#top">Top</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "guide", "index.html"), []byte(`<!doctype html><html><body><h1 id="intro">Guide</h1><a href="/index.html#top">Home</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"site-check", "--site-dir", siteDir, "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand site-check code = %d, stderr = %q", code, stderr.String())
+	}
+	var report docSiteReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("site-check JSON failed to decode: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "pass" || report.HTMLFileCount != 2 || report.LocalLinkCount != 3 || report.AssetRefCount != 1 || report.FragmentCheckCount != 2 || report.FailureCount != 0 || len(report.FailureDetails) != 0 {
+		t.Fatalf("site-check report = %+v, want passing rendered-site report", report)
+	}
+}
+
+func TestDocSiteCheckReportsBrokenSite(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	siteDir := filepath.Join(t.TempDir(), "site")
+	if err := os.MkdirAll(siteDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "index.html"), []byte(`<!doctype html><html><body><h1 id="top">Leia</h1><a href="/missing.html">Missing</a><a href="#absent">Bad anchor</a></body></html>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"site-check", "--site-dir", siteDir, "--json"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runDocCommand site-check code = %d, want 1; stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report docSiteReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("site-check JSON failed to decode: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "issues" || report.FailureKindCount != 2 || report.FailureCount != 2 || !containsString(report.FailureKinds, "missing_target") || !containsString(report.FailureKinds, "missing_anchor") {
+		t.Fatalf("site-check broken report = %+v, want missing target and anchor", report)
+	}
+}

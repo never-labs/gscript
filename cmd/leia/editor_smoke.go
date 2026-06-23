@@ -26,7 +26,7 @@ func runEditorSmokeCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "usage: leia editor smoke")
 		return 2
 	}
-	root, err := findEditorSmokeRoot()
+	root, err := findCLIRepoRootFromCWD()
 	if err != nil {
 		fmt.Fprintf(errw, "leia editor smoke: %v\n", err)
 		return 1
@@ -58,23 +58,6 @@ func (s editorSmoke) run() error {
 		}
 	}
 	return nil
-}
-
-func findEditorSmokeRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if fileExists(filepath.Join(dir, "go.mod")) && fileExists(filepath.Join(dir, "cmd", "leia", "commands.go")) {
-			return dir, nil
-		}
-		next := filepath.Dir(dir)
-		if next == dir {
-			return "", errors.New("could not find Leia repository root")
-		}
-		dir = next
-	}
 }
 
 func (s editorSmoke) path(rel string) string {
