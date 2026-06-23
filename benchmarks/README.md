@@ -295,7 +295,9 @@ local checks, set the corresponding `--min-runtime-*-benchmarks=0` flag.
 `BenchmarkQEvalJITScriptWarm` contributes JIT backend route evidence through
 the q session counters: planned op-exit calls are the direct route, shell
 fallbacks are the slow route, eval errors must remain zero, and backend shapes
-show how many distinct q session lowerings were observed.
+show how many distinct q session lowerings were observed. The default
+`leia bench q-suite` runs a stable JIT/VM script subset for release evidence;
+pass `--jit-full` when auditing the full q.eval script coverage table.
 
 The `Runtime Primitive Registry Routes` section is the lower-level backend
 contract. It accepts either VM runtime primitive registry counters such as

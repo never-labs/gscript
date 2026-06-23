@@ -8,11 +8,15 @@ cd "$ROOT"
 : "${LEIA_GO_BENCHCOUNT:=1}"
 
 SMOKE=0
+JIT_FULL=0
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --smoke)
       SMOKE=1
+      ;;
+    --jit-full)
+      JIT_FULL=1
       ;;
     *)
       ARGS+=("$arg")
@@ -65,8 +69,13 @@ go test ./benchmarks -run '^TestQEvalRealDataMatchesGoBaseline$' \
 # JIT/VM script-binding warm benches feeding the jit_script/vm_script Go-ratio
 # families in q_perf_report.py. Tolerant while these benches land: `-bench`
 # with zero matches still exits 0 and simply contributes no rows.
+if [[ "$JIT_FULL" == "1" ]]; then
+  Q_SCRIPT_BENCH='BenchmarkQEval(JIT|VM)ScriptWarm'
+else
+  Q_SCRIPT_BENCH='BenchmarkQEval(JIT|VM)ScriptWarm/(ComboWherePriceBandSizeWithin|ComboOverGatherModuloSum)$'
+fi
 go test ./benchmarks -run '^$' \
-  -bench 'BenchmarkQEval(JIT|VM)ScriptWarm' \
+  -bench "${Q_SCRIPT_BENCH}" \
   -benchmem \
   -benchtime="${LEIA_GO_BENCHTIME}" \
   -count="${LEIA_GO_BENCHCOUNT}"

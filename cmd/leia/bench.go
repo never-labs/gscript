@@ -183,7 +183,7 @@ func benchScriptForMode(mode string) (string, error) {
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-report, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-report, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
 	}
 }
 
