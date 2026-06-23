@@ -51,7 +51,7 @@ bash benchmarks/q_columnar_suite.sh --runs=3 --warmup=1 \
 
 # Full q performance suite: q columnar scripts plus Go-level qSQL/q.eval
 # comparisons against hand-written Go with allocation metrics.
-LEIA_GO_BENCHTIME=100x bash benchmarks/q_performance_suite.sh --runs=3 --warmup=1 \
+LEIA_GO_BENCHTIME=100x go run ./cmd/leia bench q-suite --runs=3 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128
 
 # q performance completeness report: qSQL plus ordinary q.eval/list/vector
@@ -117,7 +117,7 @@ accepted by the harness.
 
 ## q Columnar Analytics
 
-`benchmarks/q_performance_suite.sh` is the broad q performance entrypoint. It
+`leia bench q-suite` is the broad q performance entrypoint. It
 runs the focused q analytics script suite and then runs Go benchmarks for qSQL
 and ordinary q session expressions against hand-written Go baselines with
 `ns/op`, `B/op`, and `allocs/op`.
@@ -153,7 +153,7 @@ Use the full wrapper after q runtime, frame/vector, schema-cache, or JIT path
 changes to keep measurements comparable:
 
 ```bash
-LEIA_GO_BENCHTIME=100x bash benchmarks/q_performance_suite.sh --runs=5 --warmup=1 \
+LEIA_GO_BENCHTIME=100x go run ./cmd/leia bench q-suite --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128
 ```
 

@@ -7,8 +7,37 @@ cd "$ROOT"
 : "${LEIA_GO_BENCHTIME:=100x}"
 : "${LEIA_GO_BENCHCOUNT:=1}"
 
+SMOKE=0
+ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --smoke)
+      SMOKE=1
+      ;;
+    *)
+      ARGS+=("$arg")
+      ;;
+  esac
+done
+
+if [[ "$SMOKE" == "1" ]]; then
+  SMOKE_BENCHTIME="${LEIA_Q_SUITE_SMOKE_BENCHTIME:-1x}"
+  SMOKE_BENCHCOUNT="${LEIA_Q_SUITE_SMOKE_BENCHCOUNT:-1}"
+  go test ./internal/stdlib/bind -run '^$' \
+    -bench 'BenchmarkQSQLBindMatrixWarm/ExecVectorWhere$' \
+    -benchmem \
+    -benchtime="${SMOKE_BENCHTIME}" \
+    -count="${SMOKE_BENCHCOUNT}"
+  go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
+    -bench 'BenchmarkQEvalVectorResultCacheWarm/VectorAffineSumSmall$' \
+    -benchmem \
+    -benchtime="${SMOKE_BENCHTIME}" \
+    -count="${SMOKE_BENCHCOUNT}"
+  exit 0
+fi
+
 if [[ "${LEIA_SKIP_TIMING_COMPARE:-0}" != "1" ]]; then
-  bash benchmarks/q_columnar_suite.sh "$@"
+  bash benchmarks/q_columnar_suite.sh "${ARGS[@]}"
 fi
 
 go test ./internal/stdlib/bind -run '^$' \

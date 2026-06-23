@@ -66,8 +66,32 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "regression-guard" {
 		return runBenchRegressionGuardCommand(harnessArgs, outw, errw)
 	}
+	if mode == "q-suite" {
+		return runBenchShellScript("q_performance_suite.sh", harnessArgs, outw, errw)
+	}
 
 	return runBenchHarness(mode, harnessArgs, outw, errw)
+}
+
+func runBenchShellScript(script string, args []string, outw, errw io.Writer) int {
+	path, err := findBenchmarkScript(script)
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench: %v\n", err)
+		return 1
+	}
+	cmd := benchExecCommand("bash", append([]string{path}, args...)...)
+	cmd.Stdout = outw
+	cmd.Stderr = errw
+	cmd.Dir = filepath.Dir(filepath.Dir(path))
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(errw, "leia bench: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 func runBenchHarness(mode string, harnessArgs []string, outw, errw io.Writer) int {
@@ -137,7 +161,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "q-suite", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
 		return false
 	default:
 		return true

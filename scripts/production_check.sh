@@ -413,16 +413,12 @@ add_q_performance_gate() {
         add_skip "Q Performance Gate" "missing go"
         return
     fi
-    if [ ! -f benchmarks/q_performance_suite.sh ]; then
-        add_skip "Q Performance Gate" "missing benchmarks/q_performance_suite.sh"
-        return
-    fi
     # Go-bench q suite (timing_compare leg skipped; the generic Performance
     # Gate already covers current-vs-HEAD timing) teed into the q ratio /
     # runtime-counter report check. Full mode only, like the other long
     # performance stages; --quick keeps it out of the plan.
     add_run "Q Performance Gate" \
-        "q_perf_dir=\$(mktemp -d \"\${TMPDIR:-/tmp}/leia-q-perf-gate.XXXXXX\") && trap 'rm -rf \"\$q_perf_dir\"' EXIT && set -o pipefail && LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh | tee \"\$q_perf_dir/output.txt\" && go run ./cmd/leia bench q-report --from-output \"\$q_perf_dir/output.txt\" --check --json \"\$q_perf_dir/q_perf_report.json\" --markdown \"\$q_perf_dir/q_perf_report.md\" && echo \"q performance evidence: \$q_perf_dir/q_perf_report.json \$q_perf_dir/q_perf_report.md\""
+        "q_perf_dir=\$(mktemp -d \"\${TMPDIR:-/tmp}/leia-q-perf-gate.XXXXXX\") && trap 'rm -rf \"\$q_perf_dir\"' EXIT && set -o pipefail && LEIA_SKIP_TIMING_COMPARE=1 go run ./cmd/leia bench q-suite | tee \"\$q_perf_dir/output.txt\" && go run ./cmd/leia bench q-report --from-output \"\$q_perf_dir/output.txt\" --check --json \"\$q_perf_dir/q_perf_report.json\" --markdown \"\$q_perf_dir/q_perf_report.md\" && echo \"q performance evidence: \$q_perf_dir/q_perf_report.json \$q_perf_dir/q_perf_report.md\""
 }
 
 add_documentation_references() {
