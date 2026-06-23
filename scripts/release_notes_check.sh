@@ -294,7 +294,7 @@ check_template() {
     add_failure "missing $template" "missing_file" "$template"
     return
   fi
-  require_contains "$template" "bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version vX.Y.Z"
+  require_contains "$template" "scripts/run.sh release-check --build --require-clean --require-tag --version vX.Y.Z"
   require_contains "$template" "List known issues, or write \`None known\` after release validation."
   require_contains "$template" "## Checksums And Artifacts"
   require_contains "$template" "## Release Decisions"
@@ -314,7 +314,7 @@ check_version() {
     require_contains "$notes" "$heading"
   done
   require_contains "$notes" "$version"
-  require_contains "$notes" "bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version $version"
+  require_contains "$notes" "scripts/run.sh release-check --build --require-clean --require-tag --version $version"
   require_contains "$notes" "leia-lsp"
   require_release_archive_names "$notes" "$version"
 

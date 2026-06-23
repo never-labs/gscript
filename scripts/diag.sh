@@ -147,7 +147,7 @@ fi
 
 echo
 echo "=== Writing diag/summary.md ==="
-python3 scripts/diag_summary.py "$DIAG_ROOT" >"$DIAG_ROOT/summary.md" || {
-    echo "diag_summary.py failed (non-fatal)"
+go run ./cmd/leia diag summary "$DIAG_ROOT" >"$DIAG_ROOT/summary.md" || {
+    echo "diag summary failed (non-fatal)"
 }
 echo "Done. See $DIAG_ROOT/"

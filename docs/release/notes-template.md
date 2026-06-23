@@ -60,7 +60,7 @@ scripts/run.sh perf --full
 bash scripts/public_release_blockers_check.sh --require-resolved
 scripts/run.sh release-dist --require-goreleaser
 bash scripts/release_notes_check.sh --require-ready --version vX.Y.Z
-bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version vX.Y.Z
+scripts/run.sh release-check --build --require-clean --require-tag --version vX.Y.Z
 ```
 
 ## Known Issues

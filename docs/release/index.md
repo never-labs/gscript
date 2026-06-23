@@ -21,16 +21,16 @@ Machine-readable release evidence:
 ```bash
 go run ./cmd/leia capabilities --json
 bash scripts/diagnostics_bundle.sh --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
-bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan
-bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json
+scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan
+scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
 bash scripts/q_conformance_gate.sh --scope core --bench smoke --json
 LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh > /tmp/leia-q-perf-output.txt
 python3 benchmarks/q_perf_report.py --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md
-bash scripts/editor_check.sh --json
+scripts/run.sh editor --json
 bash scripts/public_release_blockers_check.sh --json
 bash scripts/release_notes_check.sh --json --version vX.Y.Z
-bash scripts/release_distribution_check.sh --json
+scripts/run.sh release-dist --json
 bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json
 bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json
 bash scripts/release_artifacts_check.sh --json --version vX.Y.Z

@@ -152,9 +152,8 @@ function previewSpec() {
     return;
   }
   const config = vscode.workspace.getConfiguration("leia");
-  const script = config.get("specPreviewScript", "scripts/spec_preview.py");
   const output = config.get("specPreviewOutput", "docs/spec/index.html");
-  const command = `python3 ${shellQuote(path.join(cwd, script))} --output ${shellQuote(path.join(cwd, output))}`;
+  const command = `${shellQuote(executable())} doc spec-preview --output ${shellQuote(path.join(cwd, output))}`;
   runInTerminal(command, cwd);
   vscode.env.openExternal(vscode.Uri.file(path.join(cwd, output)));
 }
@@ -229,9 +228,8 @@ function taskArgs(definition, cwd) {
 
 function specPreviewArgs(cwd) {
   const config = vscode.workspace.getConfiguration("leia");
-  const script = config.get("specPreviewScript", "scripts/spec_preview.py");
   const output = config.get("specPreviewOutput", "docs/spec/index.html");
-  return ["python3", path.join(cwd, script), "--output", path.join(cwd, output)];
+  return [executable(), "doc", "spec-preview", "--output", path.join(cwd, output)];
 }
 
 function specPreviewCommand(cwd, extraArgs) {

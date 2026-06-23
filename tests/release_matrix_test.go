@@ -302,20 +302,20 @@ func TestReleaseMatrixCoveredReleaseCellsHaveExecutableEvidence(t *testing.T) {
 
 func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	root := findRepoRoot(t)
-	releaseMatrixCmd := "go test ./tests -run 'TestReleaseMatrix' -count=1"
-	internalReleaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
+	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
+	internalReleaseMatrixCmd := releaseMatrixCmd
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
-	docsCheckCmd := "bash scripts/docs_check.sh"
+	docsCheckCmd := "scripts/run.sh docs"
 	ciReleaseListCmd := "go run ./cmd/leia ci release --list"
 	ciReleaseVersionListCmd := "go run ./cmd/leia ci release --release-version vX.Y.Z --list"
-	productionFullCmd := "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z"
-	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
-	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
+	productionFullCmd := "scripts/run.sh production --full --release-profile --release-version vX.Y.Z"
+	performanceSmokeCmd := "scripts/run.sh perf --smoke"
+	fullPerfGateCmd := "scripts/run.sh perf --full"
 	shellSyntaxCmd := "for f in scripts/*.sh benchmarks/*.sh; do bash -n \"$f\"; done"
 	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
-	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
+	releaseDistributionCmd := "scripts/run.sh release-dist --require-goreleaser"
 	releaseNotesCmd := "bash scripts/release_notes_check.sh --require-ready --version vX.Y.Z"
-	strictReleaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version vX.Y.Z"
+	strictReleaseArtifactsCmd := "scripts/run.sh release-check --build --require-clean --require-tag --version vX.Y.Z"
 
 	for _, item := range []struct {
 		path     string
@@ -491,7 +491,7 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
 	specContractCmd := "go test ./tests/docs/spec -count=1"
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
-	docsCheckCmd := "bash scripts/docs_check.sh"
+	docsCheckCmd := "scripts/run.sh docs"
 
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
@@ -924,7 +924,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 		}
 	}
 	prOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "pr", "--no-luajit", "--list")
-	for _, want := range []string{"go test ./... -count=1", "go run ./cmd/leia examples check --jobs=6", "bash scripts/docs_check.sh", "bash scripts/performance_gate.sh --smoke --no-luajit"} {
+	for _, want := range []string{"go test ./... -count=1", "go run ./cmd/leia examples check --jobs=6", "scripts/run.sh docs", "scripts/run.sh perf --smoke --no-luajit"} {
 		if !strings.Contains(prOut, want) {
 			t.Fatalf("ci pr --list must include %q so PR validation matches product gates; got:\n%s", want, prOut)
 		}
@@ -940,11 +940,11 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	}
 
 	releaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--list")
-	if strings.TrimSpace(releaseOut) != "bash scripts/production_check.sh --full --release-profile" {
+	if strings.TrimSpace(releaseOut) != "scripts/run.sh production --full --release-profile" {
 		t.Fatalf("ci release --list must delegate to production release profile only; got:\n%s", releaseOut)
 	}
 	versionedReleaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list")
-	if strings.TrimSpace(versionedReleaseOut) != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+	if strings.TrimSpace(versionedReleaseOut) != "scripts/run.sh production --full --release-profile --release-version vX.Y.Z" {
 		t.Fatalf("ci release --release-version --list must delegate to versioned production release profile only; got:\n%s", versionedReleaseOut)
 	}
 	badReleaseVersion := runCommandResult(root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--release-version", "bad version")
@@ -1060,15 +1060,15 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json",
 		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
-		"bash scripts/production_check.sh --quick --list --json",
-		"bash scripts/production_check.sh --quick --list --out-dir /tmp/leia-release-plan",
+		"scripts/run.sh production --quick --list --json",
+		"scripts/run.sh production --quick --list --out-dir /tmp/leia-release-plan",
 		"go run ./cmd/leia ci release --release-version vX.Y.Z --list --json",
-		"bash scripts/performance_gate.sh --validate-only /tmp/leia_performance_gate/timing_gate.json --json",
+		"scripts/run.sh perf --validate-only /tmp/leia_performance_gate/timing_gate.json --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench none --json",
-		"bash scripts/editor_check.sh --json",
-		"bash scripts/release_distribution_check.sh --json",
-		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
-		"bash scripts/release_artifacts_check.sh",
+		"scripts/run.sh editor --json",
+		"scripts/run.sh release-dist --json",
+		"scripts/run.sh release-check --json --version vX.Y.Z",
+		"scripts/run.sh release-check",
 	} {
 		if !strings.Contains(toolingGuide, snippet) {
 			t.Fatalf("docs/guides/tooling.md must keep README tooling evidence snippet %q", snippet)
@@ -1198,16 +1198,16 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"complete the release decisions recorded in `docs/release/decisions.md`",
 		"examples/README.md",
 		"docs/reference/platforms/index.md",
-		"bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan",
-		"bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json",
+		"scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan",
+		"scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json",
 		"go run ./cmd/leia doc check --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench smoke --json",
 		"LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh > /tmp/leia-q-perf-output.txt",
 		"python3 benchmarks/q_perf_report.py --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md",
-		"bash scripts/editor_check.sh --json",
+		"scripts/run.sh editor --json",
 		"bash scripts/public_release_blockers_check.sh --json",
 		"bash scripts/release_notes_check.sh --json --version vX.Y.Z",
-		"bash scripts/release_distribution_check.sh --json",
+		"scripts/run.sh release-dist --json",
 		"bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json",
 		"bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json",
 		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
@@ -2248,7 +2248,7 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 
 ## Validation
 
-bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version %[1]s
+scripts/run.sh release-check --build --require-clean --require-tag --version %[1]s
 
 ## Known Issues
 
@@ -2317,7 +2317,7 @@ Each archive includes leia and leia-lsp.
 
 ## Validation
 
-bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version %[1]s
+scripts/run.sh release-check --build --require-clean --require-tag --version %[1]s
 
 ## Known Issues
 
@@ -3021,9 +3021,9 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	for name, want := range map[string]string{
 		"Architecture Health":     "bash scripts/arch_check.sh --json",
 		"Public Release Blockers": "bash scripts/public_release_blockers_check.sh --require-resolved",
-		"Release Distribution":    "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
+		"Release Distribution":    "scripts/run.sh release-dist --require-goreleaser",
 		"Release Notes":           "bash scripts/release_notes_check.sh --require-ready --version \"vX.Y.Z\"",
-		"Release Artifacts":       "bash scripts/release_artifacts_check.sh",
+		"Release Artifacts":       "scripts/run.sh release-check",
 		"Q Performance Gate":      "python3 benchmarks/q_perf_report.py --from-output \"$q_perf_dir/output.txt\" --check --json \"$q_perf_dir/q_perf_report.json\" --markdown \"$q_perf_dir/q_perf_report.md\"",
 	} {
 		if !strings.Contains(commands[name], want) {
@@ -3057,13 +3057,13 @@ func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
 		t.Fatalf("ci profile plan JSON = %+v, want release schema v1 plan", report)
 	}
 	command := report.Commands[0]
-	if command.Name != "Production check" || command.Command != "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z" {
+	if command.Name != "Production check" || command.Command != "scripts/run.sh production --full --release-profile --release-version vX.Y.Z" {
 		t.Fatalf("ci profile plan command = %+v, want versioned production check", command)
 	}
 	if command.ArgCount != len(command.Args) || command.ArgCount != 6 {
 		t.Fatalf("ci profile plan arg_count = %d args = %#v, want count 6 matching args", command.ArgCount, command.Args)
 	}
-	for _, want := range []string{"bash", "scripts/production_check.sh", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
+	for _, want := range []string{"scripts/run.sh", "production", "--full", "--release-profile", "--release-version", "vX.Y.Z"} {
 		if !stringSliceContains(command.Args, want) {
 			t.Fatalf("ci profile plan args = %#v, want %q", command.Args, want)
 		}

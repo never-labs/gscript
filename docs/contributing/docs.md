@@ -39,7 +39,7 @@ specification assembled from the chapter files in `docs/spec/`. Edit the chapter
 files first, then refresh the published spec and local preview with:
 
 ```bash
-python3 scripts/spec_preview.py --write-index --output docs/spec/index.html
+go run ./cmd/leia doc spec-preview --write-index --output docs/spec/index.html
 ```
 
 Run the same gate through the CLI when checking documentation locally:

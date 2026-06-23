@@ -95,9 +95,9 @@ export GENERATED_REFERENCE_COUNT="$generated_reference_count"
 TMP_SPEC_DIR="$TMP_DOCS/spec"
 mkdir -p "$TMP_SPEC_DIR"
 cp docs/spec/*.md docs/spec/grammar.ebnf "$TMP_SPEC_DIR/"
-python3 scripts/spec_preview.py --spec-dir "$TMP_SPEC_DIR" --write-index --output "$TMP_DOCS/spec-preview.html" >/dev/null
+go run ./cmd/leia doc spec-preview --spec-dir "$TMP_SPEC_DIR" --write-index --output "$TMP_DOCS/spec-preview.html" >/dev/null
 if ! cmp -s "$TMP_SPEC_DIR/index.md" "docs/spec/index.md"; then
-    echo "error: docs/spec/index.md is stale; run: python3 scripts/spec_preview.py --write-index --output docs/spec/index.html" >&2
+    echo "error: docs/spec/index.md is stale; run: go run ./cmd/leia doc spec-preview --write-index --output docs/spec/index.html" >&2
     exit 1
 fi
 if [ ! -f "docs/_layouts/spec.html" ]; then
@@ -129,7 +129,7 @@ if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
     exit 1
 fi
 if ! cmp -s "$TMP_DOCS/spec-preview.html" "docs/spec/index.html"; then
-    echo "error: docs/spec/index.html is stale; run: python3 scripts/spec_preview.py --write-index --output docs/spec/index.html" >&2
+    echo "error: docs/spec/index.html is stale; run: go run ./cmd/leia doc spec-preview --output docs/spec/index.html" >&2
     exit 1
 fi
 if ! grep -Fq "spec/index.html" docs/_config.yml; then

@@ -220,11 +220,6 @@
 		  "default": "leia-lsp",
 		  "description": "Path to the leia-lsp executable."
 		},
-		"leia.specPreviewScript": {
-		  "type": "string",
-		  "default": "scripts/spec_preview.py",
-          "description": "Workspace-relative path to the spec HTML generator."
-        },
         "leia.specPreviewOutput": {
           "type": "string",
           "default": "docs/spec/index.html",

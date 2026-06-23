@@ -11,14 +11,17 @@ var diagExecCommand = exec.Command
 
 func runDiagCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: leia diag [dump|bundle] [diagnostic-flags...]")
+		fmt.Fprintln(errw, "usage: leia diag [dump|bundle|summary] [diagnostic-flags...]")
 		return 2
 	}
 	mode := args[0]
 	scriptArgs := args[1:]
 	if mode == "help" || mode == "-h" || mode == "--help" {
-		fmt.Fprintln(outw, "usage: leia diag [dump|bundle] [diagnostic-flags...]")
+		fmt.Fprintln(outw, "usage: leia diag [dump|bundle|summary] [diagnostic-flags...]")
 		return 0
+	}
+	if mode == "summary" {
+		return runDiagSummaryCommand(scriptArgs, outw, errw)
 	}
 
 	script, err := diagScriptForMode(mode)

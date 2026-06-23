@@ -36,7 +36,7 @@ The extension assumes `leia` and `leia-lsp` executables are available on
 Set `leia.languageServer.enabled` to `false` to keep only syntax highlighting
 and CLI-backed commands.
 
-The spec preview command runs `scripts/spec_preview.py` in the current
+The spec preview command runs `go run ./cmd/leia doc spec-preview` in the current
 workspace and opens `docs/spec/index.html`.
 
 ## Tasks
