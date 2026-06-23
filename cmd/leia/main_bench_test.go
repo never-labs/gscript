@@ -485,6 +485,73 @@ func TestBenchDebugArtifactWritesOutputFile(t *testing.T) {
 	}
 }
 
+func TestBenchCoverageCommandAcceptsCurrentRepositoryMap(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	t.Chdir(root)
+	cases := benchCoverageConformanceCases(root)
+	known := benchCoverageBenchmarkIDs(root)
+	if missing := benchCoverageMissingFamilies(cases); len(missing) != 0 {
+		t.Fatalf("missing coverage families = %v", missing)
+	}
+	if missing := benchCoverageMissingRefs(cases, known); len(missing) != 0 {
+		t.Fatalf("missing benchmark refs = %v", missing)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"coverage", "--check"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand coverage code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "# Language Conformance Performance Coverage") ||
+		!strings.Contains(stdout.String(), "| Family | Cases | Status | Existing Hot Benchmarks |") {
+		t.Fatalf("coverage markdown missing expected sections:\n%s", stdout.String())
+	}
+}
+
+func TestBenchCoverageCommandWritesJSONAndMarkdown(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	t.Chdir(root)
+	dir := t.TempDir()
+	jsonPath := filepath.Join(dir, "coverage.json")
+	mdPath := filepath.Join(dir, "coverage.md")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"coverage", "--check", "--json", jsonPath, "--markdown", mdPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand coverage code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty when --markdown is used", stdout.String())
+	}
+	md, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(md), "# Language Conformance Performance Coverage") {
+		t.Fatalf("markdown = %q, want report", string(md))
+	}
+	var payload []map[string]any
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("coverage JSON failed to decode: %v\n%s", err, string(data))
+	}
+	if len(payload) == 0 {
+		t.Fatal("coverage JSON is empty")
+	}
+}
+
+func TestBenchCoverageReportsMissingFamilyAndRefs(t *testing.T) {
+	cases := map[string][]string{"newfamily": nil, "math": nil}
+	if got := benchCoverageMissingFamilies(cases); len(got) != 1 || got[0] != "newfamily" {
+		t.Fatalf("missing families = %v, want newfamily", got)
+	}
+	refs := benchCoverageMissingRefs(map[string][]string{"math": nil}, map[string]bool{})
+	if !containsString(refs, "numeric/math_intensive") {
+		t.Fatalf("missing refs = %v, want numeric/math_intensive", refs)
+	}
+}
+
 func writeTestFile(t *testing.T, path string, value any) {
 	t.Helper()
 	data, err := json.Marshal(value)

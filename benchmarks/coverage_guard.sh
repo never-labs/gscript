@@ -7,4 +7,4 @@
 
 set -u
 cd "$(dirname "$0")/.."
-exec python3 benchmarks/conformance_perf_coverage.py --check "$@"
+exec go run ./cmd/leia bench coverage --check "$@"
