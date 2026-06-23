@@ -149,7 +149,7 @@ print_json_report() {
   printf '    "tools/tree-sitter-leia/src/node-types.json"\n'
   printf '  ],\n'
   printf '  "smoke_tests": [\n'
-  printf '    "tools/editor/smoke/editor_smoke.py"\n'
+  printf '    "cmd/leia/editor_smoke.go"\n'
   printf '  ]\n'
   printf '}\n'
 }
@@ -181,23 +181,13 @@ on_error() {
 
 trap 'on_error "$?"' ERR
 
-python3 -m json.tool tools/syntax/textmate/leia.tmLanguage.json >/dev/null
-python3 -m json.tool tools/syntax/textmate/leia-mod.tmLanguage.json >/dev/null
-python3 -m json.tool editors/vscode/package.json >/dev/null
-python3 -m json.tool editors/vscode/language-configuration.json >/dev/null
-python3 -m json.tool editors/vscode/snippets/leia.json >/dev/null
-python3 -m json.tool editors/vscode/syntaxes/leia.tmLanguage.json >/dev/null
-python3 -m json.tool editors/vscode/syntaxes/leia-mod.tmLanguage.json >/dev/null
-python3 -m json.tool tools/tree-sitter-leia/src/grammar.json >/dev/null
-python3 -m json.tool tools/tree-sitter-leia/src/node-types.json >/dev/null
-
 cmp -s tools/syntax/textmate/leia.tmLanguage.json editors/vscode/syntaxes/leia.tmLanguage.json
 cmp -s tools/syntax/textmate/leia-mod.tmLanguage.json editors/vscode/syntaxes/leia-mod.tmLanguage.json
 
 node -c editors/vscode/extension.js >/dev/null
 node -c tools/tree-sitter-leia/grammar.js >/dev/null
 go run ./cmd/leia doc spec-preview --help >/dev/null 2>&1
-python3 tools/editor/smoke/editor_smoke.py >/dev/null
+go run ./cmd/leia editor smoke >/dev/null
 
 tree_sitter=""
 if [ -x tools/tree-sitter-leia/node_modules/.bin/tree-sitter ]; then

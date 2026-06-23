@@ -511,10 +511,6 @@ add_editor_assets() {
         add_run "Editor Assets" "scripts/run.sh editor --require-tree-sitter"
         return
     fi
-    if ! have_cmd python3; then
-        add_skip "Editor Assets" "missing python3"
-        return
-    fi
     if ! have_cmd node; then
         add_skip "Editor Assets" "missing node"
         return

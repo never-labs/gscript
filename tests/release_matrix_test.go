@@ -3227,7 +3227,7 @@ func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
 			t.Fatalf("editor asset JSON missing tree-sitter asset %q: %+v", want, report.TreeSitterAssets)
 		}
 	}
-	if !stringSliceContains(report.SmokeTests, "tools/editor/smoke/editor_smoke.py") {
+	if !stringSliceContains(report.SmokeTests, "cmd/leia/editor_smoke.go") {
 		t.Fatalf("editor asset JSON missing smoke test: %+v", report.SmokeTests)
 	}
 }

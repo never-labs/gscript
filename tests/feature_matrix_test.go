@@ -883,8 +883,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	requireFeatureCellRefs(t, editorTooling, "editor_lsp_tooling", "semantic_gate",
 		"cmd/leia-lsp/main_test.go",
 		"internal/tooling/lsp/server_test.go",
-		"tools/editor/smoke/editor_smoke.py",
-		"tools/editor/smoke/editor_check_test.py",
+		"cmd/leia/editor_smoke.go",
+		"cmd/leia/main_editor_test.go",
 		"tools/tree-sitter-leia/package.json",
 		"tools/tree-sitter-leia/grammar.js",
 		"tools/tree-sitter-leia/queries/highlights.scm",
@@ -914,13 +914,13 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 			t.Fatalf("LSP server gate must keep capability/diagnostic snippet %q", snippet)
 		}
 	}
-	editorSmoke := readFileString(t, filepath.Join(root, "tools", "editor", "smoke", "editor_smoke.py"))
+	editorSmoke := readFileString(t, filepath.Join(root, "cmd", "leia", "editor_smoke.go"))
 	for _, snippet := range []string{
-		"check_vscode()",
-		"check_emacs()",
-		"check_tree_sitter_assets()",
-		"check_packaged_editor_integrations()",
-		"check_downstream_docs()",
+		"checkVSCode",
+		"checkEmacs",
+		"checkTreeSitterAssets",
+		"checkPackagedEditorIntegrations",
+		"checkDownstreamDocs",
 		"leia.restartLanguageServer",
 		"defun leia-eglot-setup",
 		"editors/neovim/queries/leia/highlights.scm",
