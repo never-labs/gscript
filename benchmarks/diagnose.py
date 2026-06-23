@@ -415,8 +415,11 @@ def collect_for_benchmark(
             mapped_json = bench_out / "warm_pcmap.json"
             proc = run(
                 [
-                    "python3",
-                    "benchmarks/jit_addr_map.py",
+                    "go",
+                    "run",
+                    "./cmd/leia",
+                    "bench",
+                    "jit-addr-map",
                     "--binary",
                     str(binary),
                     "--warm-dir",

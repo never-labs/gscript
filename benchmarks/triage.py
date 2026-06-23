@@ -6,7 +6,7 @@ This script orchestrates the existing tools instead of replacing them:
 1. timing_compare.py decides whether a gap is real and records timing source.
 2. leia bench profile-exits explains Tier 2 exit/deopt pressure for selected benchmarks.
 3. scripts/diag.sh and pprof can be enabled when codegen/runtime detail is needed.
-4. -jit-dump-warm plus jit_addr_map.py can map sampled JIT PCs back to IR.
+4. -jit-dump-warm plus leia bench jit-addr-map can map sampled JIT PCs back to IR.
 
 The output is intended for optimization planning, not release gating.
 """
@@ -999,8 +999,11 @@ def main() -> int:
                     pcmap_json = out_dir / f"{bench_name}.jit-pcmap.json"
                     mapped = run(
                         [
-                            sys.executable,
-                            "benchmarks/jit_addr_map.py",
+                            "go",
+                            "run",
+                            "./cmd/leia",
+                            "bench",
+                            "jit-addr-map",
                             "--warm-dir",
                             str(warm_dir),
                             "--binary",

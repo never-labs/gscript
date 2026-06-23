@@ -764,6 +764,87 @@ func TestBenchSubmitGuardSkipsMixedSourcesAndLeiaOnlyLuaJIT(t *testing.T) {
 	}
 }
 
+func TestBenchJITAddrMapResolvesExplicitPC(t *testing.T) {
+	warm := filepath.Join(t.TempDir(), "warm")
+	if err := os.MkdirAll(warm, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(warm, "pcmap.json"), map[string]any{
+		"functions": []map[string]any{{
+			"name": "main",
+			"ranges": []map[string]any{{
+				"pc_start":    "0x1000",
+				"pc_end":      "0x1010",
+				"ir_instr":    7,
+				"ir_op":       "AddInt",
+				"block":       2,
+				"bytecode_pc": 4,
+				"bytecode_op": "ADD",
+				"source_line": 12,
+				"pass":        "lower",
+				"proto":       "main",
+			}},
+		}},
+	})
+	outPath := filepath.Join(t.TempDir(), "pcmap.json")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"jit-addr-map", "--warm-dir", warm, "--pc", "0x1008", "--json", outPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("jit-addr-map code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "| - | - | main | 7 | AddInt | 2 | 4 | lower | 0x1008 |") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"status": "ok"`) || !strings.Contains(string(data), `"mapped_rows": 1`) {
+		t.Fatalf("json = %s", string(data))
+	}
+}
+
+func TestBenchJITAddrMapAggregatesPprofRaw(t *testing.T) {
+	warm := filepath.Join(t.TempDir(), "warm")
+	if err := os.MkdirAll(warm, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(warm, "pcmap.json"), map[string]any{
+		"functions": []map[string]any{{
+			"name": "hot",
+			"ranges": []map[string]any{{
+				"pc_start":    0x2000,
+				"pc_end":      0x2010,
+				"ir_instr":    3,
+				"ir_op":       "Call",
+				"block":       1,
+				"bytecode_pc": 9,
+				"pass":        "emit",
+			}},
+		}},
+	})
+	raw := filepath.Join(t.TempDir(), "raw.txt")
+	if err := os.WriteFile(raw, []byte("Samples:\n  5 1000: 1\nLocations\n  1: 0x2004 M=1 runtime._ExternalCode /tmp/x.go:1:0 s=1\nMappings\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outPath := filepath.Join(t.TempDir(), "mapped.json")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"jit-addr-map", "--warm-dir", warm, "--pprof-raw", raw, "--json", outPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("jit-addr-map code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "| 5 | 0.000001s | hot | 3 | Call | 1 | 9 | emit | 0x2004 |") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"profile_samples": 5`) || !strings.Contains(string(data), `"external_code_samples": 5`) {
+		t.Fatalf("json = %s", string(data))
+	}
+}
+
 type benchTimingFixture struct {
 	Name          string
 	Current       float64
