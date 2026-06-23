@@ -39,6 +39,9 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 			harnessArgs = append(profileArgs, rest...)
 		}
 	}
+	if mode == "audit" {
+		return runBenchAuditCommand(harnessArgs, outw, errw)
+	}
 
 	return runBenchHarness(mode, harnessArgs, outw, errw)
 }
@@ -110,7 +113,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "compare", "timing", "strict", "diagnose", "help":
+	case "audit", "compare", "timing", "strict", "diagnose", "help":
 		return false
 	default:
 		return true
@@ -128,7 +131,7 @@ func benchScriptForMode(mode string) (string, error) {
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, or diagnose)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, or audit)", mode)
 	}
 }
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -198,5 +200,90 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	}
 	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "diagnose.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "control/sieve" || gotArgs[3] != "--no-timing" {
 		t.Fatalf("args = %#v, want diagnose.py --bench control/sieve --no-timing", gotArgs)
+	}
+}
+
+func TestBenchAuditCommandReportsSections(t *testing.T) {
+	payload := map[string]any{
+		"results": []map[string]any{
+			{
+				"benchmark": "fast",
+				"default":   map[string]any{"seconds": 0.002, "exit_total": 0},
+				"luajit":    map[string]any{"status": "ok", "seconds": 0.004},
+			},
+			{
+				"benchmark": "missing_ref",
+				"default":   map[string]any{"seconds": 0.020, "exit_total": 25},
+				"luajit":    map[string]any{"status": "missing", "seconds": nil},
+			},
+			{
+				"benchmark": "tiny",
+				"default":   map[string]any{"seconds": 0.0, "exit_total": 0},
+				"luajit":    map[string]any{"status": "ok", "seconds": 0.010},
+			},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "guard.json")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"audit", path, "--low-resolution-cutoff", "0.001", "--exit-cutoff", "20"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand audit code = %d, stderr = %q", code, stderr.String())
+	}
+	report := stdout.String()
+	for _, want := range []string{
+		"## Confirmed LuaJIT Comparisons",
+		"| fast | 0.002s | 0.004s | 0.50x |",
+		"| missing_ref | missing | 0.020s |",
+		"| tiny | 0.000s | Needs calibrated repeats or ns/op bench |",
+		"| missing_ref | 25 |",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("audit report missing %q:\n%s", want, report)
+		}
+	}
+}
+
+func TestBenchAuditCommandWritesMarkdown(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "guard.json")
+	if err := os.WriteFile(path, []byte(`{"results":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outPath := filepath.Join(t.TempDir(), "audit.md")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"audit", path, "--markdown", outPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand audit code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty when --markdown is used", stdout.String())
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "# Benchmark Audit") {
+		t.Fatalf("audit markdown = %q, want report", string(data))
+	}
+}
+
+func TestBenchAuditRejectsPreviousSchemaResultsMap(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "previous_schema.json")
+	if err := os.WriteFile(path, []byte(`{"results":{"fib":{}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"audit", path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runBenchCommand audit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "guard JSON must contain a list-valued 'results'") {
+		t.Fatalf("stderr = %q, want schema error", stderr.String())
 	}
 }
