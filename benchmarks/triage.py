@@ -477,7 +477,7 @@ def classify(
                 "P1" if max_lj_gap >= 2 else "P2",
                 "high" if exit_total else "medium",
                 evidence,
-                "Inspect profile_exits top sites, then reduce the dominant fallback/exit mechanism before tuning generated code.",
+                "Inspect leia bench profile-exits top sites, then reduce the dominant fallback/exit mechanism before tuning generated code.",
             )
         )
 
@@ -697,7 +697,7 @@ def verdict(row: dict) -> str:
     if gap is not None and gap >= 2:
         return "major gap: prioritize"
     if exits > 100:
-        return "exit-heavy: inspect profile_exits"
+        return "exit-heavy: inspect leia bench profile-exits"
     if gap is not None and gap < 1:
         return "faster than LuaJIT on this measurement"
     return "moderate/codegen-runtime investigation"

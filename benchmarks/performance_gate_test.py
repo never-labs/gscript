@@ -316,7 +316,7 @@ class PerformanceGateValidationTest(unittest.TestCase):
             "internal/methodjit/exit_resume_check_test.go",
             "scripts/performance_gate.sh",
             "benchmarks/performance_gate_test.py",
-            "benchmarks/perf_submit_guard_test.py",
+            "cmd/leia/main_bench_test.go",
             "benchmarks/manifest.json",
             "docs/reference/performance/index.md",
         ):

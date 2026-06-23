@@ -1037,7 +1037,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"internal/methodjit/exit_resume_check_test.go",
 		"scripts/performance_gate.sh",
 		"benchmarks/performance_gate_test.py",
-		"benchmarks/perf_submit_guard_test.py",
+		"cmd/leia/main_bench_test.go",
 		"benchmarks/manifest.json",
 		"docs/reference/performance/index.md",
 		"docs/reference/platforms/index.md",
@@ -1141,7 +1141,7 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 		"test_jit_fallback_luajit_contract_keeps_gate_refs",
 		"test_validate_only_rejects_luajit_ratio_above_threshold",
 		"test_builtin_gate_selectors_are_registered_manifest_workloads",
-		"benchmarks/perf_submit_guard_test.py",
+		"cmd/leia/main_bench_test.go",
 	} {
 		if !strings.Contains(benchmarkGateTest, snippet) {
 			t.Fatalf("benchmark tests must keep README execution/performance gate snippet %q", snippet)
@@ -1152,7 +1152,7 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "semantic_gate",
 		"scripts/performance_gate.sh",
 		"benchmarks/performance_gate_test.py",
-		"benchmarks/perf_submit_guard_test.py",
+		"cmd/leia/main_bench_test.go",
 		"benchmarks/manifest.json",
 		"docs/reference/performance/index.md",
 		"docs/reference/platforms/index.md",

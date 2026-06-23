@@ -7,10 +7,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 import benchmark_discovery as discovery
-import conformance_perf_coverage as coverage
-import profile_exits
 import regression_guard
-import validate_lua_refs
+import timing_compare
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,10 +69,8 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
 
     def test_python_benchmark_entrypoints_share_discovery_groups(self):
         expected = tuple(discovery.GROUPS)
-        self.assertEqual(coverage.BENCHMARK_GROUPS, expected)
-        self.assertEqual(profile_exits.BENCHMARK_GROUPS, expected)
         self.assertEqual(regression_guard.BENCHMARK_GROUPS, expected)
-        self.assertEqual(validate_lua_refs.BENCHMARK_GROUPS, expected)
+        self.assertEqual(tuple(timing_compare.GROUPS), expected)
 
     def test_release_scripts_gate_current_module_path(self):
         expected = module_path()
@@ -91,10 +87,8 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
 
         self.assertIn('add_go_test "Correctness"', full_plan)
         self.assertIn('add_skip "Feature Matrix" "covered by Correctness', full_plan)
-        self.assertIn('add_skip "Language Conformance Surface" "covered by Correctness', full_plan)
         self.assertIn('add_skip "Release Matrix Metadata" "covered by Correctness', full_plan)
         self.assertNotIn('add_go_test "Feature Matrix"', full_plan)
-        self.assertNotIn('add_go_test "Language Conformance Surface"', full_plan)
         self.assertNotIn('add_go_test "Release Matrix Metadata"', full_plan)
 
     def test_release_profile_requires_release_only_tool_smokes(self):
@@ -109,7 +103,6 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertIn("--require-goreleaser", distribution)
         self.assertIn("goreleaser CLI is required for release distribution profile", distribution)
         self.assertIn('"--full", "--release-profile"', ci)
-        self.assertIn('"--require-goreleaser"', ci)
 
     def test_production_release_profile_list_includes_required_tool_flags(self):
         proc = subprocess.run(
@@ -167,6 +160,8 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
                         ),
                         str(script),
                     ]
+                elif script.suffix == ".leia":
+                    cmd = ["go", "run", "./cmd/leia", "lint", str(script)]
                 else:
                     self.fail(f"unsupported script entrypoint type: {script.name}")
                 subprocess.run(

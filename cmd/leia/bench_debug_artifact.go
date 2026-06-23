@@ -42,7 +42,7 @@ func runBenchDebugArtifactCommand(args []string, outw, errw io.Writer) int {
 		opts.BenchmarkJSON = append(opts.BenchmarkJSON, value)
 		return nil
 	})
-	fs.StringVar(&opts.ExitStats, "exit-stats", "", "profile_exits JSON, raw -exit-stats-json output, or embedded JSON")
+	fs.StringVar(&opts.ExitStats, "exit-stats", "", "leia bench profile-exits JSON, raw -exit-stats-json output, or embedded JSON")
 	fs.StringVar(&opts.RuntimePathStats, "runtime-path-stats", "", "raw -runtime-path-stats[-json] output")
 	fs.StringVar(&opts.PerfStats, "perf-stats", "", "raw -tier2-perf-stats[-json] output")
 	fs.StringVar(&opts.SpecState, "spec-state", "", "raw -tier2-spec-state-json output")
