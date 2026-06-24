@@ -17,6 +17,7 @@ Tasks:
   production           Run production readiness gate
   public-blockers      Check public release blocker decisions
   q                    Run q conformance gate
+  q-perf               Run q performance report gate
   release-artifacts    Build local release artifacts
   release-check        Check local release artifacts
   release-dist         Check release distribution config
@@ -63,6 +64,54 @@ run_leia_task() {
   exec go run ./cmd/leia run "$repo_root/$script" "$@"
 }
 
+run_q_perf_task() {
+  local output_dir=""
+  local suite_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --output)
+        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+          echo "scripts/run.sh q-perf: --output requires a directory" >&2
+          exit 2
+        fi
+        output_dir="$2"
+        shift 2
+        ;;
+      --output=*)
+        output_dir="${1#--output=}"
+        shift
+        ;;
+      -h|--help)
+        cat <<'USAGE'
+Usage: scripts/run.sh q-perf [--output DIR] [q-suite args...]
+
+Runs the q performance suite, captures its output, and checks the q performance
+report. The output directory receives output.txt, q_perf_report.json, and
+q_perf_report.md.
+USAGE
+        return
+        ;;
+      *)
+        suite_args+=("$1")
+        shift
+        ;;
+    esac
+  done
+  if [ -z "$output_dir" ]; then
+    output_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-q-perf-gate.XXXXXX")"
+  fi
+  mkdir -p "$output_dir"
+  set -o pipefail
+  LEIA_SKIP_TIMING_COMPARE="${LEIA_SKIP_TIMING_COMPARE:-1}" \
+    go run ./cmd/leia bench q-suite "${suite_args[@]}" | tee "$output_dir/output.txt"
+  go run ./cmd/leia bench q-report \
+    --from-output "$output_dir/output.txt" \
+    --check \
+    --json "$output_dir/q_perf_report.json" \
+    --markdown "$output_dir/q_perf_report.md"
+  echo "q performance evidence: $output_dir/q_perf_report.json $output_dir/q_perf_report.md"
+}
+
 case "$task" in
   -h|--help|help)
     usage
@@ -93,6 +142,9 @@ case "$task" in
     ;;
   q|q-conformance)
     run_shell_task scripts/q_conformance_gate.sh "$@"
+    ;;
+  q-perf|q-performance|q-performance-gate)
+    run_q_perf_task "$@"
     ;;
   release-artifacts)
     run_shell_task scripts/release_artifacts.sh "$@"

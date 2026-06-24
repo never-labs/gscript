@@ -25,8 +25,7 @@ scripts/run.sh production --full --release-profile --release-version vX.Y.Z --li
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
 scripts/run.sh q --scope core --bench smoke --json
-LEIA_SKIP_TIMING_COMPARE=1 go run ./cmd/leia bench q-suite > /tmp/leia-q-perf-output.txt
-go run ./cmd/leia bench q-report --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md
+scripts/run.sh q-perf --output /tmp/leia-q-perf
 scripts/run.sh editor --json
 scripts/run.sh public-blockers --json
 scripts/run.sh release-notes --json --version vX.Y.Z

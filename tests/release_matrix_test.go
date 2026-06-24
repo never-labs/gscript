@@ -1202,8 +1202,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json",
 		"go run ./cmd/leia doc check --json",
 		"scripts/run.sh q --scope core --bench smoke --json",
-		"LEIA_SKIP_TIMING_COMPARE=1 go run ./cmd/leia bench q-suite > /tmp/leia-q-perf-output.txt",
-		"go run ./cmd/leia bench q-report --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md",
+		"scripts/run.sh q-perf --output /tmp/leia-q-perf",
 		"scripts/run.sh editor --json",
 		"scripts/run.sh public-blockers --json",
 		"scripts/run.sh release-notes --json --version vX.Y.Z",
@@ -3016,7 +3015,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		"Release Distribution":    "scripts/run.sh release-dist --require-goreleaser",
 		"Release Notes":           "scripts/run.sh release-notes --require-ready --version \"vX.Y.Z\"",
 		"Release Artifacts":       "scripts/run.sh release-check",
-		"Q Performance Gate":      "go run ./cmd/leia bench q-suite | tee \"$q_perf_dir/output.txt\" && go run ./cmd/leia bench q-report --from-output \"$q_perf_dir/output.txt\" --check --json \"$q_perf_dir/q_perf_report.json\" --markdown \"$q_perf_dir/q_perf_report.md\"",
+		"Q Performance Gate":      "scripts/run.sh q-perf",
 	} {
 		if !strings.Contains(commands[name], want) {
 			t.Fatalf("production plan JSON command %q = %q, want fragment %q", name, commands[name], want)
