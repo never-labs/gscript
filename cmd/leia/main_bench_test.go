@@ -246,6 +246,27 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outDir, "diagnostics.json")); err != nil {
 		t.Fatalf("diagnostics.json missing: %v", err)
 	}
+	data, err := os.ReadFile(filepath.Join(outDir, "diagnostics.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		Benchmarks []map[string]any `json:"benchmarks"`
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Benchmarks) != 1 {
+		t.Fatalf("benchmarks = %#v", report.Benchmarks)
+	}
+	runtimeSummary, _ := report.Benchmarks[0]["runtime_summary"].(map[string]any)
+	tier2Summary, _ := report.Benchmarks[0]["tier2_call_summary"].(map[string]any)
+	if runtimeSummary["status"] != "skipped" || runtimeSummary["readiness"] != "needs-attention" || runtimeSummary["has_exits"] != false {
+		t.Fatalf("runtime_summary = %#v", runtimeSummary)
+	}
+	if tier2Summary["attempted"] != float64(0) || tier2Summary["entered_pct"] != float64(0) {
+		t.Fatalf("tier2_call_summary = %#v", tier2Summary)
+	}
 }
 
 func TestBenchCommandDispatchesTriageHarness(t *testing.T) {

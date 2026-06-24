@@ -123,8 +123,8 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 			"work_proto":            "",
 			"work_priority":         0,
 			"readiness":             benchDiagnoseReadiness(diag),
-			"runtime_summary":       map[string]any{},
-			"tier2_call_summary":    map[string]any{},
+			"runtime_summary":       benchDiagnoseRuntimeSummary(diag),
+			"tier2_call_summary":    benchDiagnoseTier2Summary(diag),
 			"pprof_runs":            0,
 			"pprof_script_repeat":   0,
 			"pprof_samples_seconds": 0,
@@ -271,6 +271,32 @@ func benchDiagnoseReadiness(diag benchDiagnoseRun) string {
 		return "has-runtime-evidence"
 	}
 	return "baseline"
+}
+
+func benchDiagnoseRuntimeSummary(diag benchDiagnoseRun) map[string]any {
+	return map[string]any{
+		"status":       diag.Status,
+		"readiness":    benchDiagnoseReadiness(diag),
+		"exit_total":   diag.ExitTotal,
+		"has_exits":    diag.ExitTotal > 0,
+		"wall_seconds": diag.WallSeconds,
+	}
+}
+
+func benchDiagnoseTier2Summary(diag benchDiagnoseRun) map[string]any {
+	summary := map[string]any{
+		"attempted": diag.T2Attempted,
+		"entered":   diag.T2Entered,
+		"failed":    diag.T2Failed,
+	}
+	if diag.T2Attempted > 0 {
+		summary["entered_pct"] = float64(diag.T2Entered) / float64(diag.T2Attempted) * 100
+		summary["failed_pct"] = float64(diag.T2Failed) / float64(diag.T2Attempted) * 100
+	} else {
+		summary["entered_pct"] = 0.0
+		summary["failed_pct"] = 0.0
+	}
+	return summary
 }
 
 type benchTriageConfig struct {
