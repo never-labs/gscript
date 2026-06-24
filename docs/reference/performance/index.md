@@ -28,7 +28,7 @@ LuaJIT reference programs, where meaningful, live under
 
 ## Commands
 
-The CLI forwards to the Python harnesses:
+The CLI runs the Go benchmark harnesses:
 
 ```bash
 leia bench --quick
@@ -37,7 +37,7 @@ leia bench --full --runs 5 --warmup 1 --sort luajit-gap
 leia bench strict --runs 3 --warmup 1 \
   --json /tmp/leia_strict.json \
   --markdown /tmp/leia_strict.md
-leia diagnose table/table_array_access --out-dir /tmp/leia-diag
+leia bench diagnose --bench table/table_array_access --out-dir /tmp/leia-diag
 ```
 
 The shell gate wraps the same harnesses with repository defaults:
@@ -72,6 +72,13 @@ ratio, LuaJIT ratio, and Tier 2 exits.
 Low-resolution script timers are not treated as wins. The harness can increase
 repeat counts and fall back to repeated command wall time when the script time
 is below the timer resolution.
+
+Use `--scale=group/name:KEY=VALUE[,KEY=VALUE...]` to run the same benchmark
+shape with larger or smaller top-level numeric constants. The harness writes
+temporary scaled Leia sources, applies the same override to the clean
+`--head-ref` snapshot, and records the applied scale in the JSON report.
+`--scale-profile NAME` reads recommended scales from `benchmarks/manifest.json`
+when a workload declares them.
 
 ## Strict Guard
 
