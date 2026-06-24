@@ -180,8 +180,7 @@ func runBenchTriageCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1
 	}
-	specs, err := benchSelectForDiag(root, benchdisc.DomainGroups, cfg.Benches, false)
-	if err != nil {
+	if _, err := benchSelectForDiag(root, benchdisc.DomainGroups, cfg.Benches, false); err != nil {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 2
 	}
@@ -193,29 +192,23 @@ func runBenchTriageCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1
 	}
-	timing := make([]map[string]any, 0, len(specs))
-	for _, spec := range specs {
-		timing = append(timing, map[string]any{
-			"benchmark":  spec.ID(),
-			"scale":      map[string]any{},
-			"mode":       "default",
-			"current":    nil,
-			"head":       nil,
-			"luajit":     nil,
-			"cur_head":   nil,
-			"cur_luajit": nil,
-			"source":     "",
-			"repeat":     0,
-			"exits":      0,
-			"ci95":       nil,
-			"note":       "timing capture delegated to leia bench compare",
-		})
+	timingJSON := filepath.Join(outDir, "timing.json")
+	timingMD := filepath.Join(outDir, "timing.md")
+	compareArgs := benchTriageCompareArgs(cfg, timingJSON, timingMD)
+	if code := runBenchGoHarness("compare", compareArgs, io.Discard, errw); code != 0 {
+		fmt.Fprintf(errw, "leia bench triage: timing compare failed with code %d\n", code)
+		return code
+	}
+	timing, err := benchTriageRowsFromCompare(timingJSON)
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
+		return 1
 	}
 	payload := map[string]any{
 		"timing":             timing,
 		"bottlenecks":        []any{},
-		"recommendations":    []string{"Run leia bench compare for calibrated timing and leia bench diagnose for runtime artifacts."},
-		"artifacts":          map[string]any{},
+		"recommendations":    benchTriageRecommendations(timing),
+		"artifacts":          map[string]any{"timing_json": timingJSON, "timing_md": timingMD},
 		"exit_summary":       map[string]any{"total": 0, "by_code": map[string]any{}, "by_reason": map[string]any{}, "top_sites": []any{}, "statuses": map[string]any{}},
 		"pprof_summary":      map[string]any{},
 		"pcmap_summary":      map[string]any{},
@@ -227,22 +220,12 @@ func runBenchTriageCommand(args []string, outw, errw io.Writer) int {
 	}
 	jsonPath := filepath.Join(outDir, "triage.json")
 	mdPath := filepath.Join(outDir, "triage.md")
-	timingJSON := filepath.Join(outDir, "timing.json")
-	timingMD := filepath.Join(outDir, "timing.md")
 	if err := writeJSONFile(jsonPath, payload); err != nil {
-		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
-		return 1
-	}
-	if err := writeJSONFile(timingJSON, map[string]any{"results": []any{}, "modes": cfg.Modes}); err != nil {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1
 	}
 	md := benchTriageMarkdown(timing)
 	if err := os.WriteFile(mdPath, []byte(md), 0o644); err != nil {
-		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
-		return 1
-	}
-	if err := os.WriteFile(timingMD, []byte("# Timing\n\nTiming capture delegated to `leia bench compare`.\n"), 0o644); err != nil {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1
 	}
@@ -281,6 +264,130 @@ func parseBenchTriageArgs(args []string, errw io.Writer) (benchTriageConfig, err
 		return cfg, flag.ErrHelp
 	}
 	return cfg, nil
+}
+
+func benchTriageCompareArgs(cfg benchTriageConfig, timingJSON, timingMD string) []string {
+	args := []string{
+		"--runs", cfg.Runs,
+		"--warmup", cfg.Warmup,
+		"--timeout", cfg.Timeout,
+		"--min-sample-seconds", cfg.MinSampleSeconds,
+		"--max-repeat", cfg.MaxRepeat,
+		"--time-source", cfg.TimeSource,
+		"--head-ref", "HEAD",
+		"--json", timingJSON,
+		"--markdown", timingMD,
+	}
+	for _, mode := range cfg.Modes {
+		args = append(args, "--mode", mode)
+	}
+	for _, bench := range cfg.Benches {
+		args = append(args, "--bench", bench)
+	}
+	for _, scale := range cfg.Scale {
+		args = append(args, "--scale", scale)
+	}
+	if cfg.ScaleProfile != "" && cfg.ScaleProfile != "none" {
+		args = append(args, "--scale-profile", cfg.ScaleProfile)
+	}
+	return args
+}
+
+func benchTriageRowsFromCompare(path string) ([]map[string]any, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var report struct {
+		Results []map[string]any `json:"results"`
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		return nil, err
+	}
+	rows := []map[string]any{}
+	for _, result := range report.Results {
+		benchmark := fmt.Sprint(result["benchmark"])
+		group := fmt.Sprint(result["group"])
+		if group != "" && group != "<nil>" {
+			benchmark = group + "/" + benchmark
+		}
+		scale := map[string]any{}
+		if raw, ok := result["scale"].(map[string]any); ok {
+			scale = raw
+		}
+		modes, _ := result["modes"].(map[string]any)
+		for mode, rawMode := range modes {
+			modeRow, _ := rawMode.(map[string]any)
+			current := benchTriageSubject(modeRow["current"])
+			head := benchTriageSubject(modeRow["head"])
+			luajit := benchTriageSubject(modeRow["luajit"])
+			rows = append(rows, map[string]any{
+				"benchmark":  benchmark,
+				"scale":      scale,
+				"mode":       mode,
+				"current":    current["seconds"],
+				"head":       head["seconds"],
+				"luajit":     luajit["seconds"],
+				"cur_head":   benchTriageRatio(current["seconds"], head["seconds"]),
+				"cur_luajit": benchTriageRatio(current["seconds"], luajit["seconds"]),
+				"status":     map[string]any{"current": current["status"], "head": head["status"], "luajit": luajit["status"]},
+				"source":     current["source"],
+				"repeat":     current["repeat"],
+				"exits":      current["exit_total"],
+				"ci95":       current["ci95"],
+				"note":       benchTriageTimingNote(current, head, luajit),
+			})
+		}
+	}
+	return rows, nil
+}
+
+func benchTriageSubject(raw any) map[string]any {
+	subject, _ := raw.(map[string]any)
+	stats, _ := subject["stats"].(map[string]any)
+	return map[string]any{
+		"seconds":    stats["median"],
+		"status":     subject["status"],
+		"source":     subject["source"],
+		"repeat":     subject["repeat"],
+		"exit_total": subject["exit_total"],
+		"ci95":       stats["ci95_half_width_pct"],
+	}
+}
+
+func benchTriageRatio(a, b any) any {
+	left, okLeft := a.(float64)
+	right, okRight := b.(float64)
+	if !okLeft || !okRight || right == 0 {
+		return nil
+	}
+	return left / right
+}
+
+func benchTriageTimingNote(current, head, luajit map[string]any) string {
+	curStatus := fmt.Sprint(current["status"])
+	headStatus := fmt.Sprint(head["status"])
+	luaStatus := fmt.Sprint(luajit["status"])
+	if curStatus != "ok" || headStatus != "ok" {
+		return "current/head timing needs attention"
+	}
+	if luaStatus != "ok" && luaStatus != "<nil>" {
+		return "LuaJIT reference unavailable or failed"
+	}
+	return "calibrated timing captured"
+}
+
+func benchTriageRecommendations(timing []map[string]any) []string {
+	recs := []string{}
+	for _, row := range timing {
+		if note, _ := row["note"].(string); note != "" && note != "calibrated timing captured" {
+			recs = append(recs, fmt.Sprintf("%s: %s", row["benchmark"], note))
+		}
+	}
+	if len(recs) == 0 {
+		return []string{"Use timing.json for detailed current/head/LuaJIT ratios; run leia bench diagnose when runtime artifacts are needed."}
+	}
+	return recs
 }
 
 func benchSelectForDiag(root string, groups, benches []string, allGroups bool) ([]benchdisc.Benchmark, error) {
@@ -351,9 +458,17 @@ func benchTriageMarkdown(timing []map[string]any) string {
 	b.WriteString("| Benchmark | Mode | Current | HEAD | LuaJIT | Note |\n")
 	b.WriteString("| --- | --- | ---: | ---: | ---: | --- |\n")
 	for _, row := range timing {
-		b.WriteString(benchMarkdownRow(row["benchmark"], row["mode"], "-", "-", "-", row["note"]))
+		b.WriteString(benchMarkdownRow(row["benchmark"], row["mode"], benchDiagFormatSeconds(row["current"]), benchDiagFormatSeconds(row["head"]), benchDiagFormatSeconds(row["luajit"]), row["note"]))
 		b.WriteByte('\n')
 	}
 	b.WriteString("\n## Artifacts\n\nGenerated by `leia bench triage`.\n\n## Artifact Status\n\nNo external artifacts were requested.\n")
 	return b.String()
+}
+
+func benchDiagFormatSeconds(value any) string {
+	seconds, ok := value.(float64)
+	if !ok {
+		return "-"
+	}
+	return fmt.Sprintf("%.6fs", seconds)
 }
