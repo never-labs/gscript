@@ -299,7 +299,7 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 	fs.StringVar(&cfg.ScaleProfile, "scale-profile", "", "Scale profile.")
 	fs.Var((*benchStringList)(&cfg.Scale), "scale", "Scale override.")
 	fs.Var((*benchStringList)(&cfg.Scale), "param", "Scale override alias.")
-	fs.Var(&repeatOverrides, "repeat", "Repeat override. Accepted for strict compatibility.")
+	fs.Var(&repeatOverrides, "repeat", "Scale override alias retained for older strict invocations.")
 	fs.IntVar(&cfg.Runs, "measured", cfg.Runs, "Measured runs alias for strict compatibility.")
 	fs.Float64Var(&cfg.SuspiciousVMSpeedup, "suspicious-vm-speedup", cfg.SuspiciousVMSpeedup, "Warn when VM/default median ratio exceeds this threshold.")
 	fs.Float64Var(&cfg.SuspiciousLuaJITRatio, "suspicious-luajit-ratio", cfg.SuspiciousLuaJITRatio, "Warn when default/LuaJIT median ratio exceeds this threshold.")

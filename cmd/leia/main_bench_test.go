@@ -1489,6 +1489,17 @@ func TestBenchGoHarnessRejectsInvalidStrictThresholds(t *testing.T) {
 	}
 }
 
+func TestBenchGoHarnessRepeatAliasFeedsScaleOverrides(t *testing.T) {
+	var stderr bytes.Buffer
+	cfg, err := parseBenchGoHarnessConfig("strict", []string{"--repeat", "control/sieve:N=1000", "--repeat", "REPS=3"}, &stderr)
+	if err != nil {
+		t.Fatalf("parse err = %v, stderr = %q", err, stderr.String())
+	}
+	if !reflect.DeepEqual(cfg.Scale, []string{"control/sieve:N=1000", "REPS=3"}) {
+		t.Fatalf("scale = %#v", cfg.Scale)
+	}
+}
+
 func TestBenchRegressionGuardWritesCSVAndMarkdown(t *testing.T) {
 	vm, def, lua, base, pct := 1.0, 0.5, 0.25, 0.4, 25.0
 	row := benchRegressionResult{
