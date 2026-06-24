@@ -276,6 +276,7 @@ print_json_report() {
   printf '  "pass_pipeline_line_count": %d,\n' "${#pass_pipeline_lines[@]}"
   printf '  "debt_marker_count": %d,\n' "${#debt_marker_paths[@]}"
   printf '  "missing_test_count": %d,\n' "${#missing_test_files[@]}"
+  printf '  "same_name_test_gap_count": %d,\n' "${#missing_test_files[@]}"
   printf '  "top_file_details": '
   print_json_file_details "  "
   printf ',\n'
