@@ -54,17 +54,28 @@ func isSoAColumnAffineUpdateProto(p *FuncProto) bool {
 
 func soaColumnAffineUpdateSpecForProto(p *FuncProto) (soaColumnAffineUpdateSpec, bool) {
 	var spec soaColumnAffineUpdateSpec
-	if p != nil && p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization != nil {
+	if p == nil {
+		return spec, false
+	}
+	p.RuntimeSpecs.mu.Lock()
+	if p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization != nil {
 		c := p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization
+		p.RuntimeSpecs.mu.Unlock()
 		return c.spec, c.recognized
 	}
+	p.RuntimeSpecs.mu.Unlock()
 	spec, ok := recognizeSoAColumnAffineUpdateSpec(p)
-	if p != nil {
-		p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization = &soaColumnAffineUpdateCache{
-			recognized: ok,
-			spec:       spec,
-		}
+	cache := &soaColumnAffineUpdateCache{
+		recognized: ok,
+		spec:       spec,
 	}
+	p.RuntimeSpecs.mu.Lock()
+	if existing := p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization; existing != nil {
+		p.RuntimeSpecs.mu.Unlock()
+		return existing.spec, existing.recognized
+	}
+	p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization = cache
+	p.RuntimeSpecs.mu.Unlock()
 	return spec, ok
 }
 
@@ -135,17 +146,32 @@ func soaAffineManyLiteralSpecForProto(p *FuncProto, startPC int) (soaAffineManyL
 	if p == nil || startPC < 0 || startPC >= len(p.Code) {
 		return spec, false
 	}
+	p.RuntimeSpecs.mu.Lock()
 	if len(p.RuntimeSpecs.SoAAffineManyLiteralSpecialization) != len(p.Code) {
 		p.RuntimeSpecs.SoAAffineManyLiteralSpecialization = make([]soaAffineManyLiteralCallSiteCache, len(p.Code))
 	}
 	cache := &p.RuntimeSpecs.SoAAffineManyLiteralSpecialization[startPC]
 	if cache.probed {
-		return cache.spec, cache.recognized
+		spec, ok := cache.spec, cache.recognized
+		p.RuntimeSpecs.mu.Unlock()
+		return spec, ok
 	}
+	p.RuntimeSpecs.mu.Unlock()
 	spec, ok := recognizeSoAAffineManyLiteralSpec(p, startPC)
+	p.RuntimeSpecs.mu.Lock()
+	if len(p.RuntimeSpecs.SoAAffineManyLiteralSpecialization) != len(p.Code) {
+		p.RuntimeSpecs.SoAAffineManyLiteralSpecialization = make([]soaAffineManyLiteralCallSiteCache, len(p.Code))
+	}
+	cache = &p.RuntimeSpecs.SoAAffineManyLiteralSpecialization[startPC]
+	if cache.probed {
+		spec, ok := cache.spec, cache.recognized
+		p.RuntimeSpecs.mu.Unlock()
+		return spec, ok
+	}
 	cache.probed = true
 	cache.recognized = ok
 	cache.spec = spec
+	p.RuntimeSpecs.mu.Unlock()
 	return spec, ok
 }
 
@@ -289,8 +315,12 @@ func (vm *VM) runSoAColumnAffineUpdateRuntimeSpecialization(cl *Closure, args []
 			return false, nil
 		}
 		spec.guard = guard
-		if cl != nil && cl.Proto != nil && cl.Proto.RuntimeSpecs.SoAColumnAffineUpdateSpecialization != nil {
-			cl.Proto.RuntimeSpecs.SoAColumnAffineUpdateSpecialization.spec = spec
+		if cl != nil && cl.Proto != nil {
+			cl.Proto.RuntimeSpecs.mu.Lock()
+			if cl.Proto.RuntimeSpecs.SoAColumnAffineUpdateSpecialization != nil {
+				cl.Proto.RuntimeSpecs.SoAColumnAffineUpdateSpecialization.spec = spec
+			}
+			cl.Proto.RuntimeSpecs.mu.Unlock()
 		}
 	}
 	if err := s.Affine(spec.dstName, spec.srcName, args[1].Number(), args[2].Number()); err != nil {

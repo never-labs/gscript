@@ -122,13 +122,13 @@ func TestBenchCommandDispatchesProfiles(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	if code := runBenchCommand([]string{"--quick", "--no-luajit", "--json", filepath.Join(t.TempDir(), "quick.json")}, &stdout, &stderr); code != 0 {
+	if code := runBenchCommand([]string{"--quick", "--dry-run", "--no-luajit", "--json", filepath.Join(t.TempDir(), "quick.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("quick code = %d, stderr = %q", code, stderr.String())
 	}
-	if code := runBenchCommand([]string{"--full", "--no-luajit", "--json", filepath.Join(t.TempDir(), "full.json")}, &stdout, &stderr); code != 0 {
+	if code := runBenchCommand([]string{"--full", "--dry-run", "--no-luajit", "--json", filepath.Join(t.TempDir(), "full.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("full code = %d, stderr = %q", code, stderr.String())
 	}
-	if code := runBenchCommand([]string{"--guard", "--no-luajit", "--json", filepath.Join(t.TempDir(), "guard.json")}, &stdout, &stderr); code != 0 {
+	if code := runBenchCommand([]string{"--guard", "--dry-run", "--no-luajit", "--json", filepath.Join(t.TempDir(), "guard.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("guard code = %d, stderr = %q", code, stderr.String())
 	}
 	if len(calls) == 0 {
