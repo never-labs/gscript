@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/never-labs/leia/internal/tooling/benchdisc"
 )
@@ -57,6 +58,25 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
 		return 1
 	}
+	tempDir, err := os.MkdirTemp("", "leia-bench-diagnose-")
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
+		return 1
+	}
+	defer os.RemoveAll(tempDir)
+	leiaBin := ""
+	timeout, err := parseBenchGoTimeout(cfg.Timeout)
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
+		return 2
+	}
+	if !cfg.NoTiming {
+		leiaBin = filepath.Join(tempDir, "leia-current")
+		if err := benchBuildLeia(root, leiaBin, "build failed in {root} with exit {exit_code}", errw); err != nil {
+			fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
+			return 1
+		}
+	}
 	rows := make([]map[string]any, 0, len(specs))
 	for _, spec := range specs {
 		artifactDir := filepath.Join(outDir, spec.Group+"__"+spec.Name)
@@ -64,34 +84,55 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 			fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
 			return 1
 		}
+		scale, err := benchGoScaleForSpec(root, spec, benchGoHarnessConfig{Scale: cfg.Scale, ScaleProfile: cfg.ScaleProfile})
+		if err != nil {
+			fmt.Fprintf(errw, "leia bench diagnose: %s: %v\n", spec.ID(), err)
+			return 2
+		}
+		runSpec, err := benchGoPrepareScaledSpec(spec, filepath.Join(tempDir, "scaled", spec.Group+"__"+spec.Name), scale)
+		if err != nil {
+			fmt.Fprintf(errw, "leia bench diagnose: %s: %v\n", spec.ID(), err)
+			return 2
+		}
 		summary := filepath.Join(artifactDir, "summary.raw.txt")
-		_ = os.WriteFile(summary, []byte("diagnose summary pending deep runtime probes\n"), 0o644)
+		raw := filepath.Join(artifactDir, "run.raw.txt")
+		diag := benchRunDiagnoseSpec(runSpec, leiaBin, timeout, cfg)
+		if err := os.WriteFile(raw, []byte(diag.RawOutput), 0o644); err != nil {
+			fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
+			return 1
+		}
+		if err := os.WriteFile(summary, []byte(benchDiagnoseSummaryText(spec, diag)), 0o644); err != nil {
+			fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
+			return 1
+		}
 		rows = append(rows, map[string]any{
 			"benchmark":             spec.Name,
 			"group":                 spec.Group,
 			"script":                spec.LeiaRel(),
-			"status":                "ok",
-			"time_seconds":          nil,
-			"t2_attempted":          0,
-			"t2_compiled":           0,
-			"t2_entered":            0,
-			"t2_failed":             0,
-			"exit_total":            0,
+			"status":                diag.Status,
+			"time_seconds":          diag.TimeSeconds,
+			"t2_attempted":          diag.T2Attempted,
+			"t2_compiled":           diag.T2Entered,
+			"t2_entered":            diag.T2Entered,
+			"t2_failed":             diag.T2Failed,
+			"exit_total":            diag.ExitTotal,
 			"top_exit":              nil,
 			"work_action":           "collect-runtime-evidence",
 			"work_target":           spec.ID(),
 			"work_proto":            "",
 			"work_priority":         0,
-			"readiness":             "baseline",
+			"readiness":             benchDiagnoseReadiness(diag),
 			"runtime_summary":       map[string]any{},
 			"tier2_call_summary":    map[string]any{},
 			"pprof_runs":            0,
 			"pprof_script_repeat":   0,
 			"pprof_samples_seconds": 0,
 			"pprof_effective":       cfg.PPROF,
+			"scale":                 scale,
 			"artifact_dir":          artifactDir,
 			"artifacts": map[string]string{
 				"summary_raw_txt": summary,
+				"run_raw_txt":     raw,
 			},
 		})
 	}
@@ -140,6 +181,95 @@ func parseBenchDiagnoseArgs(args []string, errw io.Writer) (benchDiagConfig, err
 		return cfg, flag.ErrHelp
 	}
 	return cfg, nil
+}
+
+type benchDiagnoseRun struct {
+	Status      string
+	TimeSeconds *float64
+	T2Attempted int
+	T2Entered   int
+	T2Failed    int
+	ExitTotal   int
+	WallSeconds float64
+	RawOutput   string
+}
+
+func benchRunDiagnoseSpec(spec benchdisc.Benchmark, leiaBin string, timeout time.Duration, cfg benchDiagConfig) benchDiagnoseRun {
+	if cfg.NoTiming {
+		return benchDiagnoseRun{Status: "skipped", RawOutput: "diagnose timing skipped by --no-timing\n"}
+	}
+	cmd, err := benchBenchmarkModeCommand("default", leiaBin, spec.Leia, "", "")
+	if err != nil {
+		return benchDiagnoseRun{Status: "error", RawOutput: err.Error() + "\n"}
+	}
+	if cmd.Unavailable != "" {
+		return benchDiagnoseRun{Status: cmd.Unavailable, RawOutput: "input unavailable\n"}
+	}
+	for i := 0; i < cfg.Warmup; i++ {
+		_ = benchRunTextCommand(cmd.Args, timeout, cmd.Env)
+	}
+	runs := cfg.Runs
+	if runs < 1 {
+		runs = 1
+	}
+	values := []float64{}
+	last := benchTextCommandResult{Status: "missing"}
+	for i := 0; i < runs; i++ {
+		last = benchRunTextCommand(cmd.Args, timeout, cmd.Env)
+		if seconds := benchParseTime(last.Output); seconds != nil {
+			values = append(values, *seconds)
+		}
+		if last.Status != "ok" {
+			break
+		}
+	}
+	status := last.Status
+	var seconds *float64
+	if len(values) > 0 {
+		stats := benchGoComputeStats(values)
+		seconds = stats.Median
+		if status == "ok" && len(values) != runs {
+			status = "partial"
+		}
+	}
+	return benchDiagnoseRun{
+		Status:      status,
+		TimeSeconds: seconds,
+		T2Attempted: benchParseCounter(benchT2AttemptedRE, last.Output),
+		T2Entered:   benchParseCounter(benchT2EnteredRE, last.Output),
+		T2Failed:    benchParseCounter(benchT2FailedRE, last.Output),
+		ExitTotal:   benchParseCounter(benchExitTotalRE, last.Output),
+		WallSeconds: last.WallSeconds,
+		RawOutput:   last.Output,
+	}
+}
+
+func benchDiagnoseSummaryText(spec benchdisc.Benchmark, diag benchDiagnoseRun) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "benchmark: %s\n", spec.ID())
+	fmt.Fprintf(&b, "status: %s\n", diag.Status)
+	fmt.Fprintf(&b, "time_seconds: %s\n", benchDiagFormatSeconds(diag.TimeSeconds))
+	fmt.Fprintf(&b, "wall_seconds: %.6f\n", diag.WallSeconds)
+	fmt.Fprintf(&b, "tier2_attempted: %d\n", diag.T2Attempted)
+	fmt.Fprintf(&b, "tier2_entered: %d\n", diag.T2Entered)
+	fmt.Fprintf(&b, "tier2_failed: %d\n", diag.T2Failed)
+	fmt.Fprintf(&b, "exit_total: %d\n", diag.ExitTotal)
+	if tail := benchOutputTail(diag.RawOutput, 20); tail != "" {
+		b.WriteString("\noutput_tail:\n")
+		b.WriteString(tail)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func benchDiagnoseReadiness(diag benchDiagnoseRun) string {
+	if diag.Status != "ok" {
+		return "needs-attention"
+	}
+	if diag.T2Failed > 0 || diag.ExitTotal > 0 {
+		return "has-runtime-evidence"
+	}
+	return "baseline"
 }
 
 type benchTriageConfig struct {
@@ -444,7 +574,8 @@ func benchDiagnoseMarkdown(rows []map[string]any) string {
 	b.WriteString("| --- | ---: | --- | ---: | --- | --- | --- | --- | --- |\n")
 	for _, row := range rows {
 		name := fmt.Sprintf("%s/%s", row["group"], row["benchmark"])
-		b.WriteString(benchMarkdownRow(name, "-", "0/0/0", 0, "-", row["work_target"], "-", "-", "`summary.raw.txt`"))
+		tier2 := fmt.Sprintf("%v/%v/%v", row["t2_attempted"], row["t2_compiled"], row["t2_failed"])
+		b.WriteString(benchMarkdownRow(name, benchDiagFormatSeconds(row["time_seconds"]), tier2, row["exit_total"], "-", row["work_target"], "-", "-", "`summary.raw.txt`, `run.raw.txt`"))
 		b.WriteByte('\n')
 	}
 	return b.String()
@@ -466,9 +597,15 @@ func benchTriageMarkdown(timing []map[string]any) string {
 }
 
 func benchDiagFormatSeconds(value any) string {
-	seconds, ok := value.(float64)
-	if !ok {
+	switch v := value.(type) {
+	case float64:
+		return fmt.Sprintf("%.6fs", v)
+	case *float64:
+		if v == nil {
+			return "-"
+		}
+		return fmt.Sprintf("%.6fs", *v)
+	default:
 		return "-"
 	}
-	return fmt.Sprintf("%.6fs", seconds)
 }
