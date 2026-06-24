@@ -73,10 +73,10 @@ type benchGoSample struct {
 	Source             string   `json:"source,omitempty"`
 	ScriptTotalSeconds *float64 `json:"script_total_seconds,omitempty"`
 	WallTotalSeconds   float64  `json:"wall_total_seconds"`
-	T2Attempted        int      `json:"t2_attempted,omitempty"`
-	T2Entered          int      `json:"t2_entered,omitempty"`
-	T2Failed           int      `json:"t2_failed,omitempty"`
-	ExitTotal          int      `json:"exit_total,omitempty"`
+	T2Attempted        int      `json:"t2_attempted"`
+	T2Entered          int      `json:"t2_entered"`
+	T2Failed           int      `json:"t2_failed"`
+	ExitTotal          int      `json:"exit_total"`
 	Note               string   `json:"note,omitempty"`
 }
 
@@ -92,10 +92,10 @@ type benchGoSubjectResult struct {
 	OutputHash     string          `json:"output_hash,omitempty"`
 	ChecksumText   string          `json:"checksum_text,omitempty"`
 	ChecksumStatus string          `json:"checksum_status,omitempty"`
-	T2Attempted    int             `json:"t2_attempted,omitempty"`
-	T2Entered      int             `json:"t2_entered,omitempty"`
-	T2Failed       int             `json:"t2_failed,omitempty"`
-	ExitTotal      int             `json:"exit_total,omitempty"`
+	T2Attempted    int             `json:"t2_attempted"`
+	T2Entered      int             `json:"t2_entered"`
+	T2Failed       int             `json:"t2_failed"`
+	ExitTotal      int             `json:"exit_total"`
 	Note           string          `json:"note,omitempty"`
 	Diagnostic     map[string]any  `json:"diagnostic,omitempty"`
 }
