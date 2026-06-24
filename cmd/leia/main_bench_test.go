@@ -617,6 +617,47 @@ func TestBenchAuditCommandReportsSections(t *testing.T) {
 	}
 }
 
+func TestBenchAuditCommandReadsCompareReportShape(t *testing.T) {
+	payload := map[string]any{
+		"results": []map[string]any{
+			{
+				"group":     "table",
+				"benchmark": "unit",
+				"modes": map[string]any{
+					"default": map[string]any{
+						"current": map[string]any{
+							"status":     "ok",
+							"stats":      map[string]any{"median": 0.010},
+							"exit_total": 21,
+						},
+						"luajit": map[string]any{
+							"status": "ok",
+							"stats":  map[string]any{"median": 0.020},
+						},
+					},
+				},
+			},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "compare.json")
+	writeTestFile(t, path, payload)
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"audit", path, "--exit-cutoff", "20"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("audit code = %d, stderr = %q", code, stderr.String())
+	}
+	report := stdout.String()
+	for _, want := range []string{
+		"| table/unit | 0.010s | 0.020s | 0.50x |",
+		"| table/unit | 21 |",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("audit report missing %q:\n%s", want, report)
+		}
+	}
+}
+
 func TestBenchGateValidateStrictPrintsWarningsWithoutFailing(t *testing.T) {
 	payload := map[string]any{
 		"results": []map[string]any{

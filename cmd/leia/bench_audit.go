@@ -102,12 +102,12 @@ func loadBenchAuditRows(path string) ([]benchAuditRow, error) {
 		if !ok {
 			continue
 		}
-		defaultMode := benchAuditMode(rowMap, "default")
-		luajitMode := benchAuditMode(rowMap, "luajit")
+		defaultMode := benchAuditSubject(rowMap, "default", "current")
+		luajitMode := benchAuditSubject(rowMap, "default", "luajit")
 		rows = append(rows, benchAuditRow{
-			Name:           fmt.Sprint(rowMap["benchmark"]),
-			DefaultSeconds: benchAuditFloatPtr(defaultMode["seconds"]),
-			LuaJITSeconds:  benchAuditFloatPtr(luajitMode["seconds"]),
+			Name:           benchAuditName(rowMap),
+			DefaultSeconds: benchAuditSeconds(defaultMode),
+			LuaJITSeconds:  benchAuditSeconds(luajitMode),
 			LuaJITStatus:   benchAuditStringDefault(luajitMode["status"], "missing"),
 			ExitTotal:      benchAuditInt(defaultMode["exit_total"]),
 		})
@@ -221,6 +221,38 @@ func benchAuditMode(row map[string]any, name string) map[string]any {
 		return map[string]any{}
 	}
 	return mode
+}
+
+func benchAuditSubject(row map[string]any, mode, subject string) map[string]any {
+	if modes, ok := row["modes"].(map[string]any); ok {
+		if modeRow, ok := modes[mode].(map[string]any); ok {
+			if subjectRow, ok := modeRow[subject].(map[string]any); ok {
+				return subjectRow
+			}
+		}
+	}
+	if subject == "current" {
+		return benchAuditMode(row, mode)
+	}
+	return benchAuditMode(row, subject)
+}
+
+func benchAuditName(row map[string]any) string {
+	bench := fmt.Sprint(row["benchmark"])
+	group := benchAuditStringDefault(row["group"], "")
+	if group != "" && !strings.HasPrefix(bench, group+"/") {
+		return group + "/" + bench
+	}
+	return bench
+}
+
+func benchAuditSeconds(row map[string]any) *float64 {
+	if stats := benchAuditMode(row, "stats"); len(stats) > 0 {
+		if seconds := benchAuditFloatPtr(stats["median"]); seconds != nil {
+			return seconds
+		}
+	}
+	return benchAuditFloatPtr(row["seconds"])
 }
 
 func benchAuditFloatPtr(value any) *float64 {
