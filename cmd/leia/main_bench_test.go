@@ -296,9 +296,22 @@ func TestBenchTriageRowsKeepRuntimeCounters(t *testing.T) {
 	if len(rows) != 1 || rows[0]["t2_attempted"] != float64(5) || rows[0]["t2_entered"] != float64(4) || rows[0]["t2_failed"] != float64(1) || rows[0]["exits"] != float64(3) {
 		t.Fatalf("rows = %#v", rows)
 	}
-	markdown := benchTriageMarkdown(rows)
+	bottlenecks := benchTriageBottlenecks(rows)
+	if len(bottlenecks) == 0 {
+		t.Fatalf("bottlenecks = %#v", bottlenecks)
+	}
+	artifacts := map[string]any{
+		"timing_json": map[string]any{"path": "/tmp/timing.json", "status": "ok", "note": "compare JSON report"},
+	}
+	markdown := benchTriageMarkdown(rows, bottlenecks, benchTriageRecommendations(rows), artifacts)
 	if !strings.Contains(markdown, "| control/sieve | default | 0.020000s | 0.030000s | 0.010000s | 5/4/1 | 3 | calibrated timing captured |") {
 		t.Fatalf("markdown = %s", markdown)
+	}
+	if !strings.Contains(markdown, "| P1 | control/sieve | default | tier2-failed | high | t2_failed=1 | run bench diagnose and inspect Tier 2 failure reasons |") {
+		t.Fatalf("markdown missing tier2 bottleneck: %s", markdown)
+	}
+	if !strings.Contains(markdown, "| timing_json | ok | /tmp/timing.json | compare JSON report |") {
+		t.Fatalf("markdown missing artifact status: %s", markdown)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -334,11 +335,17 @@ func runBenchTriageCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1
 	}
+	bottlenecks := benchTriageBottlenecks(timing)
+	recommendations := benchTriageRecommendations(timing)
+	artifacts := map[string]any{
+		"timing_json": map[string]any{"path": timingJSON, "status": "ok", "note": "compare JSON report"},
+		"timing_md":   map[string]any{"path": timingMD, "status": "ok", "note": "compare Markdown report"},
+	}
 	payload := map[string]any{
 		"timing":             timing,
-		"bottlenecks":        []any{},
-		"recommendations":    benchTriageRecommendations(timing),
-		"artifacts":          map[string]any{"timing_json": timingJSON, "timing_md": timingMD},
+		"bottlenecks":        bottlenecks,
+		"recommendations":    recommendations,
+		"artifacts":          artifacts,
 		"exit_summary":       map[string]any{"total": 0, "by_code": map[string]any{}, "by_reason": map[string]any{}, "top_sites": []any{}, "statuses": map[string]any{}},
 		"pprof_summary":      map[string]any{},
 		"pcmap_summary":      map[string]any{},
@@ -354,7 +361,7 @@ func runBenchTriageCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1
 	}
-	md := benchTriageMarkdown(timing)
+	md := benchTriageMarkdown(timing, bottlenecks, recommendations, artifacts)
 	if err := os.WriteFile(mdPath, []byte(md), 0o644); err != nil {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1
@@ -521,9 +528,65 @@ func benchTriageRecommendations(timing []map[string]any) []string {
 		}
 	}
 	if len(recs) == 0 {
-		return []string{"Use timing.json for detailed current/head/LuaJIT ratios; run leia bench diagnose when runtime artifacts are needed."}
+		return []string{"Use timing.json for detailed ratios; run leia bench diagnose when per-run raw output is needed."}
 	}
 	return recs
+}
+
+func benchTriageBottlenecks(timing []map[string]any) []map[string]any {
+	out := []map[string]any{}
+	add := func(row map[string]any, category, priority, confidence, evidence, recommendation string) {
+		out = append(out, map[string]any{
+			"benchmark":      row["benchmark"],
+			"mode":           row["mode"],
+			"category":       category,
+			"priority":       priority,
+			"confidence":     confidence,
+			"evidence":       evidence,
+			"recommendation": recommendation,
+		})
+	}
+	for _, row := range timing {
+		note, _ := row["note"].(string)
+		if note != "" && note != "calibrated timing captured" {
+			add(row, "timing-status", "P1", "high", note, "open timing.json and fix failed or unavailable timing subjects")
+		}
+		if ratio, ok := benchTriageFloat(row["cur_head"]); ok && ratio > 1.10 {
+			add(row, "current-head-regression", "P1", "medium", fmt.Sprintf("current/head %.3fx", ratio), "profile current and clean HEAD for this benchmark")
+		}
+		if ratio, ok := benchTriageFloat(row["cur_luajit"]); ok && ratio > 0.85 {
+			add(row, "luajit-gap", "P2", "medium", fmt.Sprintf("current/LuaJIT %.3fx", ratio), "rank LuaJIT gaps and inspect JIT/runtime exits")
+		}
+		if failed, ok := benchTriageInt(row["t2_failed"]); ok && failed > 0 {
+			add(row, "tier2-failed", "P1", "high", fmt.Sprintf("t2_failed=%d", failed), "run bench diagnose and inspect Tier 2 failure reasons")
+		}
+		if exits, ok := benchTriageInt(row["exits"]); ok && exits > 0 {
+			add(row, "runtime-exits", "P2", "high", fmt.Sprintf("exits=%d", exits), "run bench profile-exits or diagnose for top exit sites")
+		}
+	}
+	return out
+}
+
+func benchTriageFloat(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	default:
+		return 0, false
+	}
+}
+
+func benchTriageInt(value any) (int, bool) {
+	switch v := value.(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	default:
+		return 0, false
+	}
 }
 
 func benchSelectForDiag(root string, groups, benches []string, allGroups bool) ([]benchdisc.Benchmark, error) {
@@ -587,10 +650,26 @@ func benchDiagnoseMarkdown(rows []map[string]any) string {
 	return b.String()
 }
 
-func benchTriageMarkdown(timing []map[string]any) string {
+func benchTriageMarkdown(timing []map[string]any, bottlenecks []map[string]any, recommendations []string, artifacts map[string]any) string {
 	var b strings.Builder
 	b.WriteString("# Performance Triage\n\n")
-	b.WriteString("## Optimization Priorities\n\nNo high-confidence bottleneck has been collected yet.\n\n")
+	b.WriteString("## Optimization Priorities\n\n")
+	if len(bottlenecks) == 0 {
+		b.WriteString("No high-confidence bottleneck was detected from timing counters.\n\n")
+	} else {
+		b.WriteString("| Priority | Benchmark | Mode | Category | Confidence | Evidence | Next step |\n")
+		b.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
+		for _, item := range bottlenecks {
+			b.WriteString(benchMarkdownRow(item["priority"], item["benchmark"], item["mode"], item["category"], item["confidence"], item["evidence"], item["recommendation"]))
+			b.WriteByte('\n')
+		}
+		b.WriteByte('\n')
+	}
+	b.WriteString("## Recommendations\n\n")
+	for _, rec := range recommendations {
+		fmt.Fprintf(&b, "- %s\n", rec)
+	}
+	b.WriteByte('\n')
 	b.WriteString("## Timing\n\n")
 	b.WriteString("| Benchmark | Mode | Current | HEAD | LuaJIT | T2 | Exits | Note |\n")
 	b.WriteString("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |\n")
@@ -599,7 +678,19 @@ func benchTriageMarkdown(timing []map[string]any) string {
 		b.WriteString(benchMarkdownRow(row["benchmark"], row["mode"], benchDiagFormatSeconds(row["current"]), benchDiagFormatSeconds(row["head"]), benchDiagFormatSeconds(row["luajit"]), tier2, row["exits"], row["note"]))
 		b.WriteByte('\n')
 	}
-	b.WriteString("\n## Artifacts\n\nGenerated by `leia bench triage`.\n\n## Artifact Status\n\nNo external artifacts were requested.\n")
+	b.WriteString("\n## Artifacts\n\nGenerated by `leia bench triage`.\n\n")
+	b.WriteString("| Artifact | Status | Path | Note |\n")
+	b.WriteString("| --- | --- | --- | --- |\n")
+	keys := make([]string, 0, len(artifacts))
+	for key := range artifacts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		item, _ := artifacts[key].(map[string]any)
+		b.WriteString(benchMarkdownRow(key, item["status"], item["path"], item["note"]))
+		b.WriteByte('\n')
+	}
 	return b.String()
 }
 
