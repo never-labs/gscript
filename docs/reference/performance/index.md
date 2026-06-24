@@ -67,7 +67,8 @@ contention is acceptable.
 - optional LuaJIT reference timing.
 
 It reports median time, coefficient of variation, repeat count, current-vs-HEAD
-ratio, LuaJIT ratio, and Tier 2 exits.
+ratio, LuaJIT ratio, Tier 2 attempted/entered/failed counters, and total exits.
+The same counters are preserved in `leia bench triage` JSON and Markdown rows.
 
 Low-resolution script timers are not treated as wins. The harness can increase
 repeat counts and fall back to repeated command wall time when the script time

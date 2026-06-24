@@ -102,7 +102,9 @@ bash scripts/diag.sh table/table_array_access
 
 `leia bench compare` is the primary local optimization harness. It records timing
 source, repeat count, CI, parameter scaling, current-vs-HEAD deltas, and LuaJIT
-gaps.
+gaps. JSON and Markdown reports also carry runtime/JIT observability counters:
+Tier 2 attempted/entered/failed and total exits for each current sample and
+summary row.
 
 `leia bench strict` is the release/regression truth pass for hot, script-timed
 workloads. It runs VM, default JIT, no-filter JIT, and LuaJIT where a reference
