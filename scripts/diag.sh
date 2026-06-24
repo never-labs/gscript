@@ -55,41 +55,71 @@ mkdir -p "$DIAG_ROOT"
 # Resolve benchmark list. Each entry is "<domain>/<file>.leia", relative to
 # benchmarks/.
 BENCHES=()
-while IFS= read -r bench; do
-    [ -n "$bench" ] || continue
-    BENCHES+=("$bench")
-done < <(python3 - "$BENCHMARK" <<'PY'
-import sys
-from pathlib import Path
-
-root = Path.cwd()
-sys.path.insert(0, str(root / "benchmarks"))
-import benchmark_discovery as discovery
-
-selector = sys.argv[1]
-try:
-    if selector == "all":
-        specs = discovery.discover_benchmarks(root, discovery.GROUPS)
-        for spec in specs:
-            print(spec.leia.relative_to(root / "benchmarks"))
-        raise SystemExit(0)
-
-    if selector in discovery.GROUPS:
-        specs = discovery.discover_benchmarks(root, [selector])
-        for spec in specs:
-            print(spec.leia.relative_to(root / "benchmarks"))
-        raise SystemExit(0)
-
-    path = discovery.resolve_script_path(root, selector)
-    if path is None:
-        raise SystemExit(f"No such domain benchmark: {selector}")
-    print(path.relative_to(root / "benchmarks"))
-except SystemExit:
-    raise
-except Exception as exc:
-    raise SystemExit(str(exc))
-PY
+DOMAIN_GROUPS=(numeric recursion table calls string concurrency data app control precision)
+DEFAULT_ORDER=(
+    fib fib_recursive sieve mandelbrot ackermann matmul spectral_norm nbody
+    fannkuch sort sum_primes mutual_recursion method_dispatch closure_bench
+    string_bench binary_trees table_field_access table_array_access
+    coroutine_bench fibonacci_iterative math_intensive object_creation
 )
+
+is_domain_group() {
+    local value="$1"
+    local group
+    for group in "${DOMAIN_GROUPS[@]}"; do
+        [ "$value" = "$group" ] && return 0
+    done
+    return 1
+}
+
+add_group_benches() {
+    local group="$1"
+    local bench_dir="benchmarks/$group"
+    local name path
+    [ -d "$bench_dir" ] || return 0
+
+    declare -A seen=()
+    for name in "${DEFAULT_ORDER[@]}"; do
+        path="$bench_dir/$name.leia"
+        if [ -f "$path" ]; then
+            BENCHES+=("$group/$name.leia")
+            seen["$name"]=1
+        fi
+    done
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        name="$(basename "$path" .leia)"
+        [ -n "${seen[$name]+x}" ] && continue
+        BENCHES+=("$group/$name.leia")
+    done < <(find "$bench_dir" -maxdepth 1 -type f -name '*.leia' | sort)
+}
+
+resolve_selector() {
+    local selector="${1#benchmarks/}"
+    selector="${selector%.leia}"
+    local group="${selector%%/*}"
+    local name="${selector#*/}"
+    if [ "$group" != "$selector" ] && is_domain_group "$group" && [ -n "$name" ] && [ -f "benchmarks/$group/$name.leia" ]; then
+        echo "$group/$name.leia"
+        return 0
+    fi
+    return 1
+}
+
+if [ "$BENCHMARK" = "all" ]; then
+    for group in "${DOMAIN_GROUPS[@]}"; do
+        add_group_benches "$group"
+    done
+elif is_domain_group "$BENCHMARK"; then
+    add_group_benches "$BENCHMARK"
+else
+    resolved="$(resolve_selector "$BENCHMARK" || true)"
+    if [ -z "$resolved" ]; then
+        echo "No such domain benchmark: $BENCHMARK" >&2
+        exit 2
+    fi
+    BENCHES+=("$resolved")
+fi
 
 if [ ${#BENCHES[@]} -eq 0 ]; then
     echo "No benchmarks selected: $BENCHMARK" >&2
@@ -128,14 +158,24 @@ for bench in "${BENCHES[@]}"; do
     # disassembler required.
 
     # Summary line.
-    total_insns=$(python3 -c "
-import json, sys
-d = json.load(open('$out_dir/stats.json'))
-total = sum(p.get('insn_count', 0) for p in d['protos'])
-protos = len(d['protos'])
-promoted = sum(1 for p in d['protos'] if not p.get('skip_reason'))
-print(f'  {promoted}/{protos} protos promoted, {total} total insns')
-")
+    total_insns=$(awk '
+        /"insn_count"[[:space:]]*:/ {
+            value=$0
+            sub(/^.*"insn_count"[[:space:]]*:[[:space:]]*/, "", value)
+            sub(/[^0-9].*$/, "", value)
+            total += value + 0
+        }
+        /"insn_count"[[:space:]]*:/ { protos += 1 }
+        /"skip_reason"[[:space:]]*:/ {
+            value=$0
+            sub(/^.*"skip_reason"[[:space:]]*:[[:space:]]*/, "", value)
+            if (value ~ /^""/ || value ~ /^null/) promoted += 1
+        }
+        END {
+            if (protos > 0 && promoted == 0) promoted = protos
+            printf "  %d/%d protos promoted, %d total insns\n", promoted, protos, total
+        }
+    ' "$out_dir/stats.json")
     echo "$total_insns"
 done
 

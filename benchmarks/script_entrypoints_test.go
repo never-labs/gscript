@@ -72,10 +72,12 @@ func runScriptEntrypointCommand(t *testing.T, root string, env []string, args ..
 func TestDiagShellUsesSharedDiscovery(t *testing.T) {
 	root := repoRootForScriptEntrypoints(t)
 	diag := readRepoFile(t, root, "scripts", "diag.sh")
-	requireContains(t, diag, "import benchmark_discovery as discovery")
-	requireContains(t, diag, "discovery.GROUPS")
-	requireContains(t, diag, "selector in discovery.GROUPS")
-	requireContains(t, diag, "discovery.resolve_script_path(root, selector)")
+	requireContains(t, diag, "DOMAIN_GROUPS=(numeric recursion table calls string concurrency data app control precision)")
+	requireContains(t, diag, "DEFAULT_ORDER=(")
+	requireContains(t, diag, "add_group_benches()")
+	requireContains(t, diag, "resolve_selector()")
+	requireContains(t, diag, `find "$bench_dir" -maxdepth 1 -type f -name '*.leia' | sort`)
+	requireNotContains(t, diag, "import benchmark_discovery as discovery")
 	requireNotContains(t, diag, "domain_list_for()")
 }
 
