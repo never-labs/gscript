@@ -236,7 +236,7 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	outDir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing", "--out-dir", outDir}, &stdout, &stderr)
+	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing", "--pprof", "--warm-dump", "--out-dir", outDir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
@@ -266,6 +266,14 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	}
 	if tier2Summary["attempted"] != float64(0) || tier2Summary["entered_pct"] != float64(0) {
 		t.Fatalf("tier2_call_summary = %#v", tier2Summary)
+	}
+	pprofSummary, _ := report.Benchmarks[0]["pprof_summary"].(map[string]any)
+	warmDumpSummary, _ := report.Benchmarks[0]["warm_dump_summary"].(map[string]any)
+	if report.Benchmarks[0]["pprof_requested"] != true || report.Benchmarks[0]["pprof_effective"] != false || pprofSummary["status"] != "not_collected" {
+		t.Fatalf("pprof fields = row %#v summary %#v", report.Benchmarks[0], pprofSummary)
+	}
+	if report.Benchmarks[0]["warm_dump_requested"] != true || report.Benchmarks[0]["warm_dump_effective"] != false || warmDumpSummary["status"] != "not_collected" {
+		t.Fatalf("warm dump fields = row %#v summary %#v", report.Benchmarks[0], warmDumpSummary)
 	}
 }
 

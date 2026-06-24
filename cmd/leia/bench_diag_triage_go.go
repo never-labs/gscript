@@ -125,10 +125,15 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 			"readiness":             benchDiagnoseReadiness(diag),
 			"runtime_summary":       benchDiagnoseRuntimeSummary(diag),
 			"tier2_call_summary":    benchDiagnoseTier2Summary(diag),
+			"pprof_requested":       cfg.PPROF,
 			"pprof_runs":            0,
 			"pprof_script_repeat":   0,
 			"pprof_samples_seconds": 0,
-			"pprof_effective":       cfg.PPROF,
+			"pprof_effective":       false,
+			"pprof_summary":         benchDiagnoseEvidenceSummary(cfg.PPROF, false, "pprof collection is not yet wired for bench diagnose"),
+			"warm_dump_requested":   cfg.WarmDump,
+			"warm_dump_effective":   false,
+			"warm_dump_summary":     benchDiagnoseEvidenceSummary(cfg.WarmDump, false, "warm dump collection is not yet wired for bench diagnose"),
 			"scale":                 scale,
 			"artifact_dir":          artifactDir,
 			"artifacts": map[string]string{
@@ -297,6 +302,23 @@ func benchDiagnoseTier2Summary(diag benchDiagnoseRun) map[string]any {
 		summary["failed_pct"] = 0.0
 	}
 	return summary
+}
+
+func benchDiagnoseEvidenceSummary(requested, effective bool, reason string) map[string]any {
+	status := "not_requested"
+	if requested {
+		status = "not_collected"
+	}
+	if effective {
+		status = "ok"
+		reason = ""
+	}
+	return map[string]any{
+		"requested": requested,
+		"effective": effective,
+		"status":    status,
+		"reason":    reason,
+	}
 }
 
 type benchTriageConfig struct {

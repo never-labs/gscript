@@ -76,7 +76,10 @@ The same counters are preserved in `leia bench triage` JSON and Markdown rows.
 `leia bench diagnose` records single-benchmark evidence under an artifact
 directory. Its JSON rows include `runtime_summary` and `tier2_call_summary`
 objects so automation can distinguish a clean baseline from Tier 2 failures,
-runtime exits, skipped timing, and unavailable benchmark inputs.
+runtime exits, skipped timing, and unavailable benchmark inputs. Optional
+evidence requests such as `--pprof` and `--warm-dump` are reported with separate
+`*_requested` and `*_effective` fields, so pending collection paths are visible
+instead of being mistaken for collected artifacts.
 
 Low-resolution script timers are not treated as wins. The harness can increase
 repeat counts and fall back to repeated command wall time when the script time
