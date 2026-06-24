@@ -80,6 +80,13 @@ type benchCompareUnreliable struct {
 	HeadSource    string
 }
 
+type benchStrictWarning struct {
+	name    string
+	mode    string
+	kind    string
+	message string
+}
+
 func validateBenchComparePayload(payload map[string]any, threshold, wallThreshold float64, outw, errw io.Writer) int {
 	rows, ok := payload["results"].([]any)
 	if !ok {
@@ -205,6 +212,7 @@ func validateBenchStrictPayload(payload map[string]any, outw, errw io.Writer) in
 	}
 	type violation struct{ name, mode, status, checksum string }
 	var violations []violation
+	var warnings []benchStrictWarning
 	for _, raw := range rows {
 		row, ok := raw.(map[string]any)
 		if !ok {
@@ -227,6 +235,9 @@ func validateBenchStrictPayload(payload map[string]any, outw, errw io.Writer) in
 				violations = append(violations, violation{name, mode, "missing", "-"})
 				continue
 			}
+			for _, item := range benchGateWarnings(result) {
+				warnings = append(warnings, benchStrictWarning{name, mode, benchGateString(item["kind"]), benchGateString(item["message"])})
+			}
 			status := benchGateStatus(result)
 			checksum := benchGateString(result["checksum_status"])
 			if status != "ok" {
@@ -243,10 +254,47 @@ func validateBenchStrictPayload(payload map[string]any, outw, errw io.Writer) in
 		for _, row := range violations {
 			fmt.Fprintf(outw, "%-34s %-10s %-16s %s\n", row.name, row.mode, row.status, row.checksum)
 		}
+		benchGatePrintStrictWarnings(outw, warnings)
 		return 1
 	}
+	benchGatePrintStrictWarnings(outw, warnings)
 	fmt.Fprintln(outw, "Strict gate passed.")
 	return 0
+}
+
+func benchGateWarnings(subject map[string]any) []map[string]any {
+	diagnostic, ok := subject["diagnostic"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	rawWarnings, ok := diagnostic["warnings"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(rawWarnings))
+	for _, raw := range rawWarnings {
+		item, ok := raw.(map[string]any)
+		if ok {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func benchGatePrintStrictWarnings(outw io.Writer, warnings []benchStrictWarning) {
+	if len(warnings) == 0 {
+		return
+	}
+	fmt.Fprintln(outw, "\nStrict gate warnings:")
+	fmt.Fprintln(outw, "Benchmark                          Mode       Kind                         Message")
+	fmt.Fprintln(outw, "--------------------------------------------------------------------------------")
+	for _, row := range warnings {
+		message := row.message
+		if message == "" {
+			message = "-"
+		}
+		fmt.Fprintf(outw, "%-34s %-10s %-28s %s\n", row.name, row.mode, benchGateDefault(row.kind, "-"), message)
+	}
 }
 
 func benchGateSubject(row map[string]any, mode, name string) map[string]any {

@@ -617,6 +617,34 @@ func TestBenchAuditCommandReportsSections(t *testing.T) {
 	}
 }
 
+func TestBenchGateValidateStrictPrintsWarningsWithoutFailing(t *testing.T) {
+	payload := map[string]any{
+		"results": []map[string]any{
+			{
+				"group":     "control",
+				"benchmark": "unit",
+				"modes": map[string]any{
+					"vm":        map[string]any{"status": "ok", "checksum_status": "ok"},
+					"default":   map[string]any{"status": "ok", "checksum_status": "ok", "diagnostic": map[string]any{"warnings": []any{map[string]any{"kind": "suspicious-vm-speedup", "message": "vm/default median ratio 3.000x exceeds 2.000x"}}}},
+					"no_filter": map[string]any{"status": "ok", "checksum_status": "ok"},
+				},
+			},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "strict.json")
+	writeTestFile(t, path, payload)
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"gate-validate", "--kind", "strict", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("gate-validate code = %d, stderr = %q, stdout = %q", code, stderr.String(), stdout.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "Strict gate warnings:") || !strings.Contains(out, "suspicious-vm-speedup") || !strings.Contains(out, "Strict gate passed.") {
+		t.Fatalf("stdout = %q", out)
+	}
+}
+
 func TestBenchAuditCommandWritesMarkdown(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "guard.json")
 	if err := os.WriteFile(path, []byte(`{"results":[]}`), 0o600); err != nil {
