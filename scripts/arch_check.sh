@@ -10,7 +10,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/arch_check.sh [--json] [--help]
 
-Scans methodjit source size, pass-pipeline hints, debt markers, test gaps, and
+Scans methodjit source size, tiering-manager mentions, debt markers, test gaps, and
 module size summary.
 
 Options:
@@ -148,7 +148,7 @@ scan_architecture() {
     debt_marker_paths+=("$(relative_path "$marker_path")")
     debt_marker_lines+=("$marker_line")
     debt_marker_texts+=("$marker_text")
-  done < <(grep -rn "TODO\|HACK\|FIXME\|workaround\|temporary" "$JIT"/*.go 2>/dev/null || true)
+  done < <(grep -rn "TODO\|HACK\|FIXME\|workaround" "$JIT"/*.go 2>/dev/null || true)
 }
 
 print_text_report() {
@@ -166,7 +166,7 @@ print_text_report() {
   done
 
   echo ""
-  echo "=== Pass Pipeline Order (from tiering_manager.go) ==="
+  echo "=== Tiering Manager Mentions (from tiering_manager.go) ==="
   printf '%s\n' "${pass_pipeline_lines[@]}"
 
   echo ""

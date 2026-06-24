@@ -2902,6 +2902,17 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 
 func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
+	badJSON := runCommandResult(root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--json")
+	if badJSON.err == nil {
+		t.Fatalf("production --quick --json unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", badJSON.stdout, badJSON.stderr)
+	}
+	if strings.TrimSpace(badJSON.stdout) != "" {
+		t.Fatalf("production --quick --json stdout = %q, want empty usage-error stdout", badJSON.stdout)
+	}
+	if !strings.Contains(badJSON.stderr, "--json is only supported with --list") {
+		t.Fatalf("production --quick --json stderr = %q, want list-only JSON error", badJSON.stderr)
+	}
+
 	quickOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--list", "--json")
 	var quickReport struct {
 		SchemaVersion     int    `json:"schema_version"`

@@ -20,7 +20,8 @@ EXPECTED_MODULE_PATH="github.com/never-labs/leia"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/production_check.sh [--quick] [--full] [--release-profile] [--release-version VERSION] [--list] [--json] [--out-dir DIR] [--help]
+Usage: scripts/production_check.sh [--quick] [--full] [--release-profile] [--release-version VERSION] [--out-dir DIR] [--help]
+       scripts/production_check.sh [--quick] [--full] [--release-profile] [--release-version VERSION] --list [--json] [--out-dir DIR]
 
 Runs the release-gate commands from docs/release/index.md.
 
@@ -38,7 +39,7 @@ Options:
             Validate release artifacts and notes for VERSION, such as v0.1.0,
             when --release-profile is enabled.
   --list    Print the commands that would run without executing them.
-  --json    With --list, print a machine-readable plan instead of text.
+  --json    Only valid with --list; print the plan JSON, not execution results.
   --out-dir DIR
             Write the resolved plan and command logs to DIR. Defaults to no
             artifact output.
@@ -94,6 +95,11 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+if [ "$JSON_OUT" -eq 1 ] && [ "$LIST_ONLY" -ne 1 ]; then
+    echo "--json is only supported with --list for production_check.sh" >&2
+    exit 2
+fi
 
 RUN_NAMES=()
 RUN_CMDS=()
@@ -747,11 +753,6 @@ fi
 if [ "$LIST_ONLY" -eq 1 ]; then
     artifact_log "list-only mode; no commands executed"
     exit 0
-fi
-
-if [ "$JSON_OUT" -eq 1 ]; then
-    echo "--json is only supported with --list for production_check.sh" >&2
-    exit 2
 fi
 
 if [ "$RELEASE_PROFILE" -eq 1 ]; then
