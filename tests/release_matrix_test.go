@@ -3077,7 +3077,9 @@ func TestReleaseMatrixLauncherRoutesTaskHelp(t *testing.T) {
 	}{
 		{task: "test", want: "Usage: scripts/run.sh test <profile>"},
 		{task: "manifest-check", want: "Usage: scripts/run.sh manifest-check [ROOT...]"},
+		{task: "module-path", want: "Usage: scripts/run.sh module-path [EXPECTED_MODULE]"},
 		{task: "release-smoke", want: "Usage: scripts/run.sh release-smoke [SMOKE_SCRIPT]"},
+		{task: "shell-syntax", want: "Usage: scripts/run.sh shell-syntax"},
 	} {
 		out := runCommand(t, root, 30*time.Second, "scripts/run.sh", "help", tc.task)
 		if !strings.Contains(out, tc.want) {

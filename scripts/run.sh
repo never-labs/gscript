@@ -347,6 +347,15 @@ USAGE
 }
 
 run_module_path_task() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh module-path [EXPECTED_MODULE]
+
+Checks the repository Go module path. EXPECTED_MODULE defaults to
+github.com/never-labs/leia.
+USAGE
+    return
+  fi
   local expected="${1:-github.com/never-labs/leia}"
   local actual
   actual="$(go list -m)"
@@ -358,6 +367,14 @@ run_module_path_task() {
 }
 
 run_shell_syntax_task() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh shell-syntax
+
+Parses every tracked shell script with bash -n.
+USAGE
+    return
+  fi
   local script
   while IFS= read -r script; do
     bash -n "$script"
