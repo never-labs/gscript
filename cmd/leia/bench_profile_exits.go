@@ -95,7 +95,7 @@ func runBenchProfileExitsCommand(args []string, outw, errw io.Writer) int {
 		results = append(results, benchProfileRunOne(root, leia, bench, *mode, time.Duration(*timeout)*time.Second))
 	}
 
-	payload := map[string]any{"mode": *mode, "benchmarks": selected, "results": results}
+	payload := map[string]any{"mode": *mode, "benchmarks": selected, "results": results, "summary": benchProfileSummary(results)}
 	if *jsonPath != "" {
 		if err := benchProfileWriteJSONFile(*jsonPath, payload); err != nil {
 			fmt.Fprintf(errw, "leia bench profile-exits: %v\n", err)
@@ -288,16 +288,24 @@ func benchProfileMarkdown(results []benchProfileExitResult, top int) string {
 		fmt.Fprintf(&b, "| %s | %s | %d | %s |\n", row.Benchmark, seconds, benchDebugToInt(row.Stats["total"]), benchProfileCodeText(row.Stats["by_exit_code"]))
 	}
 	b.WriteString("\n## Aggregate By Exit Code\n\n")
-	b.WriteString("| Exit code | Count |\n")
-	b.WriteString("|---|---:|\n")
-	for _, item := range benchProfileSortedCounts(byCode, 0) {
-		fmt.Fprintf(&b, "| %s | %d |\n", item.Name, item.Count)
+	if len(byCode) == 0 {
+		b.WriteString("_No exit-code data collected._\n")
+	} else {
+		b.WriteString("| Exit code | Count |\n")
+		b.WriteString("|---|---:|\n")
+		for _, item := range benchProfileSortedCounts(byCode, 0) {
+			fmt.Fprintf(&b, "| %s | %d |\n", item.Name, item.Count)
+		}
 	}
 	b.WriteString("\n## Aggregate By Reason\n\n")
-	b.WriteString("| Reason | Count |\n")
-	b.WriteString("|---|---:|\n")
-	for _, item := range benchProfileSortedCounts(byReason, top) {
-		fmt.Fprintf(&b, "| %s | %d |\n", item.Name, item.Count)
+	if len(byReason) == 0 {
+		b.WriteString("_No exit reason data collected._\n")
+	} else {
+		b.WriteString("| Reason | Count |\n")
+		b.WriteString("|---|---:|\n")
+		for _, item := range benchProfileSortedCounts(byReason, top) {
+			fmt.Fprintf(&b, "| %s | %d |\n", item.Name, item.Count)
+		}
 	}
 	sort.SliceStable(sites, func(i, j int) bool {
 		if sites[i].Count == sites[j].Count {
@@ -306,15 +314,39 @@ func benchProfileMarkdown(results []benchProfileExitResult, top int) string {
 		return sites[i].Count > sites[j].Count
 	})
 	b.WriteString("\n## Top Sites\n\n")
-	b.WriteString("| Count | Benchmark | Proto | Exit | PC | OpID | Reason |\n")
-	b.WriteString("|---:|---|---|---|---:|---:|---|\n")
-	for i, site := range sites {
-		if i >= top {
-			break
+	if len(sites) == 0 || top == 0 {
+		b.WriteString("_No exit sites collected._\n")
+	} else {
+		b.WriteString("| Count | Benchmark | Proto | Exit | PC | OpID | Reason |\n")
+		b.WriteString("|---:|---|---|---|---:|---:|---|\n")
+		for i, site := range sites {
+			if i >= top {
+				break
+			}
+			fmt.Fprintf(&b, "| %d | %s | %s | %s | %d | %d | %s |\n", site.Count, site.Benchmark, site.Proto, site.ExitName, site.PC, site.OpID, site.Reason)
 		}
-		fmt.Fprintf(&b, "| %d | %s | %s | %s | %d | %d | %s |\n", site.Count, site.Benchmark, site.Proto, site.ExitName, site.PC, site.OpID, site.Reason)
 	}
 	return b.String()
+}
+
+func benchProfileSummary(results []benchProfileExitResult) map[string]any {
+	statuses := map[string]int{}
+	totalExits := 0
+	okRows := 0
+	for _, row := range results {
+		statuses[row.Status]++
+		if row.Status != "ok" {
+			continue
+		}
+		okRows++
+		totalExits += benchDebugToInt(row.Stats["total"])
+	}
+	return map[string]any{
+		"benchmarks":  len(results),
+		"ok":          okRows,
+		"total_exits": totalExits,
+		"statuses":    benchDebugSortedIntMap(statuses),
+	}
 }
 
 type benchProfileSiteRow struct {

@@ -1038,6 +1038,25 @@ func TestBenchProfileExitsMarkdownAggregates(t *testing.T) {
 	}
 }
 
+func TestBenchProfileExitsMarkdownShowsEmptyEvidence(t *testing.T) {
+	report := benchProfileMarkdown([]benchProfileExitResult{
+		{Benchmark: "control/sieve", Status: "ok", Stats: map[string]any{"total": 0}},
+	}, 10)
+	for _, want := range []string{
+		"_No exit-code data collected._",
+		"_No exit reason data collected._",
+		"_No exit sites collected._",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("profile report missing %q:\n%s", want, report)
+		}
+	}
+	summary := benchProfileSummary([]benchProfileExitResult{{Benchmark: "control/sieve", Status: "ok", Stats: map[string]any{"total": 0}}})
+	if summary["benchmarks"] != 1 || summary["ok"] != 1 || summary["total_exits"] != 0 {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
 func TestBenchProfileExitsCommandRunsSelectedBenchmark(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	td := t.TempDir()
@@ -1086,7 +1105,7 @@ func TestBenchProfileExitsCommandRunsSelectedBenchmark(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `"mode": "default"`) || !strings.Contains(string(data), `"benchmark": "numeric/unit"`) {
+	if !strings.Contains(string(data), `"mode": "default"`) || !strings.Contains(string(data), `"benchmark": "numeric/unit"`) || !strings.Contains(string(data), `"total_exits": 3`) {
 		t.Fatalf("json = %s", string(data))
 	}
 }
