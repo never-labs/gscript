@@ -214,7 +214,7 @@ read_q_paths() {
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     printf '%s\n' "$path"
-  done < <(go run ./cmd/leia run scripts/manifest.leia list-q --scope "$Q_GATE_SCOPE" "$kind")
+  done < <(scripts/run.sh manifest-list-q --scope "$Q_GATE_SCOPE" "$kind")
 }
 
 run_leia_paths() {

@@ -274,12 +274,12 @@ fi
 if [ "$RUN_GO_TESTS" -eq 1 ]; then
     if have_cmd go; then
         if ! run_logged "Quick Go Packages" "$OUT_DIR/go_test_quick_packages.log" \
-            "go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1" \
+            "scripts/run.sh test core" \
             "$OUT_DIR/go_test_quick_packages.status"; then
             failures=$((failures + 1))
         fi
         if ! run_logged "Quick Go Matrix" "$OUT_DIR/go_test_quick_matrix.log" \
-            "go test ./tests -run 'TestFeatureMatrix|TestIntegration|TestStdlibContract' -count=1" \
+            "scripts/run.sh test feature-integration && scripts/run.sh test stdlib" \
             "$OUT_DIR/go_test_quick_matrix.status"; then
             failures=$((failures + 1))
         fi

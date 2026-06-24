@@ -15,6 +15,7 @@ Tasks:
   editor               Run editor asset checks
   language-conformance Run translated language conformance cases
   manifest-check       Check test and benchmark manifests
+  manifest-list-q      List q manifest paths by scope
   perf                 Run performance gate
   production           Run production readiness gate
   module-path          Check repository module path
@@ -326,6 +327,19 @@ USAGE
   run_leia_task scripts/manifest.leia check "$@"
 }
 
+run_manifest_list_q_task() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh manifest-list-q [--scope SCOPE] KIND
+
+Lists q manifest paths using scripts/manifest.leia. KIND is tests, examples,
+or benchmarks. SCOPE defaults to core.
+USAGE
+    return
+  fi
+  run_leia_task scripts/manifest.leia list-q "$@"
+}
+
 run_module_path_task() {
   local expected="${1:-github.com/never-labs/leia}"
   local actual
@@ -425,6 +439,9 @@ case "$task" in
     ;;
   manifest|manifest-check|manifest-coverage)
     run_manifest_check_task "$@"
+    ;;
+  manifest-list-q|q-manifest-list)
+    run_manifest_list_q_task "$@"
     ;;
   perf|performance|performance-gate)
     run_shell_task scripts/performance_gate.sh "$@"
