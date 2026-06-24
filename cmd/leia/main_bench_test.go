@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1261,6 +1262,40 @@ func TestBenchGoHarnessParsesAndReportsRuntimeCounters(t *testing.T) {
 	markdown := benchGoMarkdown(benchGoHarnessConfig{Mode: "compare", Modes: []string{"default"}}, []benchGoBenchmarkResult{row})
 	if !strings.Contains(markdown, "| control/sieve | default | 0.200000s | 0.400000s | 0.050000s | script_repeat | 2/1/0 | 4 |") {
 		t.Fatalf("markdown = %s", markdown)
+	}
+}
+
+func TestBenchGoHarnessSortsLuaJITGapDescending(t *testing.T) {
+	row := func(group, name string, current, luajit float64) benchGoBenchmarkResult {
+		return benchGoBenchmarkResult{
+			Group:     group,
+			Benchmark: name,
+			Modes: map[string]map[string]benchGoSubjectResult{
+				"default": {
+					"current": {Status: "ok", Stats: benchGoComputeStats([]float64{current})},
+					"luajit":  {Status: "ok", Stats: benchGoComputeStats([]float64{luajit})},
+				},
+			},
+		}
+	}
+	rows := []benchGoBenchmarkResult{
+		row("table", "fast_gap", 0.20, 0.10),
+		row("control", "slow_gap", 0.90, 0.10),
+		row("app", "missing_luajit", 0.10, 0),
+	}
+	rows[2].Modes["default"]["luajit"] = benchGoSubjectResult{Status: "skip"}
+
+	sorted := sortBenchGoResults(rows, benchGoHarnessConfig{Mode: "compare", Modes: []string{"default"}, Sort: "luajit-gap"})
+	if got := []string{benchGoRowID(sorted[0]), benchGoRowID(sorted[1]), benchGoRowID(sorted[2])}; !reflect.DeepEqual(got, []string{"control/slow_gap", "table/fast_gap", "app/missing_luajit"}) {
+		t.Fatalf("sorted rows = %v", got)
+	}
+}
+
+func TestBenchGoHarnessRejectsUnknownSort(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := parseBenchGoHarnessConfig("compare", []string{"--sort", "latency"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), `unknown --sort "latency"`) {
+		t.Fatalf("err = %v, stderr = %q", err, stderr.String())
 	}
 }
 

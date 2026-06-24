@@ -130,6 +130,7 @@ type benchGoReport struct {
 	MinWallRepeat    int               `json:"min_wall_repeat,omitempty"`
 	WallFallback     bool              `json:"wall_fallback"`
 	TimeSource       string            `json:"time_source,omitempty"`
+	Sort             string            `json:"sort,omitempty"`
 	ScaleProfile     string            `json:"scale_profile,omitempty"`
 	Scale            []string          `json:"scale,omitempty"`
 	Platform         map[string]string `json:"platform,omitempty"`
@@ -214,6 +215,7 @@ func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
 		return 2
 	}
+	results = sortBenchGoResults(results, cfg)
 
 	report := buildBenchGoReport(cfg, results, time.Since(started).Seconds())
 	if cfg.JSONPath != "" {
@@ -289,7 +291,7 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 	fs.StringVar(&cfg.MarkdownPath, "markdown", "", "Markdown report path.")
 	fs.StringVar(&cfg.HeadRef, "head-ref", "", "HEAD/reference name for current-vs-old comparison.")
 	fs.BoolVar(&cfg.Progress, "progress", false, "Print progress.")
-	fs.StringVar(&cfg.Sort, "sort", cfg.Sort, "Sort order. Accepted for compatibility.")
+	fs.StringVar(&cfg.Sort, "sort", cfg.Sort, "Sort order: name, luajit-gap, current, or head.")
 	fs.StringVar(&cfg.ScaleProfile, "scale-profile", "", "Scale profile. Accepted for compatibility.")
 	fs.Var((*benchStringList)(&cfg.Scale), "scale", "Scale override. Accepted for compatibility.")
 	fs.Var((*benchStringList)(&cfg.Scale), "param", "Scale override alias. Accepted for compatibility.")
@@ -350,10 +352,96 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 	if cfg.TimeSource != "auto" && cfg.TimeSource != "script" && cfg.TimeSource != "wall" {
 		return cfg, fmt.Errorf("unknown --time-source %q", cfg.TimeSource)
 	}
+	if !benchGoValidSort(cfg.Sort) {
+		return cfg, fmt.Errorf("unknown --sort %q", cfg.Sort)
+	}
 	if cfg.Jobs < 1 {
 		return cfg, fmt.Errorf("--jobs must be >= 1")
 	}
 	return cfg, nil
+}
+
+func benchGoValidSort(value string) bool {
+	switch value {
+	case "", "name", "luajit-gap", "current", "head":
+		return true
+	default:
+		return false
+	}
+}
+
+func sortBenchGoResults(rows []benchGoBenchmarkResult, cfg benchGoHarnessConfig) []benchGoBenchmarkResult {
+	out := append([]benchGoBenchmarkResult(nil), rows...)
+	sortKey := cfg.Sort
+	if sortKey == "" {
+		sortKey = "name"
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		left := out[i]
+		right := out[j]
+		switch sortKey {
+		case "luajit-gap":
+			leftRatio, leftOK := benchGoWorstLuaJITRatio(left, cfg)
+			rightRatio, rightOK := benchGoWorstLuaJITRatio(right, cfg)
+			if leftOK != rightOK {
+				return leftOK
+			}
+			if leftOK && rightOK && leftRatio != rightRatio {
+				return leftRatio > rightRatio
+			}
+		case "current", "head":
+			leftSeconds, leftOK := benchGoWorstSubjectMedian(left, cfg, sortKey)
+			rightSeconds, rightOK := benchGoWorstSubjectMedian(right, cfg, sortKey)
+			if leftOK != rightOK {
+				return leftOK
+			}
+			if leftOK && rightOK && leftSeconds != rightSeconds {
+				return leftSeconds > rightSeconds
+			}
+		}
+		return benchGoRowID(left) < benchGoRowID(right)
+	})
+	return out
+}
+
+func benchGoWorstLuaJITRatio(row benchGoBenchmarkResult, cfg benchGoHarnessConfig) (float64, bool) {
+	var worst float64
+	ok := false
+	for _, mode := range cfg.Modes {
+		modeRow := row.Modes[mode]
+		current, currentOK := modeRow["current"]
+		luajit, luaOK := modeRow["luajit"]
+		if !currentOK || !luaOK || current.Stats.Median == nil || luajit.Stats.Median == nil || *luajit.Stats.Median <= 0 {
+			continue
+		}
+		ratio := *current.Stats.Median / *luajit.Stats.Median
+		if !ok || ratio > worst {
+			worst = ratio
+			ok = true
+		}
+	}
+	return worst, ok
+}
+
+func benchGoWorstSubjectMedian(row benchGoBenchmarkResult, cfg benchGoHarnessConfig, subject string) (float64, bool) {
+	var worst float64
+	ok := false
+	for _, mode := range cfg.Modes {
+		modeRow := row.Modes[mode]
+		result, exists := modeRow[subject]
+		if !exists || result.Stats.Median == nil {
+			continue
+		}
+		if !ok || *result.Stats.Median > worst {
+			worst = *result.Stats.Median
+			ok = true
+		}
+	}
+	return worst, ok
+}
+
+func benchGoRowID(row benchGoBenchmarkResult) string {
+	return row.Group + "/" + row.Benchmark
 }
 
 type benchGoSpecRunResult struct {
@@ -1091,6 +1179,7 @@ func buildBenchGoReport(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult,
 		MinWallRepeat:    cfg.MinWallRepeat,
 		WallFallback:     !cfg.NoWallFallback,
 		TimeSource:       cfg.TimeSource,
+		Sort:             cfg.Sort,
 		ScaleProfile:     cfg.ScaleProfile,
 		Scale:            cfg.Scale,
 		Platform: map[string]string{

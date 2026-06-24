@@ -78,6 +78,9 @@ go run ./cmd/leia bench compare --runs=5 --warmup=1 \
 go run ./cmd/leia bench coverage
 ```
 
+`--sort=luajit-gap` orders compare reports by the worst current/LuaJIT median
+ratio so the largest runtime gaps appear first.
+
 Use `--syntax-smoke` after lexer/parser/grammar-only work when you need a
 quick current-vs-HEAD check over control, calls, table, string, and data hot
 paths plus the Leia-only dialect truth pass. Add `--no-strict` only when the

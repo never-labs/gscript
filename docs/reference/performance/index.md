@@ -40,6 +40,9 @@ leia bench strict --runs 3 --warmup 1 \
 leia bench diagnose --bench table/table_array_access --out-dir /tmp/leia-diag
 ```
 
+`--sort luajit-gap` ranks compare reports by the largest current/LuaJIT median
+ratio.
+
 The shell gate wraps the same harnesses with repository defaults:
 
 ```bash
