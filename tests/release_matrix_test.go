@@ -469,12 +469,12 @@ func TestReleaseMatrixReleaseProfileFailsCriticalSkips(t *testing.T) {
 	cmd.Env = append(os.Environ(), "PATH="+tmpBin+":/usr/bin:/bin")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
-		t.Fatalf("release profile unexpectedly passed with luajit absent from PATH:\n%s", out)
+		t.Fatalf("release profile unexpectedly passed with language oracle absent from PATH:\n%s", out)
 	}
 	text := string(out)
 	for _, want := range []string{
 		"Runnable checks:",
-		"Language Conformance Surface: missing luajit",
+		"Language Conformance Surface: missing lua",
 		"Release profile requires these checks to run instead of skip:",
 	} {
 		if !strings.Contains(text, want) {

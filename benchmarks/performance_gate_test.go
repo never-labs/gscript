@@ -658,7 +658,7 @@ func TestPerformanceGateValidateOnlyRejectsLuaJITRatioAboveThreshold(t *testing.
 	out, code := runPerformanceGateValidate(t, root, performanceGateTimingPayload(0.81, 1.00,
 		performanceGateWithBenchmarkID("numeric/matmul_dense"),
 		performanceGateWithLuaJIT(1.00),
-	))
+	), "--enforce-luajit")
 	if code != 1 {
 		t.Fatalf("performance gate exit %d, want 1:\n%s", code, out)
 	}
@@ -696,4 +696,36 @@ func TestPerformanceGateWallTimedRowsNeedLargerRegressionToFail(t *testing.T) {
 		t.Fatalf("performance gate exit %d, want 1:\n%s", code, out)
 	}
 	performanceGateContains(t, out, "wall_regression")
+}
+
+func TestPerformanceGateMixedTimingSourcesAreDiagnosticOnly(t *testing.T) {
+	root := repoRootForPerformanceGate(t)
+	out, code := runPerformanceGateValidate(t, root, performanceGateTimingPayload(5.00, 1.00,
+		performanceGateWithSource("script_repeat,wall_repeat"),
+	), "--threshold", "0.10", "--wall-threshold", "0.30")
+	if code != 0 {
+		t.Fatalf("performance gate exit %d:\n%s", code, out)
+	}
+	performanceGateContains(t, out, "mixed_time_source")
+	performanceGateContains(t, out, "wall_timed_startup_noise")
+}
+
+func TestPerformanceGateLuaJITSubmitGuardIsReportOnlyUnlessEnforced(t *testing.T) {
+	root := repoRootForPerformanceGate(t)
+	payload := performanceGateTimingPayload(1.00, 1.00,
+		performanceGateWithBenchmarkID("numeric/matmul_dense"),
+		performanceGateWithLuaJIT(1.00),
+	)
+	out, code := runPerformanceGateValidate(t, root, payload)
+	if code != 0 {
+		t.Fatalf("performance gate exit %d:\n%s", code, out)
+	}
+	performanceGateContains(t, out, "LuaJIT performance submit guard reported issues; treating as report-only")
+
+	out, code = runPerformanceGateValidate(t, root, payload, "--enforce-luajit")
+	if code != 1 {
+		t.Fatalf("performance gate exit %d, want 1:\n%s", code, out)
+	}
+	performanceGateContains(t, out, "Guard violations")
+	performanceGateContains(t, out, "numeric/matmul_dense")
 }

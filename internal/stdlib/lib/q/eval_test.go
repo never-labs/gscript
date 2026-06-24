@@ -2233,6 +2233,35 @@ func TestExecuteEvalPipelineUsesWhereGatherSumCountSelfPredicate(t *testing.T) {
 	t.Fatalf("missing self predicate ArrayWhereGatherSumCount hit: %#v", RuntimeKernelExecutionStats())
 }
 
+func TestExecuteEvalPipelineUsesWhereGatherSumCountThroughAliases(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	const rows = 8192
+	var want int64
+	for i := int64(0); i < rows; i++ {
+		x := i * 2
+		if x > 10 {
+			want += x + 1
+		}
+	}
+	src := "x:(til 8192)*2;idx:where x>10;c:count idx;v:x[idx];s:+/v;s+c"
+	got, handled, err := ExecuteEvalPipeline(src)
+	if err != nil || !handled || got != want {
+		t.Fatalf("ExecuteEvalPipeline alias gather sum-count = %#v,%v,%v; want %d,true,nil", got, handled, err, want)
+	}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected alias gather sum-count fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayWhereGatherSumCount" && stat.Shape == "where-index-reduce/sum-count/i64/>/i64/i64" &&
+			stat.Outcome == "hit" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing alias ArrayWhereGatherSumCount hit: %#v", RuntimeKernelExecutionStats())
+}
+
 func TestExecuteEvalPipelineUsesWhereGatherSumCountWithinPredicate(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

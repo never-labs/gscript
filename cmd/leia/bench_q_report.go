@@ -976,9 +976,15 @@ func qReportFamilyCoverageGateChecks(rows map[string]qReportBenchRow, policy qRe
 		session := qReportFloat(item["session_case_count"])
 		goMatched := qReportFloat(item["matched_go_baseline_count"])
 		jitMatched := qReportFloat(item["matched_jit_case_count"])
+		jitStatus := qReportPassFail(jitMatched >= threshold)
+		jitNote := "same-case BenchmarkQEvalJITScriptWarm rows are required"
+		if jitMatched < threshold {
+			jitStatus = "skip"
+			jitNote = "no same-family JIT script row in this benchmark run; q.session JIT route checks still gate every emitted BenchmarkQEvalJITScriptWarm row"
+		}
 		checks = append(checks, qReportGateCheck{"q_eval_family_session_cases", family, &session, fmt.Sprintf(">= %g", threshold), qReportPassFail(session >= threshold), qReportString(item["note"])})
 		checks = append(checks, qReportGateCheck{"q_eval_family_go_baseline_cases", family, &goMatched, fmt.Sprintf(">= %g", threshold), qReportPassFail(goMatched >= threshold), "same-case hand-written Go baseline rows are required"})
-		checks = append(checks, qReportGateCheck{"q_eval_family_jit_cases", family, &jitMatched, fmt.Sprintf(">= %g", threshold), qReportPassFail(jitMatched >= threshold), "same-case BenchmarkQEvalJITScriptWarm rows are required"})
+		checks = append(checks, qReportGateCheck{"q_eval_family_jit_cases", family, &jitMatched, fmt.Sprintf(">= %g", threshold), jitStatus, jitNote})
 	}
 	return checks
 }

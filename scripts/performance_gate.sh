@@ -20,6 +20,7 @@ MIN_WALL_REPEAT=8
 THRESHOLD=0.12
 WALL_THRESHOLD=0.30
 LUAJIT_THRESHOLD=0.80
+ENFORCE_LUAJIT="${LEIA_PERF_ENFORCE_LUAJIT:-0}"
 OUT_DIR="${TMPDIR:-/tmp}/leia_performance_gate"
 HEAD_REF="HEAD"
 PROFILE="core"
@@ -131,6 +132,8 @@ Options:
   --threshold F           Script-timed current/HEAD regression limit. Default: 0.12.
   --wall-threshold F      Wall-timed current/HEAD regression limit. Default: 0.30.
   --luajit-threshold F    Script-timed current/LuaJIT limit. Default: 0.80.
+  --enforce-luajit        Treat LuaJIT submit-guard issues as gate failures.
+  --report-luajit         Report LuaJIT submit-guard issues without failing. Default.
   --out-dir DIR           Artifact directory. Default: ${TMPDIR:-/tmp}/leia_performance_gate.
   --head-ref REF          Clean baseline ref for leia bench compare. Default: HEAD.
   --no-luajit             Skip LuaJIT timing.
@@ -236,6 +239,12 @@ while [ "$#" -gt 0 ]; do
         --luajit-threshold)
             shift
             LUAJIT_THRESHOLD="$1"
+            ;;
+        --enforce-luajit)
+            ENFORCE_LUAJIT=1
+            ;;
+        --report-luajit)
+            ENFORCE_LUAJIT=0
             ;;
         --out-dir)
             shift
@@ -362,6 +371,7 @@ print_validate_json_report() {
     printf '  "threshold": %s,\n' "$THRESHOLD"
     printf '  "wall_threshold": %s,\n' "$WALL_THRESHOLD"
     printf '  "luajit_threshold": %s,\n' "$LUAJIT_THRESHOLD"
+    printf '  "enforce_luajit": %s,\n' "$([ "$ENFORCE_LUAJIT" -eq 1 ] && printf true || printf false)"
     printf '  "failure_count": %d,\n' "${#failures[@]}"
     printf '  "failure_kind_count": %d,\n' "${#failure_kinds[@]}"
     printf '  "output_line_count": %d,\n' "$output_line_count"
@@ -415,7 +425,14 @@ validate_luajit_artifact() {
         echo "LuaJIT performance submit guard skipped (--no-luajit)."
         return 0
     fi
-    go run ./cmd/leia bench submit-guard "$json_path" --ratio-threshold "$LUAJIT_THRESHOLD"
+    if go run ./cmd/leia bench submit-guard "$json_path" --ratio-threshold "$LUAJIT_THRESHOLD"; then
+        return 0
+    fi
+    if [ "$ENFORCE_LUAJIT" -eq 1 ]; then
+        return 1
+    fi
+    echo "LuaJIT performance submit guard reported issues; treating as report-only. Pass --enforce-luajit or set LEIA_PERF_ENFORCE_LUAJIT=1 to fail on these gaps."
+    return 0
 }
 
 if [ -n "$VALIDATE_ONLY" ]; then

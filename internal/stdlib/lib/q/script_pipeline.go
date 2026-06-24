@@ -87,6 +87,7 @@ type qScriptPipelineDescriptor struct {
 	// runtime operand evaluation still runs per call.
 	whereIndexPlanBuilt bool
 	whereIndexPlan      *qPipelinePlan
+	absorbedAssignments []string
 }
 
 type qScriptPipelineAssignment struct {
@@ -166,6 +167,7 @@ func qNormalizeScriptPipelineDescriptor(descriptor qScriptPipelineDescriptor) qS
 	descriptor.sequenceShapeName = qScriptPipelineSequenceTransformName(descriptor.sequenceSteps)
 	descriptor.moduloMaskPlan = qScriptPipelineModuloMaskPlan(descriptor.maskExpr)
 	descriptor.indexExprAssignmentSkip = qScriptPipelineIndexExprSkippedAssignments(&descriptor)
+	descriptor.absorbedAssignments = qScriptPipelineAbsorbedAssignments(descriptor)
 	descriptor.shapeText = descriptor.shape()
 	return descriptor
 }
@@ -937,14 +939,14 @@ func qScriptPipelineGatherSumCountDescriptor(src string, bindings map[string]str
 	var indexExpr string
 	var countExpr string
 	for _, term := range terms {
-		if expr, ok := qScriptPipelineCountTerm(term); ok {
+		if expr, ok := qScriptPipelineCountTermResolved(term, bindings, nil); ok {
 			if countExpr != "" {
 				return qScriptPipelineDescriptor{}, false
 			}
 			countExpr = expr
 			continue
 		}
-		gatherValue, gatherIndex, ok := qScriptPipelineGatherSumTerm(term)
+		gatherValue, gatherIndex, ok := qScriptPipelineGatherSumTermResolved(term, bindings, nil)
 		if !ok {
 			return qScriptPipelineDescriptor{}, false
 		}
@@ -958,12 +960,13 @@ func qScriptPipelineGatherSumCountDescriptor(src string, bindings map[string]str
 		return qScriptPipelineDescriptor{}, false
 	}
 	return qScriptPipelineDescriptor{
-		kind:         qScriptPipelineGatherReduceSumCount,
-		valueExpr:    valueExpr,
-		valueBinding: qScriptPipelineBinding(valueExpr, bindings),
-		indexExpr:    indexExpr,
-		indexBinding: qScriptPipelineBinding(indexExpr, bindings),
-		includeCount: true,
+		kind:                qScriptPipelineGatherReduceSumCount,
+		valueExpr:           valueExpr,
+		valueBinding:        qScriptPipelineBinding(valueExpr, bindings),
+		indexExpr:           indexExpr,
+		indexBinding:        qScriptPipelineBinding(indexExpr, bindings),
+		includeCount:        true,
+		absorbedAssignments: qScriptPipelineAbsorbedTermAliases(terms, bindings),
 	}, true
 }
 
@@ -1220,6 +1223,35 @@ func qScriptPipelineGatherSumTerm(src string) (string, string, bool) {
 		return "", "", false
 	}
 	return strings.TrimSpace(valueExpr), strings.TrimSpace(indexExpr), valueExpr != "" && indexExpr != ""
+}
+
+func qScriptPipelineGatherSumTermResolved(src string, bindings map[string]string, seen map[string]bool) (string, string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if valueExpr, indexExpr, ok := qScriptPipelineGatherSumTerm(src); ok {
+		return valueExpr, indexExpr, true
+	}
+	if qScriptPipelineSimpleName(src) {
+		bound, ok := qScriptPipelineResolveSimpleBinding(src, bindings, seen)
+		if !ok {
+			return "", "", false
+		}
+		if valueExpr, indexExpr, ok := qScriptPipelineGatherSumTerm(bound); ok {
+			return valueExpr, indexExpr, true
+		}
+		if next := qScriptPipelineAliasBodyName(bound); next != "" {
+			nextBound, ok := qScriptPipelineResolveSimpleBinding(next, bindings, seen)
+			if !ok {
+				return "", "", false
+			}
+			valueExpr, indexExpr, ok := findPostfixIndex(nextBound)
+			if !ok {
+				return "", "", false
+			}
+			return strings.TrimSpace(valueExpr), strings.TrimSpace(indexExpr), valueExpr != "" && indexExpr != ""
+		}
+		return qScriptPipelineGatherSumTermResolved(bound, bindings, seen)
+	}
+	return "", "", false
 }
 
 func qScriptPipelineSumPlusDyadicFloatDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
@@ -1573,6 +1605,21 @@ func qScriptPipelineCountTerm(src string) (string, bool) {
 	return name, true
 }
 
+func qScriptPipelineCountTermResolved(src string, bindings map[string]string, seen map[string]bool) (string, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if name, ok := qScriptPipelineCountTerm(src); ok {
+		return name, true
+	}
+	if !qScriptPipelineSimpleName(src) {
+		return "", false
+	}
+	bound, ok := qScriptPipelineResolveSimpleBinding(src, bindings, seen)
+	if !ok {
+		return "", false
+	}
+	return qScriptPipelineCountTermResolved(bound, bindings, seen)
+}
+
 func qScriptPipelinePlusTerms(src string) []string {
 	src = strings.TrimSpace(src)
 	stripped := stripEnclosingParens(src)
@@ -1652,6 +1699,107 @@ func qScriptPipelineSimpleName(src string) bool {
 		}
 	}
 	return true
+}
+
+func qScriptPipelineResolveSimpleBinding(name string, bindings map[string]string, seen map[string]bool) (string, bool) {
+	name = strings.TrimSpace(name)
+	if name == "" || bindings == nil {
+		return "", false
+	}
+	bound := strings.TrimSpace(bindings[name])
+	if bound == "" {
+		return "", false
+	}
+	if seen == nil {
+		seen = make(map[string]bool, len(bindings))
+	}
+	if seen[name] {
+		return "", false
+	}
+	seen[name] = true
+	return bound, true
+}
+
+func qScriptPipelineAbsorbedAssignments(descriptor qScriptPipelineDescriptor) []string {
+	if descriptor.kind != qScriptPipelineGatherReduceSumCount {
+		return descriptor.absorbedAssignments
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, name := range descriptor.absorbedAssignments {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	return out
+}
+
+func qScriptPipelineAbsorbedTermAliases(terms []string, bindings map[string]string) []string {
+	seen := map[string]bool{}
+	var out []string
+	var collect func(string)
+	collect = func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || !qScriptPipelineSimpleName(name) || seen[name] {
+			return
+		}
+		bound := strings.TrimSpace(bindings[name])
+		if bound == "" {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
+		if next := qScriptPipelineAliasBodyName(bound); next != "" {
+			collect(next)
+		}
+	}
+	for _, term := range terms {
+		term = stripEnclosingParens(strings.TrimSpace(term))
+		if qScriptPipelineSimpleName(term) {
+			collect(term)
+			continue
+		}
+		if next := qScriptPipelineAliasBodyName(term); next != "" {
+			collect(next)
+		}
+	}
+	return out
+}
+
+func qScriptPipelineAliasBodyName(src string) string {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		name := strings.TrimSpace(src[len("+/"):])
+		if qScriptPipelineSimpleName(name) {
+			return name
+		}
+	}
+	if strings.HasPrefix(src, "sum") && wordBoundary(src, 0, len("sum")) {
+		name := strings.TrimSpace(src[len("sum"):])
+		if qScriptPipelineSimpleName(name) {
+			return name
+		}
+	}
+	return ""
+}
+
+func qScriptPipelineAssignmentAbsorbed(descriptor *qScriptPipelineDescriptor, name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" || descriptor == nil {
+		return false
+	}
+	if name == strings.TrimSpace(descriptor.valueExpr) || name == strings.TrimSpace(descriptor.indexExpr) {
+		return true
+	}
+	for _, absorbed := range descriptor.absorbedAssignments {
+		if name == strings.TrimSpace(absorbed) {
+			return true
+		}
+	}
+	return false
 }
 
 func qScriptPipelineIndexMaskExpr(indexExpr string, bindings map[string]string) (string, bool) {
@@ -2726,7 +2874,7 @@ func (s *EvalState) evalQScriptSequenceTransformChainSumCountPipeline(descriptor
 func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
 	for _, assignment := range descriptor.assignments {
 		name := strings.TrimSpace(assignment.name)
-		if name == strings.TrimSpace(descriptor.valueExpr) || name == strings.TrimSpace(descriptor.indexExpr) {
+		if qScriptPipelineAssignmentAbsorbed(descriptor, name) {
 			continue
 		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
@@ -2919,15 +3067,18 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 	}
 	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
-		return nil, true, err
+		return nil, false, nil
 	}
 	// When the gathered value expression is the same pure expression as the
 	// predicate source, the data layer can share one bulk carrier flatten
 	// between the selection mask and the reduction.
 	selfPredicate := strings.TrimSpace(plan.leftExpr) == strings.TrimSpace(descriptor.valueExpr)
 	runtimePlan, ok, err := qTypedWhereGatherSumCountDescriptorFor(array, left, right, plan.compareOp, "where-index-reduce/sum-count", selfPredicate)
-	if err != nil || !ok {
-		return nil, ok, err
+	if err != nil {
+		return nil, false, nil
+	}
+	if !ok {
+		return nil, false, nil
 	}
 	sum, count, handled, err := evalQTypedWhereGatherSumCount(runtimePlan)
 	if err != nil || !handled {

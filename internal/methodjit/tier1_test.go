@@ -242,6 +242,12 @@ for i := 1; i <= 200; i++ { result = f(3, 3) }
 `, "result")
 }
 
+func TestTier1_PowExitUsesDynamicArithmetic(t *testing.T) {
+	compareVMvsJIT(t, `
+result := ("2" ** " 3e0 ") == 8
+`, "result")
+}
+
 func TestTier1_Test(t *testing.T) {
 	compareVMvsJIT(t, `
 func f(a) { if a { return 1 } else { return 0 } }

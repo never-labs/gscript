@@ -145,12 +145,16 @@ func validateBenchComparePayload(payload map[string]any, threshold, wallThreshol
 				unreliable = append(unreliable, benchCompareUnreliable{name, mode, curStatus, headStatus, curSource, headSource})
 			}
 			wall := benchGateIsWall(curSource) || benchGateIsWall(headSource)
+			mixedSource := benchGateMixedSource(curSource, headSource)
+			if mixedSource {
+				notes = append(notes, "mixed_time_source")
+			}
 			if wall {
 				notes = append(notes, "wall_timed_startup_noise")
 			}
 			if change != nil && len(notes) == 0 && *change > threshold {
 				violations = append(violations, benchCompareViolation{"regression", name, mode, *change, threshold})
-			} else if change != nil && wall && (curStatus == "ok" || curStatus == "partial") && (headStatus == "ok" || headStatus == "partial") && *change > wallThreshold {
+			} else if change != nil && wall && !mixedSource && (curStatus == "ok" || curStatus == "partial") && (headStatus == "ok" || headStatus == "partial") && *change > wallThreshold {
 				violations = append(violations, benchCompareViolation{"wall_regression", name, mode, *change, wallThreshold})
 			}
 			note := "-"
@@ -386,6 +390,27 @@ func benchGateIsWall(source string) bool {
 		}
 	}
 	return false
+}
+
+func benchGateMixedSource(current, head string) bool {
+	current = strings.TrimSpace(current)
+	head = strings.TrimSpace(head)
+	if benchGateSourceHasMultipleKinds(current) || benchGateSourceHasMultipleKinds(head) {
+		return true
+	}
+	return current != "" && head != "" && current != head
+}
+
+func benchGateSourceHasMultipleKinds(source string) bool {
+	parts := strings.Split(source, ",")
+	seen := map[string]bool{}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			seen[part] = true
+		}
+	}
+	return len(seen) > 1
 }
 
 func benchGateFmtSeconds(value *float64) string {

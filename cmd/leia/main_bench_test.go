@@ -539,6 +539,63 @@ BenchmarkQEvalVectorGoBaseline/FallbackShape-16              100  1000 ns/op  0 
 	}
 }
 
+func TestBenchQReportCheckSkipsMissingJITFamilyCoverage(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "qbench.txt")
+	if err := os.WriteFile(input, []byte(strings.TrimSpace(`
+BenchmarkQSessionEvalVectorWarmExecution/MaskWhere-16                         100  9000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  1 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_ordinary_list_adverb
+BenchmarkQEvalVectorGoBaseline/MaskWhere-16                                   100  8000 ns/op  0 B/op  0 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/TypeMatrixShortDenseAddScalarSum-16    100  9000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  1 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/TypeMatrixShortDenseAddScalarSum-16              100  8000 ns/op  0 B/op  0 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/ComboWherePriceBandSizeWithin-16     100  9000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  1 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/ComboWherePriceBandSizeWithin-16               100  8000 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalJITScriptWarm/ComboWherePriceBandSizeWithin-16                    100  10000 ns/op  128 B/op  4 allocs/op  1 q_session_planned_op_exit/op  0 q_session_shell_fallback/op  0 q_session_eval_errors/op  1 q_session_backend_shapes
+`)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	jsonPath := filepath.Join(dir, "q-report.json")
+	mdPath := filepath.Join(dir, "q-report.md")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{
+		"q-report",
+		"--from-output", input,
+		"--check",
+		"--ratio-baseline", filepath.Join(dir, "missing-baseline.json"),
+		"--json", jsonPath,
+		"--markdown", mdPath,
+		"--min-runtime-jit-backend-benchmarks=0",
+		"--min-runtime-array-bridge-benchmarks=0",
+		"--min-runtime-bridge-benchmark-count=0",
+		"--min-runtime-backend-route-benchmarks=0",
+		"--min-runtime-backend-route-hits-op=0",
+		"--min-q-eval-family-cases=1",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("q-report JSON failed to decode: %v\n%s", err, string(data))
+	}
+	var sawSkippedTypeMatrixJIT bool
+	for _, item := range payload["gate"].([]any) {
+		check := item.(map[string]any)
+		if check["signal"] == "q_eval_family_jit_cases" && check["benchmark"] == "type_matrix" {
+			sawSkippedTypeMatrixJIT = check["status"] == "skip"
+		}
+		if check["status"] == "fail" {
+			t.Fatalf("unexpected failed check: %#v", check)
+		}
+	}
+	if !sawSkippedTypeMatrixJIT {
+		t.Fatalf("gate = %#v, want skipped q_eval_family_jit_cases/type_matrix", payload["gate"])
+	}
+}
+
 func TestBenchCommandDispatchesQSuiteHarness(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })

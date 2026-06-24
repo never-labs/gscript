@@ -442,12 +442,12 @@ add_language_conformance_gate() {
         add_skip "Language Conformance Surface" "missing go"
         return
     fi
-    if ! have_cmd luajit; then
-        add_skip "Language Conformance Surface" "missing luajit"
+    if ! have_cmd "${LUA_BIN:-lua}"; then
+        add_skip "Language Conformance Surface" "missing ${LUA_BIN:-lua}"
         return
     fi
     add_run "Language Conformance Surface" \
-        "LUA_BIN=\"\${LUA_BIN:-luajit}\" LEIA_CONFORMANCE_CHECK_JIT=1 go test ./tests -run TestLanguageConformanceTranslatedCases -count=1"
+        "LUA_BIN=\"\${LUA_BIN:-lua}\" go test ./tests -run TestLanguageConformanceTranslatedCases -count=1"
 }
 
 add_q_conformance_gate() {

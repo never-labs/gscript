@@ -8,7 +8,6 @@ package methodjit
 
 import (
 	"fmt"
-	"math"
 	"unsafe"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -543,10 +542,16 @@ func (e *BaselineJITEngine) handleTForLoop(ctx *ExecContext, regs []runtime.Valu
 
 // handlePow handles OP_POW exit.
 func (e *BaselineJITEngine) handlePow(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto) error {
+	if e.callVM == nil {
+		return fmt.Errorf("no callVM for POW op-exit")
+	}
 	a := int(ctx.BaselineA)
 	b := int(ctx.BaselineB)
 	c := int(ctx.BaselineC)
 	absA := base + a
+	if absA < 0 || absA >= len(regs) {
+		return fmt.Errorf("POW op-exit destination out of range")
+	}
 
 	var bv, cv runtime.Value
 	if b >= vm.RKBit {
@@ -560,20 +565,19 @@ func (e *BaselineJITEngine) handlePow(ctx *ExecContext, regs []runtime.Value, ba
 		cv = regs[base+c]
 	}
 
-	var baseF, expF float64
-	if bv.IsInt() {
-		baseF = float64(bv.Int())
-	} else {
-		baseF = bv.Float()
+	result, err := e.callVM.ArithmeticForJIT(vm.OP_POW, bv, cv)
+	if err != nil {
+		return err
 	}
-	if cv.IsInt() {
-		expF = float64(cv.Int())
-	} else {
-		expF = cv.Float()
-	}
-
-	if absA < len(regs) {
-		regs[absA] = runtime.FloatValue(math.Pow(baseF, expF))
+	regs[absA] = result
+	if proto != nil && proto.Feedback != nil {
+		pc := int(ctx.BaselinePC) - 1
+		if pc >= 0 && pc < len(proto.Feedback) {
+			fb := &proto.Feedback[pc]
+			fb.Left.Observe(bv.Type())
+			fb.Right.Observe(cv.Type())
+			fb.Result.Observe(result.Type())
+		}
 	}
 	return nil
 }
