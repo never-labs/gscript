@@ -302,9 +302,9 @@ func TestReleaseMatrixCoveredReleaseCellsHaveExecutableEvidence(t *testing.T) {
 
 func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	root := findRepoRoot(t)
-	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
+	releaseMatrixCmd := "scripts/run.sh test release-matrix"
 	internalReleaseMatrixCmd := releaseMatrixCmd
-	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
+	specExamplesCmd := "scripts/run.sh test spec-examples"
 	docsCheckCmd := "scripts/run.sh docs"
 	ciReleaseListCmd := "go run ./cmd/leia ci release --list"
 	ciReleaseVersionListCmd := "go run ./cmd/leia ci release --release-version vX.Y.Z --list"
@@ -488,9 +488,9 @@ func TestReleaseMatrixReleaseProfileFailsCriticalSkips(t *testing.T) {
 
 func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.T) {
 	root := findRepoRoot(t)
-	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
+	releaseMatrixCmd := "scripts/run.sh test release-matrix"
 	specContractCmd := "go test ./tests/docs/spec -count=1"
-	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
+	specExamplesCmd := "scripts/run.sh test spec-examples"
 	docsCheckCmd := "scripts/run.sh docs"
 
 	readme := readFileString(t, filepath.Join(root, "README.md"))
@@ -556,8 +556,8 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 
 	fullOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
 	for _, snippet := range []string{
-		"go test ./... -count=1",
-		"Release Matrix Metadata: covered by Correctness (go test ./... -count=1)",
+		"scripts/run.sh test correctness",
+		"Release Matrix Metadata: covered by Correctness (scripts/run.sh test correctness)",
 		docsCheckCmd,
 	} {
 		if !strings.Contains(fullOut, snippet) {
@@ -923,7 +923,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 		}
 	}
 	prOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "pr", "--no-luajit", "--list")
-	for _, want := range []string{"go test ./... -count=1", "go run ./cmd/leia examples check --jobs=6", "scripts/run.sh docs", "scripts/run.sh perf --smoke --no-luajit"} {
+	for _, want := range []string{"scripts/run.sh test correctness", "go run ./cmd/leia examples check --jobs=6", "scripts/run.sh docs", "scripts/run.sh perf --smoke --no-luajit"} {
 		if !strings.Contains(prOut, want) {
 			t.Fatalf("ci pr --list must include %q so PR validation matches product gates; got:\n%s", want, prOut)
 		}
@@ -952,7 +952,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
-	for _, want := range []string{"go test ./... -count=1", "scripts/run.sh manifest-check tests benchmarks"} {
+	for _, want := range []string{"scripts/run.sh test correctness", "scripts/run.sh manifest-check tests benchmarks"} {
 		if !strings.Contains(productionOut, want) {
 			t.Fatalf("production_check.sh --full --list must include %q so dialect/package-managed example tests stay release-gated; got:\n%s", want, productionOut)
 		}

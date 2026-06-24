@@ -149,7 +149,7 @@ func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]
 		}, nil
 	case "pr":
 		return []ciCommand{
-			{Name: "All Go tests", Args: []string{"go", "test", "./...", "-count=1"}},
+			{Name: "All Go tests", Args: []string{"scripts/run.sh", "test", "correctness"}},
 			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
 			{Name: "Module path gate", Args: modulePathGateCommand()},
 			{Name: "Example projects check", Args: []string{"go", "run", "./cmd/leia", "examples", "check", "--jobs=6"}},

@@ -784,9 +784,9 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
 	for _, snippet := range []string{
 		"Concurrency Race Smoke",
-		"go test -race ./internal/runtime ./internal/nanbox ./internal/vm ./llm ./tests/sdk ./tests/llm ./cmd/leia -count=1",
+		"scripts/run.sh test race-smoke",
 		"Go-style Concurrency Contract",
-		"go test -race ./tests -run TestGoStyleConcurrencyContract -count=1",
+		"scripts/run.sh test concurrency-contract",
 	} {
 		if !strings.Contains(productionCheck, snippet) {
 			t.Fatalf("production_check.sh must keep concurrency race gate snippet %q", snippet)

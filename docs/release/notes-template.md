@@ -54,7 +54,7 @@ scripts/run.sh perf --full
 ```bash
 go run ./cmd/leia ci release --release-version vX.Y.Z --list
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z
-go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
+scripts/run.sh test release-matrix
 scripts/run.sh docs
 scripts/run.sh perf --full
 scripts/run.sh public-blockers --require-resolved

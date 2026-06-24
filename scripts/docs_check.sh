@@ -4,7 +4,7 @@
 # Contract snippets intentionally kept for release/spec tests:
 # - README spec link and docs/spec stability contract
 # - go test ./tests/docs/spec -count=1
-# - go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
+# - scripts/run.sh test release-matrix
 # - `tests/feature_matrix.json`
 # - checked-in local preview
 # - docs/_config.yml must exclude it from GitHub Pages
@@ -173,7 +173,7 @@ if [ "$JSON" -eq 1 ]; then
     go_test_stdout="/dev/null"
 fi
 run_gate "spec_runnable" "docs/spec runnable Leia example gate failed" \
-    go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1
+    scripts/run.sh test spec-examples
 run_gate "spec_contract" "docs/spec contract gate failed" \
     go test ./tests/docs/spec -count=1
 run_gate "release_reference" "docs release/spec reference gate failed" \

@@ -32,6 +32,7 @@ Tasks:
   release-snapshot     Verify a snapshot archive through the installer
   site                 Check rendered static site output
   shell-syntax         Parse all tracked shell scripts
+  test                 Run named repository test profiles
   cli-experience       Run CLI experience checks
   worktree             Audit git worktrees
 
@@ -344,6 +345,62 @@ run_shell_syntax_task() {
   echo "shell syntax: ok"
 }
 
+run_test_task() {
+  local profile="${1:-}"
+  if [ -z "$profile" ] || [ "$profile" = "-h" ] || [ "$profile" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh test <profile>
+
+Profiles:
+  core                    Core package smoke tests
+  correctness             Full Go test suite
+  feature-integration     Feature matrix and integration tests
+  release-matrix          Feature and release matrix metadata
+  spec-examples           Runnable spec examples
+  stdlib                  Standard library contract
+  methodjit               MethodJIT regression tests
+  race-smoke              Race detector smoke tests
+  concurrency-contract    Go-style concurrency contract
+USAGE
+    return
+  fi
+  shift
+  case "$profile" in
+    core)
+      go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1 "$@"
+      ;;
+    correctness)
+      go test ./... -count=1 "$@"
+      ;;
+    feature-integration)
+      go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1 "$@"
+      ;;
+    release-matrix)
+      go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1 "$@"
+      ;;
+    spec-examples)
+      go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1 "$@"
+      ;;
+    stdlib)
+      go test ./tests -run TestStdlibContract -count=1 "$@"
+      ;;
+    methodjit)
+      go test ./internal/vm -run TestCompilerReturn -count=1 "$@"
+      go test ./internal/methodjit -run 'TestRawIntSelfABI_NonEligibleStaysBoxed|TestRawIntSelfABI_EligibleExecutionMatrix|TestRawIntSelfABI_ExitResumeFallbackKeepsCallerLiveValues|TestExitResumeCheck_RawIntSelfCallFallbackFrame|TestTier2_StringFormatLookupPreservesPositiveDivisorModuloSemantics|TestTier2_StringFormatIntLoweringCoversGenericSingleIntPatterns|TestTier2_StringFormatIntMinInt64FallsBackPrecisely|TestTier2_StringFormatIntReboundCalleeFallsBackPrecisely|TestTier2_StringFormatIntFeedbackDynamicPatternGuardsPattern|TestTier2_StringFormatConstMultiArgUsesPreciseOpExit' -count=1 "$@"
+      ;;
+    race-smoke)
+      go test -race ./internal/runtime ./internal/nanbox ./internal/vm ./llm ./tests/sdk ./tests/llm ./cmd/leia -count=1 "$@"
+      ;;
+    concurrency-contract)
+      go test -race ./tests -run TestGoStyleConcurrencyContract -count=1 "$@"
+      ;;
+    *)
+      echo "scripts/run.sh test: unknown profile: $profile" >&2
+      exit 2
+      ;;
+  esac
+}
+
 case "$task" in
   -h|--help|help)
     usage
@@ -416,6 +473,9 @@ case "$task" in
     ;;
   shell-syntax|shell-syntax-check)
     run_shell_syntax_task "$@"
+    ;;
+  test|tests)
+    run_test_task "$@"
     ;;
   cli-experience)
     run_cli_experience_task "$@"

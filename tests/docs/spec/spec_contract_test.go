@@ -16,7 +16,7 @@ func TestDocsSpecGateEntrypointsStaySynchronized(t *testing.T) {
 
 	for _, snippet := range []string{
 		"go test ./tests/docs/spec -count=1",
-		"go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1",
+		"scripts/run.sh test spec-examples",
 		"README spec link and docs/spec stability contract",
 	} {
 		if !strings.Contains(docsCheck, snippet) {

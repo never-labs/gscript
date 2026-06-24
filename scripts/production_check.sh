@@ -615,8 +615,7 @@ add_methodjit_regression_gate() {
         add_skip "MethodJIT Regression" "methodjit native tests require darwin/arm64, got ${goos}/${goarch}"
         return
     fi
-    add_run "MethodJIT Regression" \
-        "go test ./internal/vm -run TestCompilerReturn -count=1 && go test ./internal/methodjit -run 'TestRawIntSelfABI_NonEligibleStaysBoxed|TestRawIntSelfABI_EligibleExecutionMatrix|TestRawIntSelfABI_ExitResumeFallbackKeepsCallerLiveValues|TestExitResumeCheck_RawIntSelfCallFallbackFrame|TestTier2_StringFormatLookupPreservesPositiveDivisorModuloSemantics|TestTier2_StringFormatIntLoweringCoversGenericSingleIntPatterns|TestTier2_StringFormatIntMinInt64FallsBackPrecisely|TestTier2_StringFormatIntReboundCalleeFallsBackPrecisely|TestTier2_StringFormatIntFeedbackDynamicPatternGuardsPattern|TestTier2_StringFormatConstMultiArgUsesPreciseOpExit' -count=1"
+    add_run "MethodJIT Regression" "scripts/run.sh test methodjit"
 }
 
 add_race_smoke_gate() {
@@ -636,25 +635,18 @@ add_race_smoke_gate() {
             return
             ;;
     esac
-    add_run "Concurrency Race Smoke" \
-        "go test -race ./internal/runtime ./internal/nanbox ./internal/vm ./llm ./tests/sdk ./tests/llm ./cmd/leia -count=1"
-    add_run "Go-style Concurrency Contract" \
-        "go test -race ./tests -run TestGoStyleConcurrencyContract -count=1"
+    add_run "Concurrency Race Smoke" "scripts/run.sh test race-smoke"
+    add_run "Go-style Concurrency Contract" "scripts/run.sh test concurrency-contract"
 }
 
 build_quick_plan() {
-    add_go_test "Core Go packages" \
-        "go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
+    add_go_test "Core Go packages" "scripts/run.sh test core"
     add_race_smoke_gate
     add_methodjit_regression_gate
-    add_go_test "Feature Matrix and Integration" \
-        "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
-    add_go_test "Release Matrix Metadata" \
-        "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
-    add_go_test "Spec Runnable Examples" \
-        "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
-    add_go_test "Stdlib Contract" \
-        "go test ./tests -run TestStdlibContract -count=1"
+    add_go_test "Feature Matrix and Integration" "scripts/run.sh test feature-integration"
+    add_go_test "Release Matrix Metadata" "scripts/run.sh test release-matrix"
+    add_go_test "Spec Runnable Examples" "scripts/run.sh test spec-examples"
+    add_go_test "Stdlib Contract" "scripts/run.sh test stdlib"
     add_architecture_health_gate
     add_manifest_coverage
     add_module_path_gate
@@ -665,12 +657,11 @@ build_quick_plan() {
 }
 
 build_full_plan() {
-    add_go_test "Correctness" \
-        "go test ./... -count=1"
+    add_go_test "Correctness" "scripts/run.sh test correctness"
     add_race_smoke_gate
     if have_cmd go; then
-        add_skip "Feature Matrix" "covered by Correctness (go test ./... -count=1)"
-        add_skip "Release Matrix Metadata" "covered by Correctness (go test ./... -count=1)"
+        add_skip "Feature Matrix" "covered by Correctness (scripts/run.sh test correctness)"
+        add_skip "Release Matrix Metadata" "covered by Correctness (scripts/run.sh test correctness)"
     else
         add_skip "Feature Matrix" "missing go"
         add_skip "Release Matrix Metadata" "missing go"

@@ -24,10 +24,10 @@ Release validation commands:
 
 ```bash
 time scripts/run.sh perf --syntax-smoke --no-luajit
-go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
-go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1
+scripts/run.sh test release-matrix
+scripts/run.sh test spec-examples
 scripts/run.sh language-conformance
-go test ./...
+scripts/run.sh test correctness
 scripts/run.sh docs
 scripts/run.sh perf --feature-smoke
 ```
