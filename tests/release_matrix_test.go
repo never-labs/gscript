@@ -3071,6 +3071,10 @@ func TestReleaseMatrixLauncherRoutesTaskHelp(t *testing.T) {
 			t.Fatalf("docs/design/script-entrypoints.md must document launcher help and private task files; missing %q", want)
 		}
 	}
+	docsHome := readFileString(t, filepath.Join(root, "docs", "index.md"))
+	if !strings.Contains(docsHome, "(design/script-entrypoints.md)") {
+		t.Fatal("docs/index.md must link the script entrypoint policy")
+	}
 	for _, tc := range []struct {
 		task string
 		want string

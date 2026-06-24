@@ -63,6 +63,7 @@ print(leader[1].sym, leader[1].qty, leader[1].avg_px)
 - [Hot reload](reference/hot-reload/index.md)
 - [Platforms and execution modes](reference/platforms/index.md)
 - [Tooling guide](guides/tooling.md)
+- [Script entrypoints](design/script-entrypoints.md)
 - [Editors and LSP](guides/editors.md)
 - [Testing and release validation](testing.md)
 
