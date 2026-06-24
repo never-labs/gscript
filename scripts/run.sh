@@ -19,6 +19,8 @@ Tasks:
   q                    Run q conformance gate
   q-perf               Run q performance report gate
   release-artifacts    Build local release artifacts
+  release-artifacts-gate
+                       Run release artifact gate with release-profile defaults
   release-check        Check local release artifacts
   release-dist         Check release distribution config
   release-notes        Check release notes evidence
@@ -112,6 +114,63 @@ USAGE
   echo "q performance evidence: $output_dir/q_perf_report.json $output_dir/q_perf_report.md"
 }
 
+run_release_artifacts_gate_task() {
+  local version=""
+  local require_tag=0
+  local args=(--build --require-clean)
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --version)
+        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+          echo "scripts/run.sh release-artifacts-gate: --version requires a value" >&2
+          exit 2
+        fi
+        version="$2"
+        require_tag=1
+        shift 2
+        ;;
+      --version=*)
+        version="${1#--version=}"
+        require_tag=1
+        shift
+        ;;
+      --require-tag)
+        require_tag=1
+        shift
+        ;;
+      -h|--help)
+        cat <<'USAGE'
+Usage: scripts/run.sh release-artifacts-gate [--version VERSION] [--require-tag]
+
+Runs the release artifact gate with release-profile defaults. The gate builds
+artifacts and requires a clean worktree. A version argument, --require-tag, or
+LEIA_RELEASE_REQUIRE_TAG=1 adds exact-tag validation.
+USAGE
+        return
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+  if [ -z "$version" ] && [ -n "${LEIA_RELEASE_ARTIFACT_VERSION:-}" ]; then
+    version="$LEIA_RELEASE_ARTIFACT_VERSION"
+  fi
+  if [ "$require_tag" -eq 0 ] && [ -n "${LEIA_RELEASE_REQUIRE_TAG:-}" ]; then
+    require_tag=1
+  fi
+  if [ "$require_tag" -eq 1 ]; then
+    if [ -z "$version" ]; then
+      version="$(git describe --tags --exact-match)"
+    fi
+    args+=(--require-tag --version "$version")
+  elif [ -n "$version" ]; then
+    args+=(--version "$version")
+  fi
+  run_shell_task scripts/release_artifacts_check.sh "${args[@]}"
+}
+
 case "$task" in
   -h|--help|help)
     usage
@@ -148,6 +207,9 @@ case "$task" in
     ;;
   release-artifacts)
     run_shell_task scripts/release_artifacts.sh "$@"
+    ;;
+  release-artifacts-gate|release-gate-artifacts)
+    run_release_artifacts_gate_task "$@"
     ;;
   release-check|release-artifacts-check)
     run_shell_task scripts/release_artifacts_check.sh "$@"

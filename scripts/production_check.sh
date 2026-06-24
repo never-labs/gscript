@@ -493,7 +493,11 @@ add_release_artifacts_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Artifacts" "artifact_args=(--build --require-clean); if [ -n \"$RELEASE_VERSION\" ]; then artifact_args+=(--require-tag --version \"$RELEASE_VERSION\"); elif [ -n \"\${LEIA_RELEASE_REQUIRE_TAG:-}\" ]; then artifact_args+=(--require-tag --version \"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"); fi; scripts/run.sh release-check \"\${artifact_args[@]}\""
+        if [ -n "$RELEASE_VERSION" ]; then
+            add_run "Release Artifacts" "scripts/run.sh release-artifacts-gate --version \"$RELEASE_VERSION\""
+        else
+            add_run "Release Artifacts" "scripts/run.sh release-artifacts-gate"
+        fi
         return
     fi
     if ! have_cmd go; then
