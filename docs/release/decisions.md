@@ -8,84 +8,78 @@ or local validation runs.
 
 | Area | Decision Needed | Current Status |
 |---|---|---|
-| License | Choose the repository license and whether a `NOTICE` file is required. | Open. |
-| Security reporting | Confirm the private reporting route, contact path, and disclosure policy. | Open. |
-| Platform support | Define tested and supported OS/architecture combinations for the release. | Open. |
-| Release channels | Decide which channels are public: GitHub Releases, install script, `go install`, package managers, or others. | Open. |
-| Artifact signing | Decide whether SHA256 checksums are sufficient or whether cosign, GPG, or another signing flow is required. | Open. |
-| Compatibility policy | Define the pre-1.0 compatibility promise and the intended v1.0 stable surface. | Open. |
+| License | Use Apache-2.0; no `NOTICE` file is required unless third-party attribution requirements are added. | Resolved. |
+| Security reporting | Use GitHub private security advisories, with security@never-labs.com as the fallback private contact. | Resolved. |
+| Platform support | Test and support darwin/linux on amd64/arm64 for CLI, interpreter, and VM; ARM64 JIT support requires release evidence. | Resolved. |
+| Release channels | Publish GitHub Releases, `scripts/install.sh`, and `go install`; package managers are not official for the initial public release. | Resolved. |
+| Artifact signing | Publish SHA256 checksums for release archives; cosign/GPG signing is not required for the initial public release. | Resolved. |
+| Compatibility policy | Use a pre-1.0 compatibility policy: spec-covered language behavior is maintained where practical; experimental dialect, AI, JIT, and provider surfaces may change with release notes. | Resolved. |
 
 ## License
 
-The repository has no selected license until a root `LICENSE` file exists.
-Release notes and README text must not imply open-source reuse terms before
-that decision is made.
+The repository is licensed under Apache-2.0. The root `LICENSE` file is the
+authoritative license text.
 
 Record:
 
-- license identifier;
-- whether a `NOTICE` file is required;
-- whether examples, generated artifacts, or vendored assets need separate
-  notices.
+- license identifier: Apache-2.0;
+- `NOTICE` requirement: none for the current repository contents;
+- examples and generated artifacts are covered by the repository license unless
+  a file states otherwise.
 
 ## Security Reporting
 
-`SECURITY.md` describes the current conservative reporting path. A public
-release still needs an explicit maintainer decision for any confirmed contact
-route or disclosure process.
+`SECURITY.md` defines the confirmed reporting path.
 
 Record:
 
-- whether GitHub private security advisories are enabled;
-- whether an email address, PGP key, CVE process, embargo policy, or response
-  target is provided;
-- which versions or tags receive security fixes.
+- GitHub private security advisories are the primary route;
+- security@never-labs.com is the fallback private contact;
+- target initial response time is five business days;
+- `main` and the latest published tag receive security fixes unless release
+  notes state otherwise.
 
 ## Platform Support
 
 `docs/reference/platforms/index.md` defines support levels. Release notes must
 map actual release evidence to those levels.
 
-Record:
-
-- tested OS/architecture combinations;
-- Go version;
-- interpreter, bytecode VM, and JIT modes tested;
-- any disabled capabilities, live providers, editor integrations, or package
-  manager channels.
+Initial supported combinations are `darwin/amd64`, `darwin/arm64`,
+`linux/amd64`, and `linux/arm64` for CLI, interpreter, and bytecode VM.
+Windows archives may be produced as available packaging targets, but Windows is
+not support-claimed until release notes include validation evidence. ARM64 JIT
+support is claimed only when the release evidence shows it enabled and tested.
+Release notes record the exact Go version and execution modes for each tag.
 
 ## Release Channels
 
 Release evidence must identify the distribution channels and artifacts that are
 official for the tag.
 
-Record:
-
-- published archive names;
-- whether `scripts/install.sh` is a supported install path;
-- whether `go install github.com/never-labs/leia/...@TAG` is supported;
-- whether package managers are supported.
+Official initial public channels are GitHub Releases, `scripts/install.sh`,
+and `go install github.com/never-labs/leia/...@TAG`. Package managers are not
+official release channels until a later decision records owner, workflow, and
+validation evidence.
 
 ## Artifact Signing
 
 Release evidence must identify the checksum and signing policy that is official
 for the tag.
 
-Record:
-
-- whether SHA256 checksums are sufficient;
-- whether cosign, GPG, or another signing flow is required;
-- which files are signed;
-- checksum and signing requirements.
+SHA256 checksums are sufficient for the initial public release. Release
+artifacts must publish checksums for every archive. cosign, GPG, or another
+signing flow can be added later, but is not required for the first public tag.
 
 ## Compatibility Policy
 
 The specification, feature matrix, conformance gates, and release notes define
 the compatibility surface. Optimizations, JIT availability, typed kernels, and provider integrations are not compatibility guarantees unless the release notes say so explicitly.
 
-Record:
-
-- stable language, q, stdlib, embedding, CLI, module, and dialect surfaces;
-- experimental surfaces;
-- implementation-defined behavior;
-- migration notes for user-visible changes.
+Before v1.0, compatibility is best-effort and release-note-bound. The
+spec-covered language core, q semantics covered by conformance gates, stdlib
+APIs documented in reference pages, embedding API, CLI behavior, module
+resolution, and tagged dialect contracts are the intended stable surface for a
+given tag. Experimental surfaces include AI provider integration, live
+providers, JIT internals, typed runtime kernels, diagnostics formats not marked
+as release evidence, and newly added dialect extensions. User-visible changes
+must be listed in release notes with migration guidance.

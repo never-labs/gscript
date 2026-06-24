@@ -171,7 +171,11 @@ print_json_report() {
   printf '  "open_blocker_count": %d,\n' "$(count_blocker_status "Open")"
   printf '  "blocker_status_count": %d,\n' "${#blocker_status_values[@]}"
   printf '  "blocker_statuses": '
-  print_json_string_array "  " "${blocker_status_values[@]}"
+  if [[ "${#blocker_status_values[@]}" -gt 0 ]]; then
+    print_json_string_array "  " "${blocker_status_values[@]}"
+  else
+    print_json_string_array "  "
+  fi
   printf ',\n'
   printf '  "blocker_status_details": [\n'
   local status_i=0
@@ -188,7 +192,11 @@ print_json_report() {
   printf '  ],\n'
   printf '  "decision_area_count": %d,\n' "${#decision_areas[@]}"
   printf '  "decision_areas": '
-  print_json_string_array "  " "${decision_areas[@]}"
+  if [[ "${#decision_areas[@]}" -gt 0 ]]; then
+    print_json_string_array "  " "${decision_areas[@]}"
+  else
+    print_json_string_array "  "
+  fi
   printf ',\n'
   printf '  "blockers": [\n'
   local i=0

@@ -17,10 +17,9 @@ Leia is under active development before its first stable release.
 ## Reporting A Vulnerability
 
 Do not file public issues for vulnerabilities or exploit details. Use GitHub's
-private security advisory flow for this repository when available. If that is
-unavailable, open a minimal public issue that says a private security report is
-needed, without including reproduction steps, payloads, credentials, or exploit
-details.
+private security advisory flow for this repository. If you cannot access that
+flow, email security@never-labs.com with a minimal subject and no exploit
+payload in the subject line.
 
 Include:
 
@@ -30,6 +29,10 @@ Include:
 - enabled libraries and capabilities;
 - minimal reproduction steps;
 - expected and observed impact.
+
+The target initial response time is five business days. Coordinated disclosure
+timelines are handled case by case according to exploitability, affected
+versions, and available mitigations.
 
 ## Runtime Security Model
 
