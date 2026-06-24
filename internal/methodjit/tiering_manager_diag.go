@@ -14,7 +14,8 @@
 // regardless of whether the caller took the production path or the diag
 // path.
 //
-// See CLAUDE.md rule 5 and docs-internal/workflow-v5-plan.md.
+// Production and diagnostics must share this single compile path; otherwise
+// diagnostic artifacts stop representing the code production installs.
 
 package methodjit
 

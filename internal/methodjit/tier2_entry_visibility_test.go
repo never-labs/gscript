@@ -7,8 +7,7 @@
 // native code (as opposed to being compiled but never entered, or
 // falling back to Tier 1 / VM).
 //
-// This test is the red→green driver for rule 26 of CLAUDE.md on a
-// diagnostic (but emit-touching) round.
+// This test is the regression driver for the diagnostic visibility contract.
 
 package methodjit
 

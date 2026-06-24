@@ -108,8 +108,8 @@ func runParity(t *testing.T, benchFile, fnName string) {
 	// address relocation).
 	if prodInsnCount != art.InsnCount {
 		t.Fatalf("insn count diverged for %s/%s: production=%d, diagnostic=%d. "+
-			"CLAUDE.md rule 5 violated — compileTier2Pipeline is producing "+
-			"different amounts of code depending on which caller invoked it. "+
+			"compileTier2Pipeline is producing different amounts of code "+
+			"depending on which caller invoked it. "+
 			"Find the divergence and fix it.",
 			benchFile, fnName, prodInsnCount, art.InsnCount)
 	}

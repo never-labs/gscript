@@ -16,7 +16,7 @@
 # TieringManager.CompileForDiagnostics, which shares compileTier2Pipeline
 # with the production path — enforced by TestDiag_ProductionParity_*.
 # This means every byte shown here is byte-for-byte what production Tier 2
-# would install at runtime. Rule 5 of CLAUDE.md is load-bearing on this.
+# would install at runtime; diagnostics must not run a parallel compile path.
 #
 # Usage:
 #   bash scripts/diag.sh all                  — dump every domain benchmark

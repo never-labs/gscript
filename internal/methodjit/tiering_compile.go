@@ -160,7 +160,7 @@ func (tm *TieringManager) CompileTier2(proto *vm.FuncProto) error {
 //
 // Any change to this function's body is a change to the production Tier 2
 // compile semantics AND to what the diagnostic tool sees, by construction.
-// That is the load-bearing invariant of rule 5 in CLAUDE.md.
+// Keep diagnostics and production on this shared path.
 func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2Trace) (*CompiledFunction, error) {
 	speculation := NewTier2SpeculationPlanWithSuppressedGuardKinds(proto, tm.tier2SuppressedGuards(proto), tm.tier2SuppressedGuardKinds(proto))
 	var remarks *OptimizationRemarks
