@@ -43,27 +43,23 @@ func TestBenchCommandDispatchesCompareHarness(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
 	var gotName string
-	var gotArgs []string
 	benchExecCommand = func(name string, args ...string) *exec.Cmd {
 		gotName = name
-		gotArgs = append([]string(nil), args...)
 		helper, helperArgs := testHelperCommand(t, "bench")
 		return exec.Command(helper, helperArgs...)
 	}
 
+	jsonPath := filepath.Join(t.TempDir(), "compare.json")
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"compare", "--bench", "numeric/mandelbrot"}, &stdout, &stderr)
+	code := runBenchCommand([]string{"compare", "--bench", "numeric/mandelbrot", "--runs", "1", "--warmup", "0", "--no-luajit", "--json", jsonPath}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if gotName != "python3" {
-		t.Fatalf("python command = %q, want python3", gotName)
+	if gotName == "python3" {
+		t.Fatalf("compare dispatched to python")
 	}
-	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "numeric/mandelbrot" {
-		t.Fatalf("args = %#v, want timing_compare.py --bench numeric/mandelbrot", gotArgs)
-	}
-	if !strings.Contains(stdout.String(), "bench helper ok") {
-		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
+		t.Fatalf("stdout = %q, want JSON write", stdout.String())
 	}
 }
 
@@ -78,12 +74,16 @@ func TestBenchCommandDefaultsToQuickCompare(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand(nil, &stdout, &stderr)
+	jsonPath := filepath.Join(t.TempDir(), "default.json")
+	code := runBenchCommand([]string{"--quick", "--no-luajit", "--json", jsonPath}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 9 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "control/sieve" || gotArgs[3] != "--runs" || gotArgs[4] != "1" || gotArgs[5] != "--warmup" || gotArgs[6] != "0" || gotArgs[7] != "--timeout" || gotArgs[8] != "60" {
-		t.Fatalf("args = %#v, want timing_compare.py quick control/sieve profile", gotArgs)
+	if containsString(gotArgs, filepath.Join("benchmarks", "timing_compare.py")) {
+		t.Fatalf("default quick compare dispatched to python: %#v", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
+		t.Fatalf("stdout = %q, want JSON write", stdout.String())
 	}
 }
 
@@ -98,12 +98,16 @@ func TestBenchCommandDispatchesBenchmarkSelector(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"table/table_field_access", "--runs", "2"}, &stdout, &stderr)
+	jsonPath := filepath.Join(t.TempDir(), "selector.json")
+	code := runBenchCommand([]string{"table/table_field_access", "--runs", "1", "--warmup", "0", "--no-luajit", "--json", jsonPath}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 5 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "table/table_field_access" || gotArgs[3] != "--runs" || gotArgs[4] != "2" {
-		t.Fatalf("args = %#v, want timing_compare.py --bench table/table_field_access --runs 2", gotArgs)
+	if containsString(gotArgs, filepath.Join("benchmarks", "timing_compare.py")) {
+		t.Fatalf("selector compare dispatched to python: %#v", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
+		t.Fatalf("stdout = %q, want JSON write", stdout.String())
 	}
 }
 
@@ -118,26 +122,19 @@ func TestBenchCommandDispatchesProfiles(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	if code := runBenchCommand([]string{"--quick"}, &stdout, &stderr); code != 0 {
+	if code := runBenchCommand([]string{"--quick", "--no-luajit", "--json", filepath.Join(t.TempDir(), "quick.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("quick code = %d, stderr = %q", code, stderr.String())
 	}
-	if code := runBenchCommand([]string{"--full"}, &stdout, &stderr); code != 0 {
+	if code := runBenchCommand([]string{"--full", "--no-luajit", "--json", filepath.Join(t.TempDir(), "full.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("full code = %d, stderr = %q", code, stderr.String())
 	}
-	if code := runBenchCommand([]string{"--guard"}, &stdout, &stderr); code != 0 {
+	if code := runBenchCommand([]string{"--guard", "--no-luajit", "--json", filepath.Join(t.TempDir(), "guard.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("guard code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(calls) != 3 {
-		t.Fatalf("calls = %#v, want three profile dispatches", calls)
-	}
-	if !strings.HasSuffix(calls[0][1], filepath.Join("benchmarks", "timing_compare.py")) || !containsString(calls[0], "table/table_array_access") {
-		t.Fatalf("quick call = %#v, want timing quick profile", calls[0])
-	}
-	if !strings.HasSuffix(calls[1][1], filepath.Join("benchmarks", "timing_compare.py")) || !containsString(calls[1], "--all-groups") {
-		t.Fatalf("full call = %#v, want timing full profile", calls[1])
-	}
-	if !strings.HasSuffix(calls[2][1], filepath.Join("benchmarks", "strict_guard.py")) || !containsString(calls[2], "control/sieve") {
-		t.Fatalf("guard call = %#v, want strict guard profile", calls[2])
+	for _, call := range calls {
+		if len(call) > 0 && call[0] == "python3" {
+			t.Fatalf("profile dispatched to python: %#v", calls)
+		}
 	}
 }
 
@@ -152,15 +149,16 @@ func TestBenchCommandDispatchesCompareQuickProfile(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"compare", "--quick"}, &stdout, &stderr)
+	jsonPath := filepath.Join(t.TempDir(), "quick-compare.json")
+	code := runBenchCommand([]string{"compare", "--quick", "--no-luajit", "--json", jsonPath}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) ||
-		!containsString(gotArgs, "control/sieve") ||
-		!containsString(gotArgs, "table/table_array_access") ||
-		!containsString(gotArgs, "--timeout") {
-		t.Fatalf("args = %#v, want timing_compare.py quick compare profile", gotArgs)
+	if containsString(gotArgs, filepath.Join("benchmarks", "timing_compare.py")) {
+		t.Fatalf("quick compare dispatched to python: %#v", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
+		t.Fatalf("stdout = %q, want JSON write", stdout.String())
 	}
 }
 
@@ -175,12 +173,16 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"strict", "--group", "table"}, &stdout, &stderr)
+	jsonPath := filepath.Join(t.TempDir(), "strict.json")
+	code := runBenchCommand([]string{"strict", "--group", "table", "--runs", "1", "--warmup", "0", "--no-luajit", "--json", jsonPath}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "strict_guard.py")) || gotArgs[1] != "--group" || gotArgs[2] != "table" {
-		t.Fatalf("args = %#v, want strict_guard.py --group table", gotArgs)
+	if containsString(gotArgs, filepath.Join("benchmarks", "strict_guard.py")) {
+		t.Fatalf("strict dispatched to python: %#v", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
+		t.Fatalf("stdout = %q, want JSON write", stdout.String())
 	}
 }
 

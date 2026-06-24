@@ -1,0 +1,708 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"math"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/never-labs/leia/internal/tooling/benchdisc"
+)
+
+var benchGoHarnessModes = []string{"default", "vm", "no_filter"}
+
+type benchGoHarnessConfig struct {
+	Mode             string
+	BenchSelectors   []string
+	Groups           []string
+	Modes            []string
+	Runs             int
+	Warmup           int
+	Timeout          time.Duration
+	MinSampleSeconds float64
+	TimerResolution  float64
+	MaxRepeat        int
+	MinWallRepeat    int
+	TimeSource       string
+	NoWallFallback   bool
+	NoLuaJIT         bool
+	AllGroups        bool
+	DryRun           bool
+	Jobs             int
+	JSONPath         string
+	MarkdownPath     string
+	HeadRef          string
+	Progress         bool
+	Sort             string
+	ScaleProfile     string
+	Scale            []string
+	TimeoutRaw       string
+}
+
+type benchGoStats struct {
+	N                int      `json:"n"`
+	Median           *float64 `json:"median,omitempty"`
+	Mean             *float64 `json:"mean,omitempty"`
+	Min              *float64 `json:"min,omitempty"`
+	Max              *float64 `json:"max,omitempty"`
+	Stdev            *float64 `json:"stdev,omitempty"`
+	MAD              *float64 `json:"mad,omitempty"`
+	CVPct            *float64 `json:"cv_pct,omitempty"`
+	CI95Low          *float64 `json:"ci95_low,omitempty"`
+	CI95High         *float64 `json:"ci95_high,omitempty"`
+	CI95HalfWidth    *float64 `json:"ci95_half_width,omitempty"`
+	CI95HalfWidthPct *float64 `json:"ci95_half_width_pct,omitempty"`
+}
+
+type benchGoSample struct {
+	Status             string   `json:"status"`
+	Seconds            *float64 `json:"seconds,omitempty"`
+	Repeat             int      `json:"repeat"`
+	Source             string   `json:"source,omitempty"`
+	ScriptTotalSeconds *float64 `json:"script_total_seconds,omitempty"`
+	WallTotalSeconds   float64  `json:"wall_total_seconds"`
+	Note               string   `json:"note,omitempty"`
+}
+
+type benchGoSubjectResult struct {
+	Subject        string          `json:"subject,omitempty"`
+	Mode           string          `json:"mode,omitempty"`
+	Status         string          `json:"status"`
+	Repeat         int             `json:"repeat"`
+	Source         string          `json:"source,omitempty"`
+	Stats          benchGoStats    `json:"stats"`
+	Samples        []benchGoSample `json:"samples,omitempty"`
+	Warmups        []benchGoSample `json:"warmups,omitempty"`
+	OutputHash     string          `json:"output_hash,omitempty"`
+	ChecksumText   string          `json:"checksum_text,omitempty"`
+	ChecksumStatus string          `json:"checksum_status,omitempty"`
+	T2Attempted    int             `json:"t2_attempted,omitempty"`
+	T2Entered      int             `json:"t2_entered,omitempty"`
+	T2Failed       int             `json:"t2_failed,omitempty"`
+	ExitTotal      int             `json:"exit_total,omitempty"`
+	Note           string          `json:"note,omitempty"`
+	Diagnostic     map[string]any  `json:"diagnostic,omitempty"`
+}
+
+type benchGoBenchmarkResult struct {
+	Benchmark string                                     `json:"benchmark"`
+	Group     string                                     `json:"group"`
+	Modes     map[string]map[string]benchGoSubjectResult `json:"modes,omitempty"`
+	Strict    map[string]benchGoSubjectResult            `json:"-"`
+	Base      string                                     `json:"base,omitempty"`
+	Scale     map[string]string                          `json:"scale,omitempty"`
+}
+
+type benchGoReport struct {
+	SchemaVersion    int               `json:"schema_version"`
+	Mode             string            `json:"mode"`
+	Modes            []string          `json:"modes"`
+	Results          []map[string]any  `json:"results"`
+	Timestamp        string            `json:"timestamp,omitempty"`
+	GeneratedAt      string            `json:"generated_at"`
+	DurationSeconds  float64           `json:"duration_seconds"`
+	HeadRef          string            `json:"head_ref,omitempty"`
+	Groups           []string          `json:"groups,omitempty"`
+	Benchmarks       []string          `json:"benchmarks,omitempty"`
+	Runs             int               `json:"runs,omitempty"`
+	Warmup           int               `json:"warmup,omitempty"`
+	TimeoutSeconds   float64           `json:"timeout_seconds,omitempty"`
+	MinSampleSeconds float64           `json:"min_sample_seconds,omitempty"`
+	TimerResolution  float64           `json:"timer_resolution,omitempty"`
+	MaxRepeat        int               `json:"max_repeat,omitempty"`
+	MinWallRepeat    int               `json:"min_wall_repeat,omitempty"`
+	WallFallback     bool              `json:"wall_fallback"`
+	TimeSource       string            `json:"time_source,omitempty"`
+	ScaleProfile     string            `json:"scale_profile,omitempty"`
+	Scale            []string          `json:"scale,omitempty"`
+	Platform         map[string]string `json:"platform,omitempty"`
+	Notes            []string          `json:"notes,omitempty"`
+}
+
+func runBenchCompareCommand(args []string, outw, errw io.Writer) int {
+	return runBenchGoHarness("compare", args, outw, errw)
+}
+
+func runBenchStrictCommand(args []string, outw, errw io.Writer) int {
+	return runBenchGoHarness("strict", args, outw, errw)
+}
+
+func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
+	started := time.Now()
+	cfg, err := parseBenchGoHarnessConfig(mode, args, errw)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	root, err := qReportRepoRoot()
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+		return 1
+	}
+	specs, err := benchdisc.Discover(root, cfg.Groups)
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+		return 2
+	}
+	specs, err = benchdisc.SelectSpecs(specs, cfg.BenchSelectors)
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+		return 2
+	}
+	if len(specs) == 0 {
+		fmt.Fprintf(errw, "leia bench %s: no benchmarks selected\n", mode)
+		return 2
+	}
+
+	tempDir, err := os.MkdirTemp("", "leia-bench-"+mode+"-")
+	if err != nil {
+		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+		return 1
+	}
+	defer os.RemoveAll(tempDir)
+
+	leiaBin := filepath.Join(tempDir, "leia-current")
+	if err := benchBuildLeia(root, leiaBin, "build failed in {root} with exit {exit_code}", errw); err != nil {
+		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+		return 1
+	}
+	luajitBin := ""
+	if !cfg.NoLuaJIT {
+		luajitBin = findExecutable("luajit")
+	}
+
+	var results []benchGoBenchmarkResult
+	for _, spec := range specs {
+		if cfg.Progress {
+			fmt.Fprintf(errw, "bench %s\n", spec.ID())
+		}
+		result := benchGoBenchmarkResult{
+			Benchmark: spec.Name,
+			Group:     spec.Group,
+			Base:      spec.Base,
+			Modes:     map[string]map[string]benchGoSubjectResult{},
+			Strict:    map[string]benchGoSubjectResult{},
+			Scale:     map[string]string{},
+		}
+		if mode == "strict" {
+			for _, runMode := range cfg.Modes {
+				subject := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, spec, cfg)
+				result.Strict[runMode] = subject
+			}
+		} else {
+			for _, runMode := range cfg.Modes {
+				current := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, spec, cfg)
+				head := current
+				head.Subject = "head"
+				if cfg.HeadRef != "" {
+					head.Note = appendNote(head.Note, "head_ref comparison currently reuses the built current binary; clean snapshot execution is the next migration step")
+				}
+				modeRow := map[string]benchGoSubjectResult{
+					"current": current,
+					"head":    head,
+				}
+				if !cfg.NoLuaJIT {
+					modeRow["luajit"] = runBenchGoSubject("luajit", runMode, root, leiaBin, luajitBin, spec, cfg)
+				}
+				result.Modes[runMode] = modeRow
+			}
+		}
+		results = append(results, result)
+	}
+
+	report := buildBenchGoReport(cfg, results, time.Since(started).Seconds())
+	if cfg.JSONPath != "" {
+		if err := writeBenchGoJSON(cfg.JSONPath, report); err != nil {
+			fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+			return 1
+		}
+		fmt.Fprintf(outw, "wrote %s\n", cfg.JSONPath)
+	}
+	if cfg.MarkdownPath != "" {
+		if err := writeBenchGoMarkdown(cfg.MarkdownPath, cfg, results); err != nil {
+			fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+			return 1
+		}
+		fmt.Fprintf(outw, "wrote %s\n", cfg.MarkdownPath)
+	}
+	if cfg.JSONPath == "" && cfg.MarkdownPath == "" {
+		_, _ = io.WriteString(outw, benchGoMarkdown(cfg, results))
+	}
+	return 0
+}
+
+func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benchGoHarnessConfig, error) {
+	defaultGroups := []string{"numeric", "recursion", "table", "calls", "string", "app", "control"}
+	defaultModes := []string{"default"}
+	if mode == "strict" {
+		defaultModes = []string{"vm", "default", "no_filter"}
+	}
+	cfg := benchGoHarnessConfig{
+		Mode:             mode,
+		Groups:           append([]string(nil), defaultGroups...),
+		Runs:             3,
+		Warmup:           1,
+		Timeout:          60 * time.Second,
+		MinSampleSeconds: 0.020,
+		TimerResolution:  0.001,
+		MaxRepeat:        128,
+		MinWallRepeat:    4,
+		TimeSource:       "auto",
+		NoWallFallback:   mode == "strict",
+		Jobs:             1,
+		Sort:             "name",
+	}
+	var explicitGroups benchStringList
+	var explicitModes benchStringList
+	var repeatOverrides benchStringList
+	var allowWallTime bool
+	var sameWorkload bool
+	var suspiciousVMSpeedup float64
+	var suspiciousLuaJITRatio float64
+	var relatedConfirmRatio float64
+	fs := flag.NewFlagSet("bench "+mode, flag.ContinueOnError)
+	fs.SetOutput(errw)
+	fs.Var((*benchStringList)(&cfg.BenchSelectors), "bench", "Benchmark selector; repeatable.")
+	fs.Var(&explicitGroups, "group", "Benchmark group; repeatable.")
+	fs.Var(&explicitModes, "mode", "Execution mode; repeatable.")
+	fs.IntVar(&cfg.Runs, "runs", cfg.Runs, "Measured runs.")
+	fs.IntVar(&cfg.Warmup, "warmup", cfg.Warmup, "Warmup runs.")
+	cfg.TimeoutRaw = "60"
+	fs.StringVar(&cfg.TimeoutRaw, "timeout", cfg.TimeoutRaw, "Per command timeout in seconds or Go duration syntax.")
+	fs.Float64Var(&cfg.MinSampleSeconds, "min-sample-seconds", cfg.MinSampleSeconds, "Minimum sample seconds.")
+	fs.Float64Var(&cfg.TimerResolution, "timer-resolution", cfg.TimerResolution, "Timer resolution.")
+	fs.IntVar(&cfg.MaxRepeat, "max-repeat", cfg.MaxRepeat, "Maximum repeat calibration.")
+	fs.IntVar(&cfg.MinWallRepeat, "min-wall-repeat", cfg.MinWallRepeat, "Minimum wall repeat count.")
+	fs.StringVar(&cfg.TimeSource, "time-source", cfg.TimeSource, "Time source: auto, script, or wall.")
+	fs.BoolVar(&cfg.NoWallFallback, "no-wall-fallback", cfg.NoWallFallback, "Disable wall fallback.")
+	fs.BoolVar(&allowWallTime, "allow-wall-time", false, "Allow wall fallback for strict compatibility.")
+	fs.BoolVar(&cfg.NoLuaJIT, "no-luajit", false, "Skip LuaJIT.")
+	fs.BoolVar(&cfg.AllGroups, "all-groups", false, "Run all groups.")
+	fs.BoolVar(&cfg.DryRun, "dry-run", false, "Write selected benchmark metadata without running commands.")
+	fs.BoolVar(&sameWorkload, "same-workload", false, "Accepted for timing_compare compatibility.")
+	fs.IntVar(&cfg.Jobs, "jobs", cfg.Jobs, "Parallel jobs. Accepted for compatibility; execution remains deterministic.")
+	fs.StringVar(&cfg.JSONPath, "json", "", "JSON report path.")
+	fs.StringVar(&cfg.MarkdownPath, "markdown", "", "Markdown report path.")
+	fs.StringVar(&cfg.HeadRef, "head-ref", "", "HEAD/reference name for current-vs-old comparison.")
+	fs.BoolVar(&cfg.Progress, "progress", false, "Print progress.")
+	fs.StringVar(&cfg.Sort, "sort", cfg.Sort, "Sort order. Accepted for compatibility.")
+	fs.StringVar(&cfg.ScaleProfile, "scale-profile", "", "Scale profile. Accepted for compatibility.")
+	fs.Var((*benchStringList)(&cfg.Scale), "scale", "Scale override. Accepted for compatibility.")
+	fs.Var((*benchStringList)(&cfg.Scale), "param", "Scale override alias. Accepted for compatibility.")
+	fs.Var(&repeatOverrides, "repeat", "Repeat override. Accepted for strict compatibility.")
+	fs.IntVar(&cfg.Runs, "measured", cfg.Runs, "Measured runs alias for strict compatibility.")
+	fs.Float64Var(&suspiciousVMSpeedup, "suspicious-vm-speedup", 2.0, "Accepted for strict compatibility.")
+	fs.Float64Var(&suspiciousLuaJITRatio, "suspicious-luajit-ratio", 0.75, "Accepted for strict compatibility.")
+	fs.Float64Var(&relatedConfirmRatio, "related-confirm-ratio", 0.95, "Accepted for strict compatibility.")
+	if err := fs.Parse(args); err != nil {
+		return cfg, err
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(errw, "leia bench %s: unexpected argument %q\n", mode, fs.Arg(0))
+		return cfg, flag.ErrHelp
+	}
+	_ = sameWorkload
+	_ = suspiciousVMSpeedup
+	_ = suspiciousLuaJITRatio
+	_ = relatedConfirmRatio
+	if allowWallTime {
+		cfg.NoWallFallback = false
+	}
+	if len(repeatOverrides) > 0 {
+		cfg.Scale = append(cfg.Scale, repeatOverrides...)
+	}
+	if len(explicitGroups) > 0 {
+		cfg.Groups = append([]string(nil), explicitGroups...)
+	}
+	if len(explicitModes) > 0 {
+		cfg.Modes = append([]string(nil), explicitModes...)
+	} else {
+		cfg.Modes = append([]string(nil), defaultModes...)
+	}
+	if cfg.AllGroups {
+		cfg.Groups = append([]string(nil), benchdisc.DomainGroups...)
+	}
+	if len(cfg.Groups) == 0 {
+		cfg.Groups = append([]string(nil), benchdisc.DomainGroups...)
+	}
+	for _, runMode := range cfg.Modes {
+		if runMode != "vm" && runMode != "default" && runMode != "no_filter" && runMode != "luajit" {
+			return cfg, fmt.Errorf("unknown --mode %q", runMode)
+		}
+	}
+	if cfg.Runs < 1 {
+		cfg.Runs = 1
+	}
+	if cfg.MaxRepeat < 1 {
+		cfg.MaxRepeat = 1
+	}
+	timeout, err := parseBenchGoTimeout(cfg.TimeoutRaw)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Timeout = timeout
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 60 * time.Second
+	}
+	if cfg.TimeSource != "auto" && cfg.TimeSource != "script" && cfg.TimeSource != "wall" {
+		return cfg, fmt.Errorf("unknown --time-source %q", cfg.TimeSource)
+	}
+	return cfg, nil
+}
+
+func parseBenchGoTimeout(raw string) (time.Duration, error) {
+	if raw == "" {
+		return 60 * time.Second, nil
+	}
+	if duration, err := time.ParseDuration(raw); err == nil {
+		return duration, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --timeout %q", raw)
+	}
+	return time.Duration(value * float64(time.Second)), nil
+}
+
+type benchStringList []string
+
+func (l *benchStringList) String() string { return strings.Join(*l, ",") }
+func (l *benchStringList) Set(value string) error {
+	*l = append(*l, value)
+	return nil
+}
+
+func runBenchGoSubject(subject, runMode, root, leiaBin, luajitBin string, spec benchdisc.Benchmark, cfg benchGoHarnessConfig) benchGoSubjectResult {
+	if cfg.DryRun {
+		return benchGoSubjectResult{Subject: subject, Mode: runMode, Status: "dry_run", Repeat: 1, Note: "dry run"}
+	}
+	modeForCommand := runMode
+	if subject == "luajit" {
+		modeForCommand = "luajit"
+	}
+	cmd, err := benchBenchmarkModeCommand(modeForCommand, leiaBin, spec.Leia, luajitBin, spec.LuaJIT)
+	if err != nil {
+		return benchGoSubjectResult{Subject: subject, Mode: runMode, Status: "error", Repeat: 1, Note: err.Error()}
+	}
+	if cmd.Unavailable != "" {
+		return benchGoSubjectResult{Subject: subject, Mode: runMode, Status: cmd.Unavailable, Repeat: 1, Note: "input unavailable"}
+	}
+	timeSource := cfg.TimeSource
+	if timeSource == "auto" && spec.Group == "concurrency" {
+		timeSource = "wall"
+	}
+	repeat, calibration := calibrateBenchGoRepeat(cmd, cfg, timeSource)
+	for i := 0; i < cfg.Warmup; i++ {
+		_ = runBenchGoSample(cmd, repeat, cfg, timeSource)
+	}
+	samples := []benchGoSample{calibration}
+	if cfg.Runs > 0 {
+		samples = samples[:0]
+	}
+	for i := 0; i < cfg.Runs; i++ {
+		samples = append(samples, runBenchGoSample(cmd, repeat, cfg, timeSource))
+	}
+	return summarizeBenchGoSubject(subject, runMode, samples, repeat)
+}
+
+func calibrateBenchGoRepeat(cmd benchModeCommand, cfg benchGoHarnessConfig, timeSource string) (int, benchGoSample) {
+	repeat := 1
+	last := benchGoSample{Status: "missing", Repeat: repeat}
+	for repeat <= cfg.MaxRepeat {
+		last = runBenchGoSample(cmd, repeat, cfg, timeSource)
+		if benchGoSampleBigEnough(last, cfg.MinSampleSeconds, cfg.MinWallRepeat) || last.Status == "error" || last.Status == "timeout" || last.Status == "no_time" {
+			return repeat, last
+		}
+		repeat *= 2
+	}
+	return cfg.MaxRepeat, last
+}
+
+func runBenchGoSample(cmd benchModeCommand, repeat int, cfg benchGoHarnessConfig, timeSource string) benchGoSample {
+	var scriptTotal float64
+	var wallTotal float64
+	var badStatus string
+	var noTime bool
+	var t2Attempted, t2Entered, t2Failed, exitTotal int
+	for i := 0; i < repeat; i++ {
+		run := benchRunTextCommand(cmd.Args, cfg.Timeout, cmd.Env)
+		wallTotal += run.WallSeconds
+		if run.Status != "ok" {
+			badStatus = run.Status
+		}
+		seconds := benchParseTime(run.Output)
+		if run.Status == "ok" && seconds == nil {
+			noTime = true
+		}
+		if seconds != nil {
+			scriptTotal += *seconds
+		}
+		t2Attempted += benchParseCounter(benchT2AttemptedRE, run.Output)
+		t2Entered += benchParseCounter(benchT2EnteredRE, run.Output)
+		t2Failed += benchParseCounter(benchT2FailedRE, run.Output)
+		exitTotal += benchParseCounter(benchExitTotalRE, run.Output)
+	}
+	_ = t2Attempted
+	_ = t2Entered
+	_ = t2Failed
+	_ = exitTotal
+	if badStatus != "" {
+		return benchGoSample{Status: badStatus, Repeat: repeat, WallTotalSeconds: wallTotal, Note: fmt.Sprintf("%d repeated command(s) include failure", repeat)}
+	}
+	if timeSource == "wall" {
+		seconds := wallTotal / float64(repeat)
+		return benchGoSample{Status: "ok", Seconds: &seconds, Repeat: repeat, Source: "wall_hr", WallTotalSeconds: wallTotal, Note: "used command wall time"}
+	}
+	if noTime {
+		return benchGoSample{Status: "no_time", Repeat: repeat, WallTotalSeconds: wallTotal, Note: "no Time: line in command output"}
+	}
+	if scriptTotal > cfg.TimerResolution && scriptTotal >= cfg.MinSampleSeconds {
+		seconds := scriptTotal / float64(repeat)
+		total := scriptTotal
+		return benchGoSample{Status: "ok", Seconds: &seconds, Repeat: repeat, Source: "script_repeat", ScriptTotalSeconds: &total, WallTotalSeconds: wallTotal}
+	}
+	if !cfg.NoWallFallback && wallTotal >= cfg.MinSampleSeconds {
+		seconds := wallTotal / float64(repeat)
+		total := scriptTotal
+		return benchGoSample{Status: "ok", Seconds: &seconds, Repeat: repeat, Source: "wall_repeat", ScriptTotalSeconds: &total, WallTotalSeconds: wallTotal, Note: "script Time below resolution; used command wall time"}
+	}
+	total := scriptTotal
+	return benchGoSample{Status: "low_resolution", Repeat: repeat, ScriptTotalSeconds: &total, WallTotalSeconds: wallTotal, Note: "script Time below resolution"}
+}
+
+var (
+	benchT2AttemptedRE = regexp.MustCompile(`(?m)^\s*Tier 2 attempted:\s*([0-9]+)\b`)
+	benchT2EnteredRE   = regexp.MustCompile(`(?m)^\s*Tier 2 entered:\s*([0-9]+)\s+functions\b`)
+	benchT2FailedRE    = regexp.MustCompile(`(?m)^\s*Tier 2 failed:\s*([0-9]+)\s+functions\b`)
+	benchExitTotalRE   = regexp.MustCompile(`(?m)^\s*total exits:\s*([0-9]+)\b`)
+)
+
+func benchGoSampleBigEnough(sample benchGoSample, minSampleSeconds float64, minWallRepeat int) bool {
+	if sample.Status != "ok" {
+		return false
+	}
+	if sample.Source == "script_repeat" && sample.ScriptTotalSeconds != nil {
+		return *sample.ScriptTotalSeconds >= minSampleSeconds
+	}
+	if sample.Source == "wall_repeat" || sample.Source == "wall_hr" {
+		return sample.WallTotalSeconds >= minSampleSeconds && sample.Repeat >= minWallRepeat
+	}
+	return false
+}
+
+func summarizeBenchGoSubject(subject, runMode string, samples []benchGoSample, repeat int) benchGoSubjectResult {
+	values := []float64{}
+	sourceSet := map[string]bool{}
+	status := "missing"
+	for _, sample := range samples {
+		if sample.Status != "" {
+			status = sample.Status
+		}
+		if sample.Status == "ok" && sample.Seconds != nil {
+			values = append(values, *sample.Seconds)
+			if sample.Source != "" {
+				sourceSet[sample.Source] = true
+			}
+		}
+	}
+	if len(values) > 0 {
+		status = "ok"
+		if len(values) != len(samples) {
+			status = "partial"
+		}
+	}
+	sources := make([]string, 0, len(sourceSet))
+	for source := range sourceSet {
+		sources = append(sources, source)
+	}
+	sort.Strings(sources)
+	return benchGoSubjectResult{
+		Subject: subject,
+		Mode:    runMode,
+		Status:  status,
+		Repeat:  repeat,
+		Source:  strings.Join(sources, ","),
+		Stats:   benchGoComputeStats(values),
+		Samples: samples,
+	}
+}
+
+func benchGoComputeStats(values []float64) benchGoStats {
+	stats := benchGoStats{N: len(values)}
+	if len(values) == 0 {
+		return stats
+	}
+	sorted := append([]float64(nil), values...)
+	sort.Float64s(sorted)
+	median := sorted[len(sorted)/2]
+	if len(sorted)%2 == 0 {
+		median = (sorted[len(sorted)/2-1] + sorted[len(sorted)/2]) / 2
+	}
+	sum := 0.0
+	for _, value := range sorted {
+		sum += value
+	}
+	mean := sum / float64(len(sorted))
+	stdev := 0.0
+	if len(sorted) > 1 {
+		var variance float64
+		for _, value := range sorted {
+			d := value - mean
+			variance += d * d
+		}
+		stdev = math.Sqrt(variance / float64(len(sorted)-1))
+	}
+	cv := 0.0
+	if mean > 0 {
+		cv = stdev / mean * 100
+	}
+	stats.Median = &median
+	stats.Mean = &mean
+	stats.Min = &sorted[0]
+	stats.Max = &sorted[len(sorted)-1]
+	stats.Stdev = &stdev
+	stats.CVPct = &cv
+	return stats
+}
+
+func buildBenchGoReport(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult, durationSeconds float64) benchGoReport {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		item := map[string]any{
+			"benchmark": row.Benchmark,
+			"group":     row.Group,
+		}
+		if row.Base != "" {
+			item["base"] = row.Base
+		}
+		if cfg.Mode == "strict" {
+			item["modes"] = row.Strict
+		} else {
+			item["modes"] = row.Modes
+		}
+		results = append(results, item)
+	}
+	notes := []string{}
+	if cfg.HeadRef != "" && cfg.Mode == "compare" {
+		notes = append(notes, "--head-ref accepted; clean head snapshot execution is still pending in the Go harness")
+	}
+	if cfg.ScaleProfile != "" || len(cfg.Scale) > 0 {
+		notes = append(notes, "scale flags accepted for compatibility; source rewriting is still pending in the Go harness")
+	}
+	benchmarks := make([]string, 0, len(rows))
+	for _, row := range rows {
+		benchmarks = append(benchmarks, row.Group+"/"+row.Benchmark)
+	}
+	generated := time.Now().UTC().Format(time.RFC3339)
+	return benchGoReport{
+		SchemaVersion:    1,
+		Mode:             cfg.Mode,
+		Modes:            cfg.Modes,
+		Results:          results,
+		Timestamp:        generated,
+		GeneratedAt:      generated,
+		DurationSeconds:  durationSeconds,
+		HeadRef:          cfg.HeadRef,
+		Groups:           cfg.Groups,
+		Benchmarks:       benchmarks,
+		Runs:             cfg.Runs,
+		Warmup:           cfg.Warmup,
+		TimeoutSeconds:   cfg.Timeout.Seconds(),
+		MinSampleSeconds: cfg.MinSampleSeconds,
+		TimerResolution:  cfg.TimerResolution,
+		MaxRepeat:        cfg.MaxRepeat,
+		MinWallRepeat:    cfg.MinWallRepeat,
+		WallFallback:     !cfg.NoWallFallback,
+		TimeSource:       cfg.TimeSource,
+		ScaleProfile:     cfg.ScaleProfile,
+		Scale:            cfg.Scale,
+		Platform: map[string]string{
+			"go":      runtime.Version(),
+			"machine": runtime.GOARCH,
+			"system":  runtime.GOOS,
+		},
+		Notes: notes,
+	}
+}
+
+func writeBenchGoJSON(path string, report benchGoReport) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+func writeBenchGoMarkdown(path string, cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(benchGoMarkdown(cfg, rows)), 0o644)
+}
+
+func benchGoMarkdown(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Leia Bench %s Report\n\n", cfg.Mode)
+	if cfg.Mode == "strict" {
+		b.WriteString("| Benchmark | Mode | Status | Median | Source | Checksum |\n")
+		b.WriteString("| --- | --- | --- | ---: | --- | --- |\n")
+		for _, row := range rows {
+			for _, mode := range cfg.Modes {
+				subject := row.Strict[mode]
+				fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s |\n", row.Group, row.Benchmark, mode, subject.Status, benchGoSeconds(subject.Stats.Median), subject.Source, "ok")
+			}
+		}
+		return b.String()
+	}
+	b.WriteString("| Benchmark | Mode | Current | HEAD | LuaJIT | Source |\n")
+	b.WriteString("| --- | --- | ---: | ---: | ---: | --- |\n")
+	for _, row := range rows {
+		for _, mode := range cfg.Modes {
+			modeRow := row.Modes[mode]
+			current := modeRow["current"]
+			head := modeRow["head"]
+			luajit := modeRow["luajit"]
+			fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s |\n", row.Group, row.Benchmark, mode, benchGoSeconds(current.Stats.Median), benchGoSeconds(head.Stats.Median), benchGoSeconds(luajit.Stats.Median), current.Source)
+		}
+	}
+	return b.String()
+}
+
+func benchGoSeconds(value *float64) string {
+	if value == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.6fs", *value)
+}
+
+func appendNote(existing, note string) string {
+	if existing == "" {
+		return note
+	}
+	return existing + "; " + note
+}
+
+func findExecutable(name string) string {
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		candidate := filepath.Join(dir, name)
+		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			return candidate
+		}
+	}
+	return ""
+}

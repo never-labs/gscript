@@ -35,11 +35,11 @@ The Tier 2 optimizer uses a **module registry** pattern. Each optimization domai
 # Full bench suite (VM / JIT / LuaJIT)
 bash benchmarks/run_all.sh [--runs=N]
 
-# Statistical regression guard with checksum + CV; covers suite + extended + variants
-python3 benchmarks/strict_guard.py [--bench <suite>/<name>] [--runs N]
+# Statistical regression guard with checksum + CV.
+go run ./cmd/leia bench strict [--bench <suite>/<name>] [--runs N]
 
 # Current vs HEAD vs LuaJIT timing comparison
-python3 benchmarks/timing_compare.py --all-groups [--runs N] [--sort=luajit-gap]
+go run ./cmd/leia bench compare --all-groups [--runs N] [--sort=luajit-gap]
 
 # Production-parity Tier 2 IR/asm dump
 bash scripts/diag.sh <bench>            # bare name searched suite→extended→variants

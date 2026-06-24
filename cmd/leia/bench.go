@@ -17,10 +17,14 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 		return runManifestCheckRoots([]string{"benchmarks"}, outw, errw)
 	}
 	if len(args) == 0 {
-		return runBenchHarness("compare", []string{"--bench", "control/sieve", "--runs", "1", "--warmup", "0", "--timeout", "60"}, outw, errw)
+		return runBenchCompareCommand([]string{"--bench", "control/sieve", "--runs", "1", "--warmup", "0", "--timeout", "60"}, outw, errw)
 	}
 	if profileMode, profileArgs, rest, ok := benchProfileArgs(args); ok {
-		return runBenchHarness(profileMode, append(profileArgs, rest...), outw, errw)
+		harnessArgs := append(profileArgs, rest...)
+		if profileMode == "strict" {
+			return runBenchStrictCommand(harnessArgs, outw, errw)
+		}
+		return runBenchCompareCommand(harnessArgs, outw, errw)
 	}
 	mode := args[0]
 	harnessArgs := args[1:]
@@ -38,6 +42,10 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 		if profileMode, profileArgs, rest, ok := benchProfileArgs(harnessArgs); ok && profileMode == "compare" {
 			harnessArgs = append(profileArgs, rest...)
 		}
+		return runBenchCompareCommand(harnessArgs, outw, errw)
+	}
+	if mode == "strict" {
+		return runBenchStrictCommand(harnessArgs, outw, errw)
 	}
 	if mode == "audit" {
 		return runBenchAuditCommand(harnessArgs, outw, errw)
@@ -47,6 +55,9 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	}
 	if mode == "debug-artifact" {
 		return runBenchDebugArtifactCommand(harnessArgs, outw, errw)
+	}
+	if mode == "gate-validate" {
+		return runBenchGateValidateCommand(harnessArgs, outw, errw)
 	}
 	if mode == "coverage" {
 		return runBenchCoverageCommand(harnessArgs, outw, errw)
@@ -170,7 +181,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "q-suite", "q-columnar", "q-general", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "gate-validate", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "q-suite", "q-columnar", "q-general", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
 		return false
 	default:
 		return true
@@ -179,20 +190,14 @@ func isBenchmarkSelector(arg string) bool {
 
 func benchScriptForMode(mode string) (string, error) {
 	switch mode {
-	case "compare":
-		return "timing_compare.py", nil
-	case "strict":
-		return "strict_guard.py", nil
 	case "diagnose":
 		return "diagnose.py", nil
 	case "triage":
 		return "triage.py", nil
-	case "q-report", "report":
-		return "q_perf_report.py", nil
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-columnar, q-general, q-report, audit, rank-luajit-gaps, debug-artifact, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-columnar, q-general, q-report, audit, rank-luajit-gaps, debug-artifact, gate-validate, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
 	}
 }
 

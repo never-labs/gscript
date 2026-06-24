@@ -392,221 +392,12 @@ print_validate_json_report() {
 
 validate_artifact() {
     local json_path="$1"
-    python3 - "$json_path" "$THRESHOLD" "$WALL_THRESHOLD" <<'PY'
-import json
-import math
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-threshold = float(sys.argv[2])
-wall_threshold = float(sys.argv[3])
-
-payload = json.loads(path.read_text())
-rows = payload.get("results")
-if not isinstance(rows, list):
-    print("performance gate: JSON artifact has no list-valued results", file=sys.stderr)
-    sys.exit(2)
-
-
-def subject(row, mode, name):
-    modes = row.get("modes")
-    if not isinstance(modes, dict):
-        return {}
-    mode_row = modes.get(mode)
-    if not isinstance(mode_row, dict):
-        return {}
-    value = mode_row.get(name)
-    return value if isinstance(value, dict) else {}
-
-
-def seconds(item):
-    stats = item.get("stats")
-    if isinstance(stats, dict) and isinstance(stats.get("median"), (int, float)):
-        return float(stats["median"])
-    if isinstance(item.get("seconds"), (int, float)):
-        return float(item["seconds"])
-    return None
-
-
-def source(item):
-    return str(item.get("source") or "")
-
-
-def status(item):
-    return str(item.get("status") or "missing")
-
-
-def is_wall(src):
-    parts = {part.strip() for part in src.split(",") if part.strip()}
-    return bool(parts & {"wall_repeat", "wall_hr"})
-
-
-def cv(item):
-    stats = item.get("stats")
-    if isinstance(stats, dict) and isinstance(stats.get("cv_pct"), (int, float)):
-        return float(stats["cv_pct"])
-    return None
-
-
-ranked = []
-violations = []
-unreliable = []
-
-for raw in rows:
-    if not isinstance(raw, dict):
-        continue
-    group = str(raw.get("group") or "")
-    bench = str(raw.get("benchmark") or "")
-    name = f"{group}/{bench}" if group else bench
-    modes = payload.get("modes") if isinstance(payload.get("modes"), list) else ["default"]
-    for mode in modes:
-        cur = subject(raw, mode, "current")
-        head = subject(raw, mode, "head")
-        cur_s = seconds(cur)
-        head_s = seconds(head)
-        cur_status = status(cur)
-        head_status = status(head)
-        cur_source = source(cur)
-        head_source = source(head)
-        ratio = None
-        change = None
-        comparable = cur_s is not None and head_s is not None and head_s > 0
-        if comparable:
-            ratio = cur_s / head_s
-            change = ratio - 1.0
-
-        note = []
-        if cur_status == "low_resolution" or head_status == "low_resolution":
-            note.append("low_resolution")
-            unreliable.append((name, mode, cur_status, head_status, cur_source, head_source))
-        elif cur_status in {"ok", "partial"} and head_status == "missing" and head_s is None:
-            note.append("current_only_new_benchmark")
-        elif cur_status not in {"ok", "partial"} or head_status not in {"ok", "partial"}:
-            note.append(f"status={cur_status}/{head_status}")
-            unreliable.append((name, mode, cur_status, head_status, cur_source, head_source))
-
-        wall = is_wall(cur_source) or is_wall(head_source)
-        if wall:
-            note.append("wall_timed_startup_noise")
-
-        if comparable and not note:
-            if change is not None and change > threshold:
-                violations.append(("regression", name, mode, change, threshold, cur_s, head_s, cur_source, head_source))
-        elif comparable and wall and cur_status in {"ok", "partial"} and head_status in {"ok", "partial"}:
-            if change is not None and change > wall_threshold:
-                violations.append(("wall_regression", name, mode, change, wall_threshold, cur_s, head_s, cur_source, head_source))
-
-        ranked.append(
-            {
-                "name": name,
-                "mode": mode,
-                "current": cur_s,
-                "head": head_s,
-                "change": change,
-                "current_status": cur_status,
-                "head_status": head_status,
-                "current_source": cur_source,
-                "head_source": head_source,
-                "current_cv": cv(cur),
-                "note": ",".join(note) if note else "-",
-            }
-        )
-
-
-def fmt_seconds(value):
-    return "-" if value is None else f"{value:.6f}s"
-
-
-def fmt_change(value):
-    return "-" if value is None or math.isnan(value) else f"{value * 100:+.2f}%"
-
-
-def fmt_pct(value):
-    return "-" if value is None else f"{value:.2f}%"
-
-
-ranked.sort(key=lambda row: row["change"] if row["change"] is not None else -999.0, reverse=True)
-print("Performance gate current/HEAD ranking:")
-print("Benchmark                          Mode      Current      HEAD       Change    CV cur   Status        Source                 Note")
-print("-------------------------------------------------------------------------------------------------------------------------------")
-for row in ranked:
-    print(
-        f"{row['name']:<34} {row['mode']:<9} "
-        f"{fmt_seconds(row['current']):>10} {fmt_seconds(row['head']):>10} "
-        f"{fmt_change(row['change']):>9} {fmt_pct(row['current_cv']):>8} "
-        f"{row['current_status'] + '/' + row['head_status']:<13} "
-        f"{row['current_source'] + '/' + row['head_source']:<22} "
-        f"{row['note']}"
-    )
-
-if violations:
-    print("\nPerformance gate violations:")
-    print("Kind             Benchmark                          Mode      Change     Limit")
-    print("----------------------------------------------------------------------------")
-    for kind, name, mode, change, limit, cur_s, head_s, cur_source, head_source in violations:
-        print(f"{kind:<16} {name:<34} {mode:<9} {change * 100:+8.2f}% {limit * 100:>7.2f}%")
-
-if unreliable:
-    print("\nUnreliable timing rows:")
-    print("Benchmark                          Mode      Current/HEAD status     Current/HEAD source")
-    print("----------------------------------------------------------------------------------------")
-    for name, mode, cur_status, head_status, cur_source, head_source in unreliable:
-        print(f"{name:<34} {mode:<9} {cur_status + '/' + head_status:<23} {cur_source + '/' + head_source}")
-
-if violations or unreliable:
-    sys.exit(1)
-print("\nPerformance gate passed.")
-PY
+    go run ./cmd/leia bench gate-validate --kind compare --threshold "$THRESHOLD" --wall-threshold "$WALL_THRESHOLD" "$json_path"
 }
 
 validate_strict_artifact() {
     local json_path="$1"
-    python3 - "$json_path" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-payload = json.loads(path.read_text())
-rows = payload.get("results")
-if not isinstance(rows, list):
-    print("strict gate: JSON artifact has no list-valued results", file=sys.stderr)
-    sys.exit(2)
-
-violations = []
-for raw in rows:
-    if not isinstance(raw, dict):
-        continue
-    group = str(raw.get("group") or "numeric")
-    bench = str(raw.get("benchmark") or "")
-    name = f"{group}/{bench}" if group and not bench.startswith(f"{group}/") else bench
-    modes = raw.get("modes")
-    if not isinstance(modes, dict):
-        violations.append((name, "-", "missing_modes", "-"))
-        continue
-    for mode in ("vm", "default", "no_filter"):
-        result = modes.get(mode)
-        if not isinstance(result, dict):
-            violations.append((name, mode, "missing", "-"))
-            continue
-        status = str(result.get("status") or "missing")
-        checksum = str(result.get("checksum_status") or "")
-        if status != "ok":
-            violations.append((name, mode, status, checksum or "-"))
-        elif checksum and checksum not in {"ok", "single"}:
-            violations.append((name, mode, status, checksum))
-
-if violations:
-    print("Strict gate violations:")
-    print("Benchmark                          Mode       Status           Checksum")
-    print("-----------------------------------------------------------------------")
-    for name, mode, status, checksum in violations:
-        print(f"{name:<34} {mode:<10} {status:<16} {checksum}")
-    sys.exit(1)
-
-print("Strict gate passed.")
-PY
+    go run ./cmd/leia bench gate-validate --kind strict "$json_path"
 }
 
 validate_luajit_artifact() {
@@ -653,18 +444,23 @@ fi
 mkdir -p "$OUT_DIR"
 
 if [ -z "$JOBS" ]; then
-    JOBS="$(python3 - "$MAX_JOBS" <<'PY'
-import os
-import sys
-
-try:
-    max_jobs = int(sys.argv[1])
-except (IndexError, ValueError):
-    max_jobs = 8
-max_jobs = max(1, max_jobs)
-print(max(1, min(max_jobs, os.cpu_count() or 1)))
-PY
-)"
+    cpu_count="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || printf '1')"
+    case "$cpu_count" in
+        ''|*[!0-9]*) cpu_count=1 ;;
+    esac
+    case "$MAX_JOBS" in
+        ''|*[!0-9]*) MAX_JOBS=8 ;;
+    esac
+    if [ "$MAX_JOBS" -lt 1 ]; then
+        MAX_JOBS=1
+    fi
+    if [ "$cpu_count" -lt 1 ]; then
+        cpu_count=1
+    fi
+    JOBS="$MAX_JOBS"
+    if [ "$cpu_count" -lt "$JOBS" ]; then
+        JOBS="$cpu_count"
+    fi
 fi
 
 TIMING_JSON="$OUT_DIR/timing_gate.json"
