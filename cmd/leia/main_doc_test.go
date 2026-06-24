@@ -246,11 +246,11 @@ func TestDocCheckDispatchesDocsScript(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if gotName != "bash" {
-		t.Fatalf("command = %q, want bash", gotName)
+	if !strings.HasSuffix(gotName, filepath.Join("scripts", "run.sh")) {
+		t.Fatalf("command = %q, want scripts/run.sh", gotName)
 	}
-	if len(gotArgs) != 1 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "docs_check.sh")) {
-		t.Fatalf("args = %#v, want scripts/docs_check.sh", gotArgs)
+	if len(gotArgs) != 1 || gotArgs[0] != "docs" {
+		t.Fatalf("args = %#v, want docs", gotArgs)
 	}
 	if !strings.Contains(stdout.String(), "doc helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())
@@ -274,11 +274,11 @@ func TestDocCheckJSONDispatchesDocsScriptWithJSON(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if gotName != "bash" {
-		t.Fatalf("command = %q, want bash", gotName)
+	if !strings.HasSuffix(gotName, filepath.Join("scripts", "run.sh")) {
+		t.Fatalf("command = %q, want scripts/run.sh", gotName)
 	}
-	if len(gotArgs) != 2 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "docs_check.sh")) || gotArgs[1] != "--json" {
-		t.Fatalf("args = %#v, want scripts/docs_check.sh --json", gotArgs)
+	if len(gotArgs) != 2 || gotArgs[0] != "docs" || gotArgs[1] != "--json" {
+		t.Fatalf("args = %#v, want docs --json", gotArgs)
 	}
 	if !strings.Contains(stdout.String(), "doc helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())

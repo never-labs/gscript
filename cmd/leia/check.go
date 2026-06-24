@@ -213,28 +213,28 @@ func runManifestCheckRoots(roots []string, outw, errw io.Writer) int {
 }
 
 func runDocsCheck(outw, errw io.Writer) int {
-	script, err := findScriptFromCWD(filepath.Join("scripts", "docs_check.sh"))
+	launcher, err := findScriptFromCWD(filepath.Join("scripts", "run.sh"))
 	if err != nil {
 		fmt.Fprintf(errw, "leia check: %v\n", err)
 		return 1
 	}
-	cmd := checkExecCommand("bash", script)
+	cmd := checkExecCommand(launcher, "docs")
 	cmd.Stdout = outw
 	cmd.Stderr = errw
-	cmd.Dir = filepath.Dir(filepath.Dir(script))
+	cmd.Dir = filepath.Dir(filepath.Dir(launcher))
 	return runExternalCommand(cmd, "leia check", errw)
 }
 
 func runEditorCheck(outw, errw io.Writer) int {
-	script, err := findScriptFromCWD(filepath.Join("scripts", "editor_check.sh"))
+	launcher, err := findScriptFromCWD(filepath.Join("scripts", "run.sh"))
 	if err != nil {
 		fmt.Fprintf(errw, "leia check: %v\n", err)
 		return 1
 	}
-	cmd := checkExecCommand("bash", script)
+	cmd := checkExecCommand(launcher, "editor")
 	cmd.Stdout = outw
 	cmd.Stderr = errw
-	cmd.Dir = filepath.Dir(filepath.Dir(script))
+	cmd.Dir = filepath.Dir(filepath.Dir(launcher))
 	return runExternalCommand(cmd, "leia check", errw)
 }
 

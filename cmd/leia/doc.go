@@ -187,19 +187,19 @@ func runDocCheckCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "usage: leia doc check [--json]")
 		return 2
 	}
-	script, err := findScriptFromCWD(filepath.Join("scripts", "docs_check.sh"))
+	launcher, err := findScriptFromCWD(filepath.Join("scripts", "run.sh"))
 	if err != nil {
 		fmt.Fprintf(errw, "leia doc check: %v\n", err)
 		return 1
 	}
-	cmdArgs := []string{script}
+	cmdArgs := []string{"docs"}
 	if *jsonOut {
 		cmdArgs = append(cmdArgs, "--json")
 	}
-	cmd := docExecCommand("bash", cmdArgs...)
+	cmd := docExecCommand(launcher, cmdArgs...)
 	cmd.Stdout = outw
 	cmd.Stderr = errw
-	cmd.Dir = filepath.Dir(filepath.Dir(script))
+	cmd.Dir = filepath.Dir(filepath.Dir(launcher))
 	return runExternalCommand(cmd, "leia doc check", errw)
 }
 
