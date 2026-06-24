@@ -31,7 +31,7 @@ builders or release tooling:
 go run ./cmd/leia doc generate --format json
 ```
 
-`scripts/docs_check.sh` compares the checked-in Markdown reference pages with
+`scripts/run.sh docs` compares the checked-in Markdown reference pages with
 the current generated output, so stale generated docs fail the docs gate.
 
 The public spec entrypoint `docs/spec/index.md` is a generated single-page

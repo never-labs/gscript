@@ -188,13 +188,13 @@ while IFS= read -r _; do
     markdown_files=$((markdown_files + 1))
 done < <({ printf '%s\n' README.md; find docs -type f -name '*.md' ! -path 'docs/archive/*'; } | sort)
 
-relative_documentation_links="$(rg -n '\]\([^)]*\.(md|html)(#[^)]*)?\)' README.md docs -g '*.md' | wc -l | tr -d ' ')"
-repository_script_code_block_mentions="$(rg -n 'scripts/(production_check|performance_gate|diagnostics_bundle|docs_check|editor_check|q_conformance_gate|public_release_blockers_check|release_notes_check|release_artifacts|release_artifacts_check|release_distribution_check|release_snapshot_install_check|site_check|worktree_audit)\.sh' README.md docs -g '*.md' | wc -l | tr -d ' ')"
+relative_documentation_links="$({ rg -n '\]\([^)]*\.(md|html)(#[^)]*)?\)' README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
+repository_script_code_block_mentions="$({ rg -n 'scripts/(production_check|performance_gate|diagnostics_bundle|docs_check|editor_check|q_conformance_gate|public_release_blockers_check|release_notes_check|release_artifacts|release_artifacts_check|release_distribution_check|release_snapshot_install_check|site_check|worktree_audit)\.sh' README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
 release_gate_docs=4
 reference_entrypoints="$(find docs/reference -mindepth 2 -maxdepth 2 -name index.md | wc -l | tr -d ' ')"
 examples_index_directories="$(find examples -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 examples_capability_drift_gates=3
-runnable_spec_examples="$(rg -n '^```leia (run|fail) all$' docs/spec -g '*.md' | wc -l | tr -d ' ')"
+runnable_spec_examples="$({ rg -n '^```leia (run|fail) all$' docs/spec -g '*.md' || true; } | wc -l | tr -d ' ')"
 
 if [ "$JSON" -eq 1 ]; then
     status="pass"

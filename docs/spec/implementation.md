@@ -97,7 +97,7 @@ Changes to stable runtime behavior require:
   affected;
 - release-matrix coverage for any changed stable spec section.
 
-Documentation release checks are enforced by `scripts/docs_check.sh`. That gate
+Documentation release checks are enforced by `scripts/run.sh docs`. That gate
 checks Markdown links, documented release-script references, release-readiness
 snippets, generated reference documentation, and generated spec HTML freshness.
 
@@ -109,7 +109,7 @@ Adding, removing, renaming, or changing the public behavior of a standard
 library module requires updating `internal/stdlib/catalog/catalog.go`,
 `docs/reference/stdlib/index.md`, and the corresponding stdlib tests. Generated
 stdlib documentation must remain reproducible by the docs generation command
-checked by `scripts/docs_check.sh`.
+checked by `scripts/run.sh docs`.
 
 Catalog metadata is part of the release surface. Module names, layers,
 capabilities, and safe-default classification must match the implementation and
@@ -126,7 +126,7 @@ code generation. Such a change requires correctness evidence and performance
 evidence. Benchmark output is not a substitute for semantic coverage.
 
 Performance-sensitive changes must use the repository performance gate relevant
-to the touched path. The repository provides `scripts/performance_gate.sh`,
+to the touched path. The repository provides `scripts/run.sh perf`,
 which wraps `go run ./cmd/leia bench compare` and `go run ./cmd/leia bench strict`.
 Release documentation also references `scripts/run.sh perf
 --feature-smoke` for feature-smoke performance evidence.

@@ -20,7 +20,7 @@ Machine-readable release evidence:
 
 ```bash
 go run ./cmd/leia capabilities --json
-bash scripts/diagnostics_bundle.sh --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
+scripts/run.sh diagnostics --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
@@ -32,8 +32,8 @@ scripts/run.sh public-blockers --json
 scripts/run.sh release-notes --json --version vX.Y.Z
 scripts/run.sh release-dist --json
 bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json
-bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json
-bash scripts/release_artifacts_check.sh --json --version vX.Y.Z
+scripts/run.sh release-artifacts --dry-run --version vX.Y.Z --json
+scripts/run.sh release-check --json --version vX.Y.Z
 ```
 
 `leia capabilities --json` includes `tooling.report_count` and
@@ -42,7 +42,7 @@ entry advertises `status_field`, `scalar_fields`, `count_fields`, and
 `collection_fields`, and `collection_item_fields` when the report exposes
 machine-readable release evidence. Nested fields use dotted JSON paths; `[]`
 marks per-item array paths.
-`scripts/production_check.sh --out-dir DIR` writes `plan.txt`, `plan.json`,
+`scripts/run.sh production --out-dir DIR` writes `plan.txt`, `plan.json`,
 and `commands.log` so the resolved release plan can be archived with both
 human-readable and machine-readable evidence. The JSON plan includes
 `output_dir` when an artifact directory is requested, plus
@@ -79,14 +79,14 @@ The release evidence should cite:
 - `docs/reference/diagnostics/index.md`
 - `examples/README.md`
 - `docs/release/decisions.md`
-- `scripts/public_release_blockers_check.sh`
+- `scripts/run.sh public-blockers`
 
 Before a public tag, update install instructions, examples, compatibility
 notes, known issues, benchmark caveats, and security notes.
 
 Use [`decisions.md`](decisions.md) to record maintainer decisions that cannot
 be inferred from tests, local release evidence, or implementation defaults.
-`scripts/public_release_blockers_check.sh` reports each unresolved release
+`scripts/run.sh public-blockers` reports each unresolved release
 decision with its area and the short action recorded in that table.
 Its JSON report includes `blocker_count` plus kind-specific counts:
 `missing_file_count`, `release_decision_count`, `stale_text_count`,
@@ -118,7 +118,7 @@ Release archives must include both executables:
 
 `scripts/install.sh --dry-run --json` reports `install_entries` so automation
 can map each executable role to the exact install path.
-`scripts/release_artifacts.sh --dry-run --json` reports `artifact_entries` for
+`scripts/run.sh release-artifacts --dry-run --json` reports `artifact_entries` for
 the same role/name/path mapping before files are written.
 
 Use [`notes-template.md`](notes-template.md) for release candidates and public
@@ -128,7 +128,7 @@ recorded consistently and can be passed to GoReleaser.
 
 ## Release-Critical Gates
 
-`scripts/production_check.sh --full --release-profile` treats these gates as
+`scripts/run.sh production --full --release-profile` treats these gates as
 release-critical:
 
 | Gate | Evidence |
@@ -151,19 +151,19 @@ release-critical:
 | Release Notes | Candidate notes for the tag, including all archive targets and checksums. |
 | Release Artifacts | Local artifact build, tag, cleanliness, and install archive checks. |
 
-`scripts/release_distribution_check.sh --json` reports
+`scripts/run.sh release-dist --json` reports
 `failure_kind_count`, `failure_count`, `workflow_count`, and
 `install_target_count`. Its `install_target_details` field splits each target
 into `goos` and `goarch`, and its `failure_kinds` and `failure_details` fields
 make missing workflow, install-plan, fixture, and local tool failures
 machine-readable.
-`scripts/release_artifacts_check.sh --json` uses the same failure fields for
+`scripts/run.sh release-check --json` uses the same failure fields for
 version, tag, clean-worktree, checksum, artifact, and local install failures,
 and reports `artifact_entries` for the verified release artifact roles.
 `scripts/run.sh release-snapshot --json` verifies the GoReleaser
 snapshot archive through `scripts/install.sh` with a staged local `file://`
 release directory.
-`scripts/arch_check.sh --json` reports methodjit source/test size,
+`scripts/run.sh arch --json` reports methodjit source/test size,
 `large_file_details`, `debt_marker_details`, and `missing_test_files` so
 architecture debt is visible to release dashboards.
 `scripts/run.sh site --json` reports rendered-site HTML, local link, asset,
