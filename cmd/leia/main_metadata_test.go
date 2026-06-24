@@ -229,7 +229,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		"scripts/run.sh release-dist --json",
 		"scripts/run.sh release-notes --json",
 		"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json",
-		"scripts/run.sh site --json",
+		"scripts/run.sh site --site-dir SITE_DIR --json",
 		"scripts/run.sh worktree --json",
 	} {
 		if !capabilitiesHaveReport(caps.Tooling.Reports, want) {
@@ -254,6 +254,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 	}{
 		{"scripts/run.sh perf --validate-only FILE --json", []string{"FILE"}},
 		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", []string{"DIST_DIR", "BIN_DIR"}},
+		{"scripts/run.sh site --site-dir SITE_DIR --json", []string{"SITE_DIR"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		if report == nil || !report.Template {
@@ -281,7 +282,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/run.sh release-dist --json", []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}},
 		{"scripts/run.sh release-notes --json", []string{"require_ready", "version"}},
 		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", []string{"dist_dir", "goos", "goarch", "archive", "archive_name", "snapshot_version", "installer_version", "staged_asset", "staged_release_dir", "bin_dir"}},
-		{"scripts/run.sh site --json", []string{"site_dir"}},
+		{"scripts/run.sh site --site-dir SITE_DIR --json", []string{"site_dir"}},
 		{"scripts/run.sh worktree --json", []string{"fail_on_findings"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
@@ -345,8 +346,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/run.sh release-notes --json", "required_artifact_details"},
 		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", "installed_paths"},
 		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", "failure_details"},
-		{"scripts/run.sh site --json", "failure_kinds"},
-		{"scripts/run.sh site --json", "failure_details"},
+		{"scripts/run.sh site --site-dir SITE_DIR --json", "failure_kinds"},
+		{"scripts/run.sh site --site-dir SITE_DIR --json", "failure_details"},
 		{"scripts/run.sh worktree --json", "finding_statuses"},
 		{"scripts/run.sh worktree --json", "findings"},
 	} {
@@ -454,7 +455,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/run.sh release-dist --json", []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}},
 		{"scripts/run.sh release-notes --json", []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}},
 		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", []string{"install_count", "failure_kind_count", "failure_count"}},
-		{"scripts/run.sh site --json", []string{"html_file_count", "local_link_count", "asset_ref_count", "fragment_check_count", "failure_kind_count", "failure_count"}},
+		{"scripts/run.sh site --site-dir SITE_DIR --json", []string{"html_file_count", "local_link_count", "asset_ref_count", "fragment_check_count", "failure_kind_count", "failure_count"}},
 		{"scripts/run.sh worktree --json", []string{"finding_count", "finding_status_count"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)

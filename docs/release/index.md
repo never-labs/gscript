@@ -169,8 +169,9 @@ dashboards. `pass_pipeline_line_count` and `missing_test_count` are kept as
 compatibility aliases for `tiering_manager_mention_count` and
 `same_name_test_gap_count`; the latter is a mechanical same-name test-file
 signal, not a coverage percentage.
-`scripts/run.sh site --json` reports rendered-site HTML, local link, asset,
-fragment-anchor, and failure details after the GitHub Pages build.
+`scripts/run.sh site --site-dir SITE_DIR --json` reports rendered-site HTML,
+local link, asset, fragment-anchor, and failure details after the GitHub Pages
+build; `SITE_DIR` is the rendered site directory, such as `_site`.
 
 ## Release Compatibility Checklist
 
