@@ -25,8 +25,10 @@ Tasks:
   release-dist         Check release distribution config
   release-notes        Check release notes evidence
   release-notes-gate   Run release notes gate with release-profile defaults
+  release-smoke        Run release-profile smoke checks
   release-snapshot     Verify a snapshot archive through the installer
   site                 Check rendered static site output
+  cli-experience       Run CLI experience checks
   worktree             Audit git worktrees
 
 Bootstrap-only entrypoints stay outside this launcher:
@@ -225,6 +227,71 @@ USAGE
   run_shell_task scripts/release_notes_check.sh "${args[@]}"
 }
 
+run_release_smoke_task() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh release-smoke [SMOKE_SCRIPT]
+
+Runs release-profile smoke checks: direct script execution, JIT execution, and
+bytecode inspection.
+USAGE
+    return
+  fi
+  local smoke_script="${1:-tests/smoke/01_basic.leia}"
+  if [ ! -f "$smoke_script" ]; then
+    echo "scripts/run.sh release-smoke: missing $smoke_script" >&2
+    exit 1
+  fi
+  if [ ! -f benchmarks/table/table_field_access.leia ]; then
+    echo "scripts/run.sh release-smoke: missing benchmarks/table/table_field_access.leia" >&2
+    exit 1
+  fi
+  go run ./cmd/leia "$smoke_script"
+  go run ./cmd/leia -jit benchmarks/table/table_field_access.leia
+  go run ./cmd/leia inspect bytecode "$smoke_script"
+}
+
+run_cli_experience_task() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh cli-experience [SMOKE_SCRIPT]
+
+Runs user-facing CLI checks covering run, test, check, examples, evaluate,
+module setup, and playground help.
+USAGE
+    return
+  fi
+  local smoke_script="${1:-tests/smoke/01_basic.leia}"
+  if [ ! -f "$smoke_script" ]; then
+    echo "scripts/run.sh cli-experience: missing $smoke_script" >&2
+    exit 1
+  fi
+  local required=(
+    examples/hello/fib.leia
+    examples/hello/types_demo.leia
+    examples/hello/dialects.leia
+    examples/evaluate/basic_assert.leia
+  )
+  local path
+  for path in "${required[@]}"; do
+    if [ ! -f "$path" ]; then
+      echo "scripts/run.sh cli-experience: missing $path" >&2
+      exit 1
+    fi
+  done
+  local cli_tmp
+  cli_tmp="$(mktemp -d "${TMPDIR:-/tmp}/leia-cli-experience.XXXXXX")"
+  trap 'rm -rf "$cli_tmp"' RETURN
+  go run ./cmd/leia run "$smoke_script"
+  go run ./cmd/leia test "$smoke_script"
+  go run ./cmd/leia check --quick "$smoke_script"
+  go run ./cmd/leia examples check --jobs=6 examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia
+  go run ./cmd/leia evaluate --json examples/evaluate/basic_assert.leia
+  go run ./cmd/leia mod init --module example.com/cli-experience --dir "$cli_tmp"
+  go run ./cmd/leia mod check --json "$cli_tmp"
+  go run ./cmd/leia playground --help
+}
+
 case "$task" in
   -h|--help|help)
     usage
@@ -277,11 +344,17 @@ case "$task" in
   release-notes-gate)
     run_release_notes_gate_task "$@"
     ;;
+  release-smoke)
+    run_release_smoke_task "$@"
+    ;;
   release-snapshot|release-snapshot-install|release-snapshot-install-check)
     run_shell_task scripts/release_snapshot_install_check.sh "$@"
     ;;
   site|site-check)
     run_shell_task scripts/site_check.sh "$@"
+    ;;
+  cli-experience)
+    run_cli_experience_task "$@"
     ;;
   worktree|worktree-audit)
     run_shell_task scripts/worktree_audit.sh "$@"

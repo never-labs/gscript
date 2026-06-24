@@ -985,14 +985,7 @@ func TestReleaseMatrixReadmeCLIExperienceCommandsHaveEvidence(t *testing.T) {
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
 	for _, want := range []string{
 		"CLI Experience",
-		"go run ./cmd/leia run tests/smoke/01_basic.leia",
-		"go run ./cmd/leia test tests/smoke/01_basic.leia",
-		"go run ./cmd/leia check --quick tests/smoke/01_basic.leia",
-		"go run ./cmd/leia examples check --jobs=6 examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia",
-		"go run ./cmd/leia evaluate --json examples/evaluate/basic_assert.leia",
-		"go run ./cmd/leia mod init --module example.com/cli-experience",
-		"go run ./cmd/leia mod check --json",
-		"go run ./cmd/leia playground --help",
+		"scripts/run.sh cli-experience",
 	} {
 		if !strings.Contains(productionOut, want) {
 			t.Fatalf("production_check.sh --full --list must keep README CLI experience gate %q; got:\n%s", want, productionOut)
@@ -3015,6 +3008,8 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		"Release Distribution":    "scripts/run.sh release-dist --require-goreleaser",
 		"Release Notes":           "scripts/run.sh release-notes-gate --version \"vX.Y.Z\"",
 		"Release Artifacts":       "scripts/run.sh release-artifacts-gate",
+		"Release Smoke":           "scripts/run.sh release-smoke",
+		"CLI Experience":          "scripts/run.sh cli-experience",
 		"Q Performance Gate":      "scripts/run.sh q-perf",
 	} {
 		if !strings.Contains(commands[name], want) {
