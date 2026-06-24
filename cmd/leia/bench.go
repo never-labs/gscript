@@ -66,6 +66,9 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "regression-guard" {
 		return runBenchRegressionGuardCommand(harnessArgs, outw, errw)
 	}
+	if mode == "q-report" || mode == "report" {
+		return runBenchQReportCommand(harnessArgs, outw, errw)
+	}
 	if mode == "q-suite" {
 		return runBenchShellScript("q_performance_suite.sh", harnessArgs, outw, errw)
 	}

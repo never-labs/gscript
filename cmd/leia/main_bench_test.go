@@ -224,23 +224,110 @@ func TestBenchCommandDispatchesTriageHarness(t *testing.T) {
 	}
 }
 
-func TestBenchCommandDispatchesQReportHarness(t *testing.T) {
+func TestBenchCommandRunsGoQReportFromOutput(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
-	var gotArgs []string
 	benchExecCommand = func(name string, args ...string) *exec.Cmd {
-		gotArgs = append([]string(nil), args...)
-		helper, helperArgs := testHelperCommand(t, "bench")
-		return exec.Command(helper, helperArgs...)
+		t.Fatalf("q-report --from-output invoked external command %s %#v", name, args)
+		return exec.Command("false")
 	}
 
+	dir := t.TempDir()
+	input := filepath.Join(dir, "qbench.txt")
+	if err := os.WriteFile(input, []byte(strings.TrimSpace(`
+BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject-16    100  1000 ns/op  8192 input_rows/s  200 B/op  3 allocs/op  99.0 kernel_hit_pct  0 fallbacks/op
+BenchmarkQSQLNativeGoSelectWhereProject-16               100  2000 ns/op  8192 input_rows/s  100 B/op  1 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/MaskWhere-16    100  2000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/MaskWhere-16              100  1000 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalJITScriptWarm/MaskWhere-16                 100  1500 ns/op  128 B/op  4 allocs/op  1 q_session_planned_op_exit/op  0 q_session_shell_fallback/op  0 q_session_eval_errors/op  1 q_session_backend_shapes
+`)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	jsonPath := filepath.Join(dir, "q-report.json")
+	mdPath := filepath.Join(dir, "q-report.md")
+
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"q-report", "--from-output", "/tmp/q.txt", "--check"}, &stdout, &stderr)
+	code := runBenchCommand([]string{"q-report", "--from-output", input, "--json", jsonPath, "--markdown", mdPath}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "q_perf_report.py")) || gotArgs[1] != "--from-output" || gotArgs[2] != "/tmp/q.txt" || gotArgs[3] != "--check" {
-		t.Fatalf("args = %#v, want q_perf_report.py --from-output /tmp/q.txt --check", gotArgs)
+	if !strings.Contains(stdout.String(), "wrote "+mdPath) || !strings.Contains(stdout.String(), "wrote "+jsonPath) {
+		t.Fatalf("stdout = %q, want written report paths", stdout.String())
+	}
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("q-report JSON failed to decode: %v\n%s", err, string(data))
+	}
+	benchmarks := payload["benchmarks"].(map[string]any)
+	if _, ok := benchmarks["BenchmarkQSessionEvalVectorWarmExecution/MaskWhere"]; !ok {
+		t.Fatalf("benchmarks keys = %#v, want parsed q.eval row", benchmarks)
+	}
+	runtimeMetrics := payload["runtime_metrics"].([]any)
+	if len(runtimeMetrics) == 0 || runtimeMetrics[0].(map[string]any)["data_runtime_hit_pct"] != nil {
+		t.Fatalf("runtime metrics = %#v, want custom metric schema with nil missing values", runtimeMetrics)
+	}
+	markdown, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "q Performance Completeness Report") {
+		t.Fatalf("markdown = %q, want q report title", string(markdown))
+	}
+}
+
+func TestBenchQReportCheckFailsObviousRuntimeRegression(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "qbench.txt")
+	if err := os.WriteFile(input, []byte(strings.TrimSpace(`
+BenchmarkQSessionEvalVectorWarmExecution/FallbackShape-16    100  9000 ns/op  2048 B/op  90 allocs/op  80.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  0.8 typed_kernel_hits/op  0.2 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  1 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/FallbackShape-16              100  1000 ns/op  0 B/op  0 allocs/op
+`)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	jsonPath := filepath.Join(dir, "q-report.json")
+	mdPath := filepath.Join(dir, "q-report.md")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{
+		"q-report",
+		"--from-output", input,
+		"--check",
+		"--ratio-baseline", filepath.Join(dir, "missing-baseline.json"),
+		"--json", jsonPath,
+		"--markdown", mdPath,
+		"--min-runtime-jit-backend-benchmarks=0",
+		"--min-runtime-array-bridge-benchmarks=0",
+		"--min-runtime-bridge-benchmark-count=0",
+		"--min-runtime-backend-route-benchmarks=0",
+		"--min-runtime-backend-route-hits-op=0",
+		"--min-q-eval-family-cases=0",
+	}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runBenchCommand code = %d, want 2; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "q performance gate failed") {
+		t.Fatalf("stderr = %q, want gate failure", stderr.String())
+	}
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("q-report JSON failed to decode: %v\n%s", err, string(data))
+	}
+	var failed []string
+	for _, item := range payload["gate"].([]any) {
+		check := item.(map[string]any)
+		if check["status"] == "fail" {
+			failed = append(failed, check["signal"].(string))
+		}
+	}
+	if !containsString(failed, "typed_hit_pct") || !containsString(failed, "allocs_op") {
+		t.Fatalf("failed signals = %#v, want typed_hit_pct and allocs_op", failed)
 	}
 }
 
