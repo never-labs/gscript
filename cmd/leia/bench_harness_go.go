@@ -182,14 +182,17 @@ func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
 	}
 	defer os.RemoveAll(tempDir)
 
-	leiaBin := filepath.Join(tempDir, "leia-current")
-	if err := benchBuildLeia(root, leiaBin, "build failed in {root} with exit {exit_code}", errw); err != nil {
-		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
-		return 1
+	leiaBin := ""
+	if !cfg.DryRun {
+		leiaBin = filepath.Join(tempDir, "leia-current")
+		if err := benchBuildLeia(root, leiaBin, "build failed in {root} with exit {exit_code}", errw); err != nil {
+			fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+			return 1
+		}
 	}
 	headRoot := ""
 	headLeiaBin := ""
-	if mode == "compare" && cfg.HeadRef != "" {
+	if mode == "compare" && cfg.HeadRef != "" && !cfg.DryRun {
 		headRoot = filepath.Join(tempDir, "head-src")
 		if err := benchExportGitRef(root, cfg.HeadRef, headRoot); err != nil {
 			fmt.Fprintf(errw, "leia bench %s: export --head-ref %s: %v\n", mode, cfg.HeadRef, err)
@@ -420,10 +423,6 @@ func runBenchGoSpec(mode, root, tempDir, leiaBin, headRoot, headLeiaBin, luajitB
 	if err != nil {
 		return benchGoBenchmarkResult{}, fmt.Errorf("%s: %w", spec.ID(), err)
 	}
-	currentSpec, err := benchGoPrepareScaledSpec(spec, filepath.Join(tempDir, "scaled", "current", spec.Group+"__"+spec.Name), scale)
-	if err != nil {
-		return benchGoBenchmarkResult{}, fmt.Errorf("%s: %w", spec.ID(), err)
-	}
 	result := benchGoBenchmarkResult{
 		Benchmark: spec.Name,
 		Group:     spec.Group,
@@ -431,6 +430,30 @@ func runBenchGoSpec(mode, root, tempDir, leiaBin, headRoot, headLeiaBin, luajitB
 		Modes:     map[string]map[string]benchGoSubjectResult{},
 		Strict:    map[string]benchGoSubjectResult{},
 		Scale:     scale,
+	}
+	if cfg.DryRun {
+		for _, runMode := range cfg.Modes {
+			current := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, spec, cfg)
+			if mode == "strict" {
+				result.Strict[runMode] = current
+				continue
+			}
+			head := current
+			head.Subject = "head"
+			modeRow := map[string]benchGoSubjectResult{
+				"current": current,
+				"head":    head,
+			}
+			if !cfg.NoLuaJIT {
+				modeRow["luajit"] = runBenchGoSubject("luajit", runMode, root, leiaBin, luajitBin, spec, cfg)
+			}
+			result.Modes[runMode] = modeRow
+		}
+		return result, nil
+	}
+	currentSpec, err := benchGoPrepareScaledSpec(spec, filepath.Join(tempDir, "scaled", "current", spec.Group+"__"+spec.Name), scale)
+	if err != nil {
+		return benchGoBenchmarkResult{}, fmt.Errorf("%s: %w", spec.ID(), err)
 	}
 	if mode == "strict" {
 		for _, runMode := range cfg.Modes {

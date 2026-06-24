@@ -131,8 +131,8 @@ func TestBenchCommandDispatchesProfiles(t *testing.T) {
 	if code := runBenchCommand([]string{"--guard", "--dry-run", "--no-luajit", "--json", filepath.Join(t.TempDir(), "guard.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("guard code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(calls) == 0 {
-		t.Fatalf("profiles did not invoke build command")
+	if len(calls) != 0 {
+		t.Fatalf("dry-run invoked external commands: %#v", calls)
 	}
 }
 
@@ -177,6 +177,7 @@ func TestBenchCompareJobsKeepDeterministicResultOrder(t *testing.T) {
 		"--bench", "control/sieve",
 		"--bench", "table/table_array_access",
 		"--no-luajit",
+		"--head-ref", "HEAD",
 		"--json", jsonPath,
 	}, &stdout, &stderr)
 	if code != 0 {
