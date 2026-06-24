@@ -214,6 +214,45 @@ func TestBenchCommandDispatchesTriageHarness(t *testing.T) {
 	}
 }
 
+func TestBenchTriageRowsKeepRuntimeCounters(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "compare.json")
+	writeTestFile(t, path, map[string]any{
+		"results": []map[string]any{
+			{
+				"group":     "control",
+				"benchmark": "sieve",
+				"modes": map[string]any{
+					"default": map[string]any{
+						"current": map[string]any{
+							"status":       "ok",
+							"source":       "script_repeat",
+							"repeat":       8,
+							"stats":        map[string]any{"median": 0.02},
+							"t2_attempted": 5,
+							"t2_entered":   4,
+							"t2_failed":    1,
+							"exit_total":   3,
+						},
+						"head":   map[string]any{"status": "ok", "stats": map[string]any{"median": 0.03}},
+						"luajit": map[string]any{"status": "ok", "stats": map[string]any{"median": 0.01}},
+					},
+				},
+			},
+		},
+	})
+	rows, err := benchTriageRowsFromCompare(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0]["t2_attempted"] != float64(5) || rows[0]["t2_entered"] != float64(4) || rows[0]["t2_failed"] != float64(1) || rows[0]["exits"] != float64(3) {
+		t.Fatalf("rows = %#v", rows)
+	}
+	markdown := benchTriageMarkdown(rows)
+	if !strings.Contains(markdown, "| control/sieve | default | 0.020000s | 0.030000s | 0.010000s | 5/4/1 | 3 | calibrated timing captured |") {
+		t.Fatalf("markdown = %s", markdown)
+	}
+}
+
 func TestBenchCommandRunsGoQReportFromOutput(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
