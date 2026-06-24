@@ -275,6 +275,14 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	if report.Benchmarks[0]["warm_dump_requested"] != true || report.Benchmarks[0]["warm_dump_effective"] != false || warmDumpSummary["status"] != "not_collected" {
 		t.Fatalf("warm dump fields = row %#v summary %#v", report.Benchmarks[0], warmDumpSummary)
 	}
+	md, err := os.ReadFile(filepath.Join(outDir, "diagnostics.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(md), "pprof not_collected: pprof collection is not yet wired for bench diagnose") ||
+		!strings.Contains(string(md), "warm-dump not_collected: warm dump collection is not yet wired for bench diagnose") {
+		t.Fatalf("diagnostics markdown missing optional evidence state:\n%s", string(md))
+	}
 }
 
 func TestBenchCommandDispatchesTriageHarness(t *testing.T) {

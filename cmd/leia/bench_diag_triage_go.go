@@ -723,10 +723,44 @@ func benchDiagnoseMarkdown(rows []map[string]any) string {
 	for _, row := range rows {
 		name := fmt.Sprintf("%s/%s", row["group"], row["benchmark"])
 		tier2 := fmt.Sprintf("%v/%v/%v", row["t2_attempted"], row["t2_compiled"], row["t2_failed"])
-		b.WriteString(benchMarkdownRow(name, benchDiagFormatSeconds(row["time_seconds"]), tier2, row["exit_total"], "-", row["work_target"], "-", "-", "`summary.raw.txt`, `run.raw.txt`"))
+		b.WriteString(benchMarkdownRow(name, benchDiagFormatSeconds(row["time_seconds"]), tier2, row["exit_total"], "-", row["work_target"], benchDiagnoseRuntimeText(row), benchDiagnoseEvidenceText(row["pprof_summary"]), benchDiagnoseArtifactText(row)))
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+func benchDiagnoseRuntimeText(row map[string]any) string {
+	runtimeSummary, _ := row["runtime_summary"].(map[string]any)
+	if len(runtimeSummary) == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("readiness=%v, exits=%v", runtimeSummary["readiness"], runtimeSummary["exit_total"])
+}
+
+func benchDiagnoseEvidenceText(value any) string {
+	summary, _ := value.(map[string]any)
+	if len(summary) == 0 {
+		return "-"
+	}
+	status := fmt.Sprint(summary["status"])
+	if status == "" || status == "<nil>" {
+		return "-"
+	}
+	if reason := strings.TrimSpace(fmt.Sprint(summary["reason"])); reason != "" && reason != "<nil>" {
+		return status + ": " + reason
+	}
+	return status
+}
+
+func benchDiagnoseArtifactText(row map[string]any) string {
+	items := []string{"`summary.raw.txt`", "`run.raw.txt`"}
+	if text := benchDiagnoseEvidenceText(row["pprof_summary"]); text != "-" {
+		items = append(items, "pprof "+text)
+	}
+	if text := benchDiagnoseEvidenceText(row["warm_dump_summary"]); text != "-" {
+		items = append(items, "warm-dump "+text)
+	}
+	return strings.Join(items, ", ")
 }
 
 func benchTriageMarkdown(timing []map[string]any, bottlenecks []map[string]any, recommendations []string, artifacts map[string]any) string {
