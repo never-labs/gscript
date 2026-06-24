@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -284,7 +285,7 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(md), "pprof not_collected: pprof collection is not yet wired for bench diagnose (max_runs=3, min_samples_ms=12.5)") ||
+	if !strings.Contains(string(md), "pprof not_collected: JIT CPU profile collection is blocked by the CLI -cpuprofile/JIT guard") ||
 		!strings.Contains(string(md), "warm-dump not_requested: warm dump not requested") {
 		t.Fatalf("diagnostics markdown missing optional evidence state:\n%s", string(md))
 	}
@@ -316,6 +317,20 @@ func TestBenchDiagnoseWarmDumpSummaryAndArgs(t *testing.T) {
 	artifacts := benchDiagnoseWarmDumpArtifacts(warmDir, filepath.Join(dir, "warm.raw.txt"))
 	if artifacts["warm_dump_manifest_json"] == "" || artifacts["warm_dump_pcmap_json"] == "" || artifacts["warm_dump_jit_symbols"] == "" {
 		t.Fatalf("artifacts = %#v", artifacts)
+	}
+}
+
+func TestBenchDiagnosePPROFSummaryExplainsJITGuard(t *testing.T) {
+	summary := benchDiagnosePPROFSummary(benchDiagConfig{PPROF: true, PPROFMinMS: 9, PPROFMaxRuns: 4})
+	if summary["status"] != "not_collected" || summary["effective"] != false {
+		t.Fatalf("summary = %#v", summary)
+	}
+	params, _ := summary["params"].(map[string]any)
+	if params["jit_profile_supported"] != false || params["fallback"] != "warm-dump+profile-exits" || params["min_samples_ms"] != float64(9) || params["max_runs"] != 4 {
+		t.Fatalf("params = %#v", params)
+	}
+	if !strings.Contains(fmt.Sprint(summary["reason"]), "-cpuprofile/JIT guard") {
+		t.Fatalf("reason = %#v", summary["reason"])
 	}
 }
 

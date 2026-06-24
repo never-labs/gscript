@@ -82,8 +82,9 @@ objects so automation can distinguish a clean baseline from Tier 2 failures,
 runtime exits, skipped timing, and unavailable benchmark inputs. Optional
 evidence requests are reported with separate `*_requested` and `*_effective`
 fields. `--warm-dump` collects production Tier 2 warm-dump artifacts under the
-benchmark artifact directory; pprof requests remain explicit until CPU profile
-collection is wired. Requested pprof controls such as
+benchmark artifact directory; pprof requests remain explicit because JIT CPU
+profile collection is blocked by the CLI `-cpuprofile`/JIT guard until a
+JIT-safe profile path is wired. Requested pprof controls such as
 `--pprof-min-samples-ms` and `--pprof-max-runs` are carried into the pprof
 evidence summary.
 

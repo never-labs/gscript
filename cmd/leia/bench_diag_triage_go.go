@@ -142,18 +142,13 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 			"pprof_script_repeat":   0,
 			"pprof_samples_seconds": 0,
 			"pprof_effective":       false,
-			"pprof_summary": benchDiagnoseEvidenceSummary(
-				cfg.PPROF,
-				false,
-				"pprof collection is not yet wired for bench diagnose",
-				map[string]any{"min_samples_ms": cfg.PPROFMinMS, "max_runs": cfg.PPROFMaxRuns},
-			),
-			"warm_dump_requested": cfg.WarmDump,
-			"warm_dump_effective": warmDump.Effective,
-			"warm_dump_summary":   warmDump.Summary,
-			"scale":               scale,
-			"artifact_dir":        artifactDir,
-			"artifacts":           artifacts,
+			"pprof_summary":         benchDiagnosePPROFSummary(cfg),
+			"warm_dump_requested":   cfg.WarmDump,
+			"warm_dump_effective":   warmDump.Effective,
+			"warm_dump_summary":     warmDump.Summary,
+			"scale":                 scale,
+			"artifact_dir":          artifactDir,
+			"artifacts":             artifacts,
 		})
 	}
 	payload := map[string]any{"out_dir": outDir, "benchmarks": rows}
@@ -462,6 +457,19 @@ func benchDiagnoseEvidenceSummary(requested, effective bool, reason string, para
 		summary["params"] = params
 	}
 	return summary
+}
+
+func benchDiagnosePPROFSummary(cfg benchDiagConfig) map[string]any {
+	reason := "pprof not requested"
+	if cfg.PPROF {
+		reason = "JIT CPU profile collection is blocked by the CLI -cpuprofile/JIT guard; use --warm-dump and profile-exits until JIT-safe CPU profiling is wired"
+	}
+	return benchDiagnoseEvidenceSummary(cfg.PPROF, false, reason, map[string]any{
+		"min_samples_ms":        cfg.PPROFMinMS,
+		"max_runs":              cfg.PPROFMaxRuns,
+		"jit_profile_supported": false,
+		"fallback":              "warm-dump+profile-exits",
+	})
 }
 
 type benchTriageConfig struct {
