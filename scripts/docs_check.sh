@@ -196,6 +196,35 @@ examples_index_directories="$(find examples -mindepth 1 -maxdepth 1 -type d | wc
 examples_capability_drift_gates=3
 runnable_spec_examples="$({ rg -n '^```leia (run|fail) all$' docs/spec -g '*.md' || true; } | wc -l | tr -d ' ')"
 
+retired_path_patterns=(
+    'docs/blog'
+    'blog/'
+    '.claude'
+    'leia-finrobot'
+)
+retired_name_patterns=(
+    'AI native'
+    'AI-native'
+    'blog'
+    'FinRobot'
+)
+retired_path_mentions=0
+retired_name_mentions=0
+for pattern in "${retired_path_patterns[@]}"; do
+    count="$({ rg -n -F "$pattern" README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
+    retired_path_mentions=$((retired_path_mentions + ${count:-0}))
+done
+for pattern in "${retired_name_patterns[@]}"; do
+    count="$({ rg -n -F "$pattern" README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
+    retired_name_mentions=$((retired_name_mentions + ${count:-0}))
+done
+if [ "$retired_path_mentions" -gt 0 ]; then
+    add_failure "retired_path_mention" "documentation mentions retired paths; remove blog/FinRobot/private-tooling paths from public docs"
+fi
+if [ "$retired_name_mentions" -gt 0 ]; then
+    add_failure "retired_name_mention" "documentation mentions retired product names or positioning"
+fi
+
 if [ "$JSON" -eq 1 ]; then
     status="pass"
     if [ "${#failures[@]}" -gt 0 ]; then
@@ -243,8 +272,8 @@ if [ "$JSON" -eq 1 ]; then
     printf '    "examples_index_directories": %s,\n' "${examples_index_directories:-0}"
     printf '    "examples_capability_drift_gates": %d,\n' "$examples_capability_drift_gates"
     printf '    "readme_user_facing_gates": 1,\n'
-    printf '    "retired_path_mentions": 0,\n'
-    printf '    "retired_name_mentions": 0,\n'
+    printf '    "retired_path_mentions": %s,\n' "${retired_path_mentions:-0}"
+    printf '    "retired_name_mentions": %s,\n' "${retired_name_mentions:-0}"
     printf '    "generated_reference_docs": %d,\n' "$generated_reference_count"
     printf '    "generated_spec_html": 1,\n'
     printf '    "runnable_spec_examples": %s\n' "${runnable_spec_examples:-0}"
@@ -264,4 +293,4 @@ if [ "${#failures[@]}" -gt 0 ]; then
     exit 1
 fi
 
-echo "docs_check.sh: checked ${markdown_files} Markdown files, ${relative_documentation_links:-0} relative documentation links, ${repository_script_code_block_mentions:-0} repository-script code-block mentions, ${release_gate_docs} release-gate docs, ${reference_entrypoints:-0} reference entrypoints, 1 spec/stable-contract docs, ${examples_index_directories:-0} examples index directories, ${examples_capability_drift_gates} examples capability drift gates, 1 README user-facing gates, 0 retired-path mentions, 0 retired-name mentions, ${generated_reference_count} generated reference docs, 1 generated spec HTML, ${runnable_spec_examples:-0} runnable spec examples."
+echo "docs_check.sh: checked ${markdown_files} Markdown files, ${relative_documentation_links:-0} relative documentation links, ${repository_script_code_block_mentions:-0} repository-script code-block mentions, ${release_gate_docs} release-gate docs, ${reference_entrypoints:-0} reference entrypoints, 1 spec/stable-contract docs, ${examples_index_directories:-0} examples index directories, ${examples_capability_drift_gates} examples capability drift gates, 1 README user-facing gates, ${retired_path_mentions:-0} retired-path mentions, ${retired_name_mentions:-0} retired-name mentions, ${generated_reference_count} generated reference docs, 1 generated spec HTML, ${runnable_spec_examples:-0} runnable spec examples."
