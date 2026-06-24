@@ -3059,6 +3059,23 @@ func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixLauncherRoutesTaskHelp(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, tc := range []struct {
+		task string
+		want string
+	}{
+		{task: "test", want: "Usage: scripts/run.sh test <profile>"},
+		{task: "manifest-check", want: "Usage: scripts/run.sh manifest-check [ROOT...]"},
+		{task: "release-smoke", want: "Usage: scripts/run.sh release-smoke [SMOKE_SCRIPT]"},
+	} {
+		out := runCommand(t, root, 30*time.Second, "scripts/run.sh", "help", tc.task)
+		if !strings.Contains(out, tc.want) {
+			t.Fatalf("scripts/run.sh help %s = %q, want %q", tc.task, out, tc.want)
+		}
+	}
+}
+
 func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 60*time.Second, "bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json")

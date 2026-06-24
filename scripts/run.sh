@@ -4,6 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage: scripts/run.sh <task> [args...]
+       scripts/run.sh help <task>
 
 Single repository script launcher.
 
@@ -56,6 +57,11 @@ cd "$repo_root"
 
 task="$1"
 shift
+if [ "$task" = "help" ] && [ "$#" -gt 0 ]; then
+  task="$1"
+  shift
+  set -- --help "$@"
+fi
 
 run_shell_task() {
   local script="$1"
