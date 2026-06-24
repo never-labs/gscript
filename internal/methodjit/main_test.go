@@ -33,9 +33,9 @@
 // SetGCPercent(-1) is kept as defense-in-depth to guard against any late
 // GC trigger.
 //
-// Production fix (tracked in docs-internal/known-issues.md): register JIT
-// code pages with a minimal fake pclntab so the unwinder can safely skip
-// JIT frames without crashing. This would remove the test-binary workaround.
+// Production fix (tracked in internal/methodjit/docs/jit_stack_design.md):
+// register JIT code pages with a minimal fake pclntab so the unwinder can
+// safely skip JIT frames without the test-binary rerun path.
 
 package methodjit
 

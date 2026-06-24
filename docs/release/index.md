@@ -133,7 +133,7 @@ release-critical:
 | Gate | Evidence |
 |---|---|
 | Correctness | Go tests, release matrix, spec examples, and stdlib contracts. |
-| Architecture Health | methodjit file size, pass-pipeline, debt marker, and test-gap scan. |
+| Architecture Health | methodjit file size, tiering-manager mention, debt marker, and same-name test-gap scan. |
 | Manifest Coverage | Test and benchmark manifest coverage. |
 | Module Path Gate | Published module path validation. |
 | Shell Script Syntax | Bash syntax parsing for release and benchmark scripts. |
@@ -163,8 +163,8 @@ and reports `artifact_entries` for the verified release artifact roles.
 snapshot archive through `scripts/install.sh` with a staged local `file://`
 release directory.
 `scripts/run.sh arch --json` reports methodjit source/test size,
-`large_file_details`, `debt_marker_details`, and `missing_test_files` so
-architecture debt is visible to release dashboards.
+`large_file_details`, `debt_marker_details`, and same-name `missing_test_files`
+so architecture debt is visible to release dashboards.
 `scripts/run.sh site --json` reports rendered-site HTML, local link, asset,
 fragment-anchor, and failure details after the GitHub Pages build.
 
