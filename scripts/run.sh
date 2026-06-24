@@ -13,6 +13,8 @@ Tasks:
   diagnostics          Collect diagnostics bundle
   docs                 Run documentation checks
   editor               Run editor asset checks
+  language-conformance Run translated language conformance cases
+  manifest-check       Check test and benchmark manifests
   perf                 Run performance gate
   production           Run production readiness gate
   module-path          Check repository module path
@@ -294,6 +296,35 @@ USAGE
   go run ./cmd/leia playground --help
 }
 
+run_language_conformance_task() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh language-conformance
+
+Runs translated language conformance cases. LUA_BIN selects the Lua reference
+runtime and defaults to lua.
+USAGE
+    return
+  fi
+  LUA_BIN="${LUA_BIN:-lua}" go test ./tests -run TestLanguageConformanceTranslatedCases -count=1
+}
+
+run_manifest_check_task() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    cat <<'USAGE'
+Usage: scripts/run.sh manifest-check [ROOT...]
+
+Checks repository manifests with scripts/manifest.leia. Defaults to tests and
+benchmarks.
+USAGE
+    return
+  fi
+  if [ "$#" -eq 0 ]; then
+    set -- tests benchmarks
+  fi
+  run_leia_task scripts/manifest.leia check "$@"
+}
+
 run_module_path_task() {
   local expected="${1:-github.com/never-labs/leia}"
   local actual
@@ -331,6 +362,12 @@ case "$task" in
     ;;
   editor|editor-check)
     run_shell_task scripts/editor_check.sh "$@"
+    ;;
+  language-conformance|language-conformance-check)
+    run_language_conformance_task "$@"
+    ;;
+  manifest|manifest-check|manifest-coverage)
+    run_manifest_check_task "$@"
     ;;
   perf|performance|performance-gate)
     run_shell_task scripts/performance_gate.sh "$@"

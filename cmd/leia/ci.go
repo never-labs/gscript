@@ -174,11 +174,11 @@ func ciProfileCommands(profile string, noLuaJIT bool, releaseVersion string) ([]
 }
 
 func manifestCoverageCommand() []string {
-	return []string{"go", "run", "./cmd/leia", "run", "scripts/manifest.leia", "check", "tests", "benchmarks"}
+	return []string{"scripts/run.sh", "manifest-check", "tests", "benchmarks"}
 }
 
 func modulePathGateCommand() []string {
-	return []string{"bash", "-c", fmt.Sprintf("test \"$(go list -m)\" = %q", ciExpectedModulePath)}
+	return []string{"scripts/run.sh", "module-path", ciExpectedModulePath}
 }
 
 func appendNoLuaJIT(args []string, noLuaJIT bool) []string {

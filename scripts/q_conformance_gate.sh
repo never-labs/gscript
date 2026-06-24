@@ -325,7 +325,7 @@ export GOCACHE="${GOCACHE:-$TMPDIR/go-cache}"
 mkdir -p "$GOCACHE"
 
 log_info "[q-gate] manifest check"
-run_logged "$TMPDIR/leia-q-gate-manifest.out" go run ./cmd/leia run scripts/manifest.leia check tests benchmarks
+run_logged "$TMPDIR/leia-q-gate-manifest.out" scripts/run.sh manifest-check tests benchmarks
 log_info "[q-gate] q gate scope: $Q_GATE_SCOPE"
 
 log_info "[q-gate] go test q/data/bind"

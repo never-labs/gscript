@@ -443,8 +443,7 @@ add_language_conformance_gate() {
         add_skip "Language Conformance Surface" "missing ${LUA_BIN:-lua}"
         return
     fi
-    add_run "Language Conformance Surface" \
-        "LUA_BIN=\"\${LUA_BIN:-lua}\" go test ./tests -run TestLanguageConformanceTranslatedCases -count=1"
+    add_run "Language Conformance Surface" "scripts/run.sh language-conformance"
 }
 
 add_q_conformance_gate() {
@@ -552,7 +551,7 @@ add_manifest_coverage() {
         add_skip "Manifest Coverage" "missing go"
         return
     fi
-    add_run "Manifest Coverage" "go run ./cmd/leia run scripts/manifest.leia check tests benchmarks"
+    add_run "Manifest Coverage" "scripts/run.sh manifest-check tests benchmarks"
 }
 
 add_module_path_gate() {

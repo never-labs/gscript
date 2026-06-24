@@ -24,7 +24,7 @@ The matrix is intentionally a coverage ledger. It does not imply full kdb+ compa
 
 ## Validation
 
-`go run ./cmd/leia run scripts/manifest.leia check tests benchmarks` validates:
+`scripts/run.sh manifest-check tests benchmarks` validates:
 
 - every `tests/language/q_*.leia` case is present in `tests/manifest.json` as language conformance;
 - every q data benchmark is present in `benchmarks/manifest.json` cases and workloads;

@@ -26,7 +26,7 @@ Release validation commands:
 time scripts/run.sh perf --syntax-smoke --no-luajit
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1
-go test ./tests -run 'TestLanguageConformanceTranslatedCases' -count=1
+scripts/run.sh language-conformance
 go test ./...
 scripts/run.sh docs
 scripts/run.sh perf --feature-smoke

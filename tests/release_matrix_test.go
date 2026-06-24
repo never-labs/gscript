@@ -917,7 +917,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	root := findRepoRoot(t)
 
 	smokeOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "smoke", "--list")
-	for _, want := range []string{"go test ./cmd/leia", "go run ./cmd/leia run scripts/manifest.leia check tests benchmarks"} {
+	for _, want := range []string{"go test ./cmd/leia", "scripts/run.sh manifest-check tests benchmarks"} {
 		if !strings.Contains(smokeOut, want) {
 			t.Fatalf("ci smoke --list must include %q so example/import guards stay in the smoke test matrix; got:\n%s", want, smokeOut)
 		}
@@ -952,7 +952,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
-	for _, want := range []string{"go test ./... -count=1", "go run ./cmd/leia run scripts/manifest.leia check tests benchmarks"} {
+	for _, want := range []string{"go test ./... -count=1", "scripts/run.sh manifest-check tests benchmarks"} {
 		if !strings.Contains(productionOut, want) {
 			t.Fatalf("production_check.sh --full --list must include %q so dialect/package-managed example tests stay release-gated; got:\n%s", want, productionOut)
 		}

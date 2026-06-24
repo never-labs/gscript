@@ -92,7 +92,7 @@ preparing a tag or release candidate.
 ## Manifest Checks
 
 ```bash
-go run ./cmd/leia run scripts/manifest.leia check tests benchmarks
+scripts/run.sh manifest-check tests benchmarks
 scripts/run.sh worktree
 ```
 
