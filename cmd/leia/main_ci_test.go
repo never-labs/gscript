@@ -57,6 +57,8 @@ func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
 		"bash scripts/public_release_blockers_check.sh --require-resolved",
 		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 		"bash scripts/release_artifacts_check.sh --build",
+		"scripts/run.sh public-blockers --require-resolved",
+		"scripts/run.sh release-dist --require-goreleaser --require-workflows",
 	} {
 		if strings.Contains(out, duplicate) {
 			t.Fatalf("stdout = %q, release profile should delegate %q to production_check.sh", out, duplicate)

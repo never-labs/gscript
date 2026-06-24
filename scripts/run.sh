@@ -15,6 +15,7 @@ Tasks:
   editor               Run editor asset checks
   perf                 Run performance gate
   production           Run production readiness gate
+  public-blockers      Check public release blocker decisions
   q                    Run q conformance gate
   release-artifacts    Build local release artifacts
   release-check        Check local release artifacts
@@ -86,6 +87,9 @@ case "$task" in
     ;;
   production|production-check)
     run_shell_task scripts/production_check.sh "$@"
+    ;;
+  public-blockers|public-release-blockers|public-release-blockers-check)
+    run_shell_task scripts/public_release_blockers_check.sh "$@"
     ;;
   q|q-conformance)
     run_shell_task scripts/q_conformance_gate.sh "$@"

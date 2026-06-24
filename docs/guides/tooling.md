@@ -79,10 +79,10 @@ go run ./cmd/leia ci pr --list
 go run ./cmd/leia ci release --list
 go run ./cmd/leia ci release --release-version vX.Y.Z --list
 go run ./cmd/leia ci release --release-version vX.Y.Z --list --json
-bash scripts/worktree_audit.sh --json
+scripts/run.sh worktree --json
 ```
 
-`scripts/worktree_audit.sh --json` reports `finding_status_count` and
+`scripts/run.sh worktree --json` reports `finding_status_count` and
 `finding_statuses` for dirty, prunable, missing, unreadable, and ahead/behind
 worktree summaries.
 
@@ -214,7 +214,7 @@ scripts/run.sh production --quick
 scripts/run.sh production --quick --list --json
 scripts/run.sh production --quick --list --out-dir /tmp/leia-release-plan
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
-bash scripts/q_conformance_gate.sh --scope core --bench none --json
+scripts/run.sh q --scope core --bench none --json
 scripts/run.sh editor --json
 scripts/run.sh release-dist --json
 scripts/run.sh release-check --json --version vX.Y.Z

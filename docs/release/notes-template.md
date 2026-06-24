@@ -57,7 +57,7 @@ scripts/run.sh production --full --release-profile --release-version vX.Y.Z
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 scripts/run.sh docs
 scripts/run.sh perf --full
-bash scripts/public_release_blockers_check.sh --require-resolved
+scripts/run.sh public-blockers --require-resolved
 scripts/run.sh release-dist --require-goreleaser
 scripts/run.sh release-notes --require-ready --version vX.Y.Z
 scripts/run.sh release-check --build --require-clean --require-tag --version vX.Y.Z

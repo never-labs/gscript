@@ -312,7 +312,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	performanceSmokeCmd := "scripts/run.sh perf --smoke"
 	fullPerfGateCmd := "scripts/run.sh perf --full"
 	shellSyntaxCmd := "git ls-files '*.sh' | while IFS= read -r f; do bash -n \"$f\"; done"
-	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
+	publicReleaseBlockersCmd := "scripts/run.sh public-blockers --require-resolved"
 	releaseDistributionCmd := "scripts/run.sh release-dist --require-goreleaser"
 	releaseNotesCmd := "scripts/run.sh release-notes --require-ready --version vX.Y.Z"
 	strictReleaseArtifactsCmd := "scripts/run.sh release-check --build --require-clean --require-tag --version vX.Y.Z"
@@ -838,7 +838,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
 				`"$(go env GOPATH)/bin/goreleaser" --version`,
 				"scripts/run.sh release-notes",
-				"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
+				"scripts/run.sh release-dist --require-goreleaser --require-workflows",
 				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
 				"scripts/run.sh release-snapshot --dist-dir dist --bin-dir /tmp/leia-snapshot-bin",
 			},
@@ -1055,7 +1055,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia doc check",
 		"go run ./cmd/leia doc check --json",
 		"GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`",
-		"bash scripts/worktree_audit.sh --json",
+		"scripts/run.sh worktree --json",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json",
 		"go run ./cmd/leia playground --help",
@@ -1064,7 +1064,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"scripts/run.sh production --quick --list --out-dir /tmp/leia-release-plan",
 		"go run ./cmd/leia ci release --release-version vX.Y.Z --list --json",
 		"scripts/run.sh perf --validate-only /tmp/leia_performance_gate/timing_gate.json --json",
-		"bash scripts/q_conformance_gate.sh --scope core --bench none --json",
+		"scripts/run.sh q --scope core --bench none --json",
 		"scripts/run.sh editor --json",
 		"scripts/run.sh release-dist --json",
 		"scripts/run.sh release-check --json --version vX.Y.Z",
@@ -1201,11 +1201,11 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan",
 		"scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json",
 		"go run ./cmd/leia doc check --json",
-		"bash scripts/q_conformance_gate.sh --scope core --bench smoke --json",
+		"scripts/run.sh q --scope core --bench smoke --json",
 		"LEIA_SKIP_TIMING_COMPARE=1 go run ./cmd/leia bench q-suite > /tmp/leia-q-perf-output.txt",
 		"go run ./cmd/leia bench q-report --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md",
 		"scripts/run.sh editor --json",
-		"bash scripts/public_release_blockers_check.sh --json",
+		"scripts/run.sh public-blockers --json",
 		"scripts/run.sh release-notes --json --version vX.Y.Z",
 		"scripts/run.sh release-dist --json",
 		"bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json",
@@ -3006,8 +3006,8 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		commands[check.Name] = check.Command
 	}
 	for name, want := range map[string]string{
-		"Architecture Health":     "bash scripts/arch_check.sh --json",
-		"Public Release Blockers": "bash scripts/public_release_blockers_check.sh --require-resolved",
+		"Architecture Health":     "scripts/run.sh arch --json",
+		"Public Release Blockers": "scripts/run.sh public-blockers --require-resolved",
 		"Release Distribution":    "scripts/run.sh release-dist --require-goreleaser",
 		"Release Notes":           "scripts/run.sh release-notes --require-ready --version \"vX.Y.Z\"",
 		"Release Artifacts":       "scripts/run.sh release-check",

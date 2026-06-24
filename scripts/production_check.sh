@@ -434,7 +434,7 @@ add_architecture_health_gate() {
         add_skip "Architecture Health" "missing scripts/arch_check.sh"
         return
     fi
-    add_run "Architecture Health" "bash scripts/arch_check.sh --json"
+    add_run "Architecture Health" "scripts/run.sh arch --json"
 }
 
 add_language_conformance_gate() {
@@ -459,7 +459,7 @@ add_q_conformance_gate() {
         add_skip "Q Conformance Gate" "missing scripts/q_conformance_gate.sh"
         return
     fi
-    add_run "Q Conformance Gate" "RUN_BENCH=smoke Q_GATE_SCOPE=core bash scripts/q_conformance_gate.sh"
+    add_run "Q Conformance Gate" "scripts/run.sh q --scope core --bench smoke"
 }
 
 add_editor_assets() {
@@ -528,9 +528,9 @@ add_public_release_blockers_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Public Release Blockers" "bash scripts/public_release_blockers_check.sh --require-resolved"
+        add_run "Public Release Blockers" "scripts/run.sh public-blockers --require-resolved"
     else
-        add_run "Public Release Blockers" "bash scripts/public_release_blockers_check.sh"
+        add_run "Public Release Blockers" "scripts/run.sh public-blockers"
     fi
 }
 

@@ -24,11 +24,11 @@ bash scripts/diagnostics_bundle.sh --output /tmp/leia-diag --skip-go-tests --ski
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
-bash scripts/q_conformance_gate.sh --scope core --bench smoke --json
+scripts/run.sh q --scope core --bench smoke --json
 LEIA_SKIP_TIMING_COMPARE=1 go run ./cmd/leia bench q-suite > /tmp/leia-q-perf-output.txt
 go run ./cmd/leia bench q-report --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md
 scripts/run.sh editor --json
-bash scripts/public_release_blockers_check.sh --json
+scripts/run.sh public-blockers --json
 scripts/run.sh release-notes --json --version vX.Y.Z
 scripts/run.sh release-dist --json
 bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json
@@ -105,7 +105,7 @@ check uses a local `goreleaser` binary if present or the pinned Go module
 fallback used by release workflows:
 
 ```bash
-scripts/public_release_blockers_check.sh --require-resolved
+scripts/run.sh public-blockers --require-resolved
 scripts/run.sh release-dist --require-goreleaser
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
 bash scripts/install.sh --version v0.1.0 --base-url file:///tmp/leia-release --bin-dir /tmp/leia-bin

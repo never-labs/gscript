@@ -440,6 +440,7 @@ fi
 if [[ -f .github/workflows/distribution-check.yml ]]; then
   require_contains .github/workflows/distribution-check.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
   require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-notes"
+  require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-dist --require-goreleaser --require-workflows"
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" --version'
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
 fi
