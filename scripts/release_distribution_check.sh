@@ -11,8 +11,11 @@ install_targets=()
 failure_kinds=()
 failure_messages=()
 goreleaser_available="false"
+goreleaser_check="skipped"
+goreleaser_check_source="none"
 local_install_fixture="pending"
 failure_printed="false"
+goreleaser_module="github.com/goreleaser/goreleaser/v2@v2.16.0"
 
 usage() {
   cat <<'USAGE'
@@ -21,7 +24,7 @@ Usage: scripts/release_distribution_check.sh [--require-goreleaser] [--require-w
 Checks release distribution configuration and install-script planning.
 
 Options:
-  --require-goreleaser  Fail if the goreleaser CLI is not available locally
+  --require-goreleaser  Run GoReleaser check using the local CLI or pinned go-run fallback
   --require-workflows   Fail if hosted release/distribution workflows are absent
   --json                Print a machine-readable distribution report
   -h, --help            Show this help
@@ -141,6 +144,8 @@ print_json_report() {
   printf '  "require_goreleaser": %s,\n' "$require_goreleaser"
   printf '  "require_workflows": %s,\n' "$require_workflows"
   printf '  "goreleaser_available": %s,\n' "$goreleaser_available"
+  printf '  "goreleaser_check": "%s",\n' "$(json_escape "$goreleaser_check")"
+  printf '  "goreleaser_check_source": "%s",\n' "$(json_escape "$goreleaser_check_source")"
   printf '  "local_install_fixture": "%s",\n' "$local_install_fixture"
   printf '  "failure_kind_count": %d,\n' "$failure_kind_count"
   printf '  "failure_kinds": '
@@ -340,6 +345,38 @@ check_local_install_fixture() {
   local_install_fixture="verified"
 }
 
+run_goreleaser_check() {
+  if command -v goreleaser >/dev/null 2>&1; then
+    goreleaser_available="true"
+    goreleaser_check="checked"
+    goreleaser_check_source="path"
+    if [[ "$json_out" == "true" ]]; then
+      goreleaser check >/dev/null 2>/dev/null
+    else
+      goreleaser check
+    fi
+    return
+  fi
+
+  if [[ "$require_goreleaser" != "true" ]]; then
+    log_info "release_distribution_check.sh: goreleaser not installed; skipping local goreleaser check"
+    return
+  fi
+
+  if ! command -v go >/dev/null 2>&1; then
+    fail "missing_command" "goreleaser check requires a local goreleaser CLI or go for pinned go-run fallback"
+  fi
+
+  goreleaser_check="checked"
+  goreleaser_check_source="go-run"
+  log_info "release_distribution_check.sh: goreleaser not installed; using go run $goreleaser_module check"
+  if [[ "$json_out" == "true" ]]; then
+    go run "$goreleaser_module" check >/dev/null 2>/dev/null
+  else
+    go run "$goreleaser_module" check
+  fi
+}
+
 require_file .goreleaser.yaml
 require_file scripts/install.sh
 require_file scripts/release_snapshot_install_check.sh
@@ -442,18 +479,7 @@ log_info "release_distribution_check.sh: install script dry-run matrix verified"
 check_local_install_fixture
 log_info "release_distribution_check.sh: local install fixture verified"
 
-if command -v goreleaser >/dev/null 2>&1; then
-  goreleaser_available="true"
-  if [[ "$json_out" == "true" ]]; then
-    goreleaser check >/dev/null
-  else
-    goreleaser check
-  fi
-elif [[ "$require_goreleaser" == "true" ]]; then
-  fail "missing_command" "goreleaser CLI is required for release distribution profile"
-else
-  log_info "release_distribution_check.sh: goreleaser not installed; skipping local goreleaser check"
-fi
+run_goreleaser_check
 
 if [[ "$json_out" == "true" ]]; then
   print_json_report

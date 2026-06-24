@@ -2486,18 +2486,34 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 			t.Fatalf("release distribution JSON missing workflow %q: %+v", workflow, report.WorkflowFiles)
 		}
 	}
-	if _, err := exec.LookPath("goreleaser"); err == nil {
-		t.Skip("goreleaser is installed locally; missing-command JSON failure path is not applicable")
+	tmpBin := t.TempDir()
+	for _, name := range []string{"awk", "bash", "chmod", "cp", "dirname", "env", "grep", "install", "mkdir", "mktemp", "openssl", "rm", "sh", "shasum", "sha256sum", "tar", "unzip", "zip"} {
+		path, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+		if err := os.Symlink(path, filepath.Join(tmpBin, name)); err != nil && !errors.Is(err, os.ErrExist) {
+			t.Fatalf("symlink %s into test PATH: %v", name, err)
+		}
 	}
-	failed := runCommandResult(root, 30*time.Second, "bash", "scripts/release_distribution_check.sh", "--require-goreleaser", "--json")
-	if failed.err == nil {
-		t.Fatalf("release_distribution_check.sh --require-goreleaser unexpectedly succeeded\nstdout:\n%s\nstderr:\n%s", failed.stdout, failed.stderr)
+	if _, err := os.Stat(filepath.Join(tmpBin, "bash")); err != nil {
+		t.Fatalf("test PATH needs bash: %v", err)
+	}
+
+	cmd := exec.Command("bash", "scripts/release_distribution_check.sh", "--require-goreleaser", "--json")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "PATH="+tmpBin)
+	failureOut, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("release_distribution_check.sh --require-goreleaser unexpectedly succeeded without go or goreleaser in PATH\noutput:\n%s", failureOut)
 	}
 	var failedReport struct {
 		SchemaVersion       int      `json:"schema_version"`
 		Status              string   `json:"status"`
 		RequireGoreleaser   bool     `json:"require_goreleaser"`
 		GoreleaserAvailable bool     `json:"goreleaser_available"`
+		GoreleaserCheck     string   `json:"goreleaser_check"`
+		GoreleaserSource    string   `json:"goreleaser_check_source"`
 		FailureKindCount    int      `json:"failure_kind_count"`
 		FailureKinds        []string `json:"failure_kinds"`
 		FailureCount        int      `json:"failure_count"`
@@ -2506,13 +2522,13 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 			Message string `json:"message"`
 		} `json:"failure_details"`
 	}
-	if err := json.Unmarshal([]byte(failed.stdout), &failedReport); err != nil {
-		t.Fatalf("release distribution failure JSON failed to decode: %v\nstdout:\n%s\nstderr:\n%s", err, failed.stdout, failed.stderr)
+	if err := json.Unmarshal(failureOut, &failedReport); err != nil {
+		t.Fatalf("release distribution failure JSON failed to decode: %v\noutput:\n%s", err, failureOut)
 	}
-	if failedReport.SchemaVersion != 1 || failedReport.Status != "fail" || !failedReport.RequireGoreleaser || failedReport.GoreleaserAvailable {
+	if failedReport.SchemaVersion != 1 || failedReport.Status != "fail" || !failedReport.RequireGoreleaser || failedReport.GoreleaserAvailable || failedReport.GoreleaserCheck != "skipped" || failedReport.GoreleaserSource != "none" {
 		t.Fatalf("release distribution failure JSON = %+v, want require-goreleaser failure report", failedReport)
 	}
-	if failedReport.FailureKindCount != 1 || failedReport.FailureCount != 1 || !stringSliceContains(failedReport.FailureKinds, "missing_command") || len(failedReport.FailureDetails) != 1 || failedReport.FailureDetails[0].Kind != "missing_command" || !strings.Contains(failedReport.FailureDetails[0].Message, "goreleaser CLI is required") {
+	if failedReport.FailureKindCount != 1 || failedReport.FailureCount != 1 || !stringSliceContains(failedReport.FailureKinds, "missing_command") || len(failedReport.FailureDetails) != 1 || failedReport.FailureDetails[0].Kind != "missing_command" || !strings.Contains(failedReport.FailureDetails[0].Message, "pinned go-run fallback") {
 		t.Fatalf("release distribution failure details = %+v, want missing goreleaser detail", failedReport)
 	}
 }

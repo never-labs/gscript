@@ -100,7 +100,9 @@ work.
 Distribution checks are split between local artifacts and hosted workflow
 presence. The local check validates GoReleaser metadata, the install script
 dry-run combinations, and local `file://` tar.gz/zip install fixtures even when
-GitHub workflow files are intentionally absent:
+GitHub workflow files are intentionally absent. When GoReleaser is required, the
+check uses a local `goreleaser` binary if present or the pinned Go module
+fallback used by release workflows:
 
 ```bash
 scripts/public_release_blockers_check.sh --require-resolved
