@@ -1064,6 +1064,48 @@ func TestBenchRegressionGuardSummarizesPartialSuccess(t *testing.T) {
 	}
 }
 
+func TestBenchGoHarnessParsesAndReportsRuntimeCounters(t *testing.T) {
+	output := "Time: 0.010s\n  Tier 2 attempted: 3\n  Tier 2 entered:  1 functions\n  Tier 2 failed: 1 functions\n  total exits: 7\n"
+	if got := benchParseCounter(benchT2AttemptedRE, output); got != 3 {
+		t.Fatalf("t2 attempted = %d, want 3", got)
+	}
+	if got := benchParseCounter(benchT2EnteredRE, output); got != 1 {
+		t.Fatalf("t2 entered = %d, want 1", got)
+	}
+	if got := benchParseCounter(benchT2FailedRE, output); got != 1 {
+		t.Fatalf("t2 failed = %d, want 1", got)
+	}
+	if got := benchParseCounter(benchExitTotalRE, output); got != 7 {
+		t.Fatalf("exit total = %d, want 7", got)
+	}
+
+	a, b := 0.3, 0.1
+	result := summarizeBenchGoSubject("current", "default", []benchGoSample{
+		{Status: "timeout", T2Attempted: 99},
+		{Status: "ok", Seconds: &a, Source: "script_repeat", T2Attempted: 2, T2Entered: 1, ExitTotal: 4},
+		{Status: "ok", Seconds: &b, Source: "script_repeat", T2Attempted: 4, T2Entered: 3, T2Failed: 1, ExitTotal: 7},
+	}, 1)
+	if result.Status != "partial" || result.Stats.Median == nil || *result.Stats.Median != 0.2 || result.T2Attempted != 2 || result.T2Entered != 1 || result.T2Failed != 0 || result.ExitTotal != 4 {
+		t.Fatalf("summary = %+v", result)
+	}
+
+	row := benchGoBenchmarkResult{
+		Group:     "control",
+		Benchmark: "sieve",
+		Modes: map[string]map[string]benchGoSubjectResult{
+			"default": {
+				"current": result,
+				"head":    {Status: "ok", Stats: benchGoComputeStats([]float64{0.4})},
+				"luajit":  {Status: "ok", Stats: benchGoComputeStats([]float64{0.05})},
+			},
+		},
+	}
+	markdown := benchGoMarkdown(benchGoHarnessConfig{Mode: "compare", Modes: []string{"default"}}, []benchGoBenchmarkResult{row})
+	if !strings.Contains(markdown, "| control/sieve | default | 0.200000s | 0.400000s | 0.050000s | script_repeat | 2/1/0 | 4 |") {
+		t.Fatalf("markdown = %s", markdown)
+	}
+}
+
 func TestBenchRegressionGuardWritesCSVAndMarkdown(t *testing.T) {
 	vm, def, lua, base, pct := 1.0, 0.5, 0.25, 0.4, 25.0
 	row := benchRegressionResult{

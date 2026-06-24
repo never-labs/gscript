@@ -73,6 +73,10 @@ type benchGoSample struct {
 	Source             string   `json:"source,omitempty"`
 	ScriptTotalSeconds *float64 `json:"script_total_seconds,omitempty"`
 	WallTotalSeconds   float64  `json:"wall_total_seconds"`
+	T2Attempted        int      `json:"t2_attempted,omitempty"`
+	T2Entered          int      `json:"t2_entered,omitempty"`
+	T2Failed           int      `json:"t2_failed,omitempty"`
+	ExitTotal          int      `json:"exit_total,omitempty"`
 	Note               string   `json:"note,omitempty"`
 }
 
@@ -776,32 +780,66 @@ func runBenchGoSample(cmd benchModeCommand, repeat int, cfg benchGoHarnessConfig
 		t2Failed += benchParseCounter(benchT2FailedRE, run.Output)
 		exitTotal += benchParseCounter(benchExitTotalRE, run.Output)
 	}
-	_ = t2Attempted
-	_ = t2Entered
-	_ = t2Failed
-	_ = exitTotal
+	counters := benchGoSample{
+		T2Attempted: t2Attempted,
+		T2Entered:   t2Entered,
+		T2Failed:    t2Failed,
+		ExitTotal:   exitTotal,
+	}
 	if badStatus != "" {
-		return benchGoSample{Status: badStatus, Repeat: repeat, WallTotalSeconds: wallTotal, Note: fmt.Sprintf("%d repeated command(s) include failure", repeat)}
+		counters.Status = badStatus
+		counters.Repeat = repeat
+		counters.WallTotalSeconds = wallTotal
+		counters.Note = fmt.Sprintf("%d repeated command(s) include failure", repeat)
+		return counters
 	}
 	if timeSource == "wall" {
 		seconds := wallTotal / float64(repeat)
-		return benchGoSample{Status: "ok", Seconds: &seconds, Repeat: repeat, Source: "wall_hr", WallTotalSeconds: wallTotal, Note: "used command wall time"}
+		counters.Status = "ok"
+		counters.Seconds = &seconds
+		counters.Repeat = repeat
+		counters.Source = "wall_hr"
+		counters.WallTotalSeconds = wallTotal
+		counters.Note = "used command wall time"
+		return counters
 	}
 	if noTime {
-		return benchGoSample{Status: "no_time", Repeat: repeat, WallTotalSeconds: wallTotal, Note: "no Time: line in command output"}
+		counters.Status = "no_time"
+		counters.Repeat = repeat
+		counters.WallTotalSeconds = wallTotal
+		counters.Note = "no Time: line in command output"
+		return counters
 	}
 	if scriptTotal > cfg.TimerResolution && scriptTotal >= cfg.MinSampleSeconds {
 		seconds := scriptTotal / float64(repeat)
 		total := scriptTotal
-		return benchGoSample{Status: "ok", Seconds: &seconds, Repeat: repeat, Source: "script_repeat", ScriptTotalSeconds: &total, WallTotalSeconds: wallTotal}
+		counters.Status = "ok"
+		counters.Seconds = &seconds
+		counters.Repeat = repeat
+		counters.Source = "script_repeat"
+		counters.ScriptTotalSeconds = &total
+		counters.WallTotalSeconds = wallTotal
+		return counters
 	}
 	if !cfg.NoWallFallback && wallTotal >= cfg.MinSampleSeconds {
 		seconds := wallTotal / float64(repeat)
 		total := scriptTotal
-		return benchGoSample{Status: "ok", Seconds: &seconds, Repeat: repeat, Source: "wall_repeat", ScriptTotalSeconds: &total, WallTotalSeconds: wallTotal, Note: "script Time below resolution; used command wall time"}
+		counters.Status = "ok"
+		counters.Seconds = &seconds
+		counters.Repeat = repeat
+		counters.Source = "wall_repeat"
+		counters.ScriptTotalSeconds = &total
+		counters.WallTotalSeconds = wallTotal
+		counters.Note = "script Time below resolution; used command wall time"
+		return counters
 	}
 	total := scriptTotal
-	return benchGoSample{Status: "low_resolution", Repeat: repeat, ScriptTotalSeconds: &total, WallTotalSeconds: wallTotal, Note: "script Time below resolution"}
+	counters.Status = "low_resolution"
+	counters.Repeat = repeat
+	counters.ScriptTotalSeconds = &total
+	counters.WallTotalSeconds = wallTotal
+	counters.Note = "script Time below resolution"
+	return counters
 }
 
 var (
@@ -826,6 +864,11 @@ func benchGoSampleBigEnough(sample benchGoSample, minSampleSeconds float64, minW
 
 func summarizeBenchGoSubject(subject, runMode string, samples []benchGoSample, repeat int) benchGoSubjectResult {
 	values := []float64{}
+	type timedSample struct {
+		seconds float64
+		sample  benchGoSample
+	}
+	okSamples := []timedSample{}
 	sourceSet := map[string]bool{}
 	status := "missing"
 	for _, sample := range samples {
@@ -834,6 +877,7 @@ func summarizeBenchGoSubject(subject, runMode string, samples []benchGoSample, r
 		}
 		if sample.Status == "ok" && sample.Seconds != nil {
 			values = append(values, *sample.Seconds)
+			okSamples = append(okSamples, timedSample{seconds: *sample.Seconds, sample: sample})
 			if sample.Source != "" {
 				sourceSet[sample.Source] = true
 			}
@@ -850,14 +894,27 @@ func summarizeBenchGoSubject(subject, runMode string, samples []benchGoSample, r
 		sources = append(sources, source)
 	}
 	sort.Strings(sources)
+	counterSource := benchGoSample{}
+	if len(okSamples) > 0 {
+		sort.Slice(okSamples, func(i, j int) bool {
+			return okSamples[i].seconds < okSamples[j].seconds
+		})
+		counterSource = okSamples[len(okSamples)/2].sample
+	} else if len(samples) > 0 {
+		counterSource = samples[len(samples)-1]
+	}
 	return benchGoSubjectResult{
-		Subject: subject,
-		Mode:    runMode,
-		Status:  status,
-		Repeat:  repeat,
-		Source:  strings.Join(sources, ","),
-		Stats:   benchGoComputeStats(values),
-		Samples: samples,
+		Subject:     subject,
+		Mode:        runMode,
+		Status:      status,
+		Repeat:      repeat,
+		Source:      strings.Join(sources, ","),
+		Stats:       benchGoComputeStats(values),
+		Samples:     samples,
+		T2Attempted: counterSource.T2Attempted,
+		T2Entered:   counterSource.T2Entered,
+		T2Failed:    counterSource.T2Failed,
+		ExitTotal:   counterSource.ExitTotal,
 	}
 }
 
@@ -978,28 +1035,32 @@ func benchGoMarkdown(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult) st
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Leia Bench %s Report\n\n", cfg.Mode)
 	if cfg.Mode == "strict" {
-		b.WriteString("| Benchmark | Mode | Status | Median | Source | Checksum |\n")
-		b.WriteString("| --- | --- | --- | ---: | --- | --- |\n")
+		b.WriteString("| Benchmark | Mode | Status | Median | Source | T2 | Exits | Checksum |\n")
+		b.WriteString("| --- | --- | --- | ---: | --- | ---: | ---: | --- |\n")
 		for _, row := range rows {
 			for _, mode := range cfg.Modes {
 				subject := row.Strict[mode]
-				fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s |\n", row.Group, row.Benchmark, mode, subject.Status, benchGoSeconds(subject.Stats.Median), subject.Source, "ok")
+				fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s | %d | %s |\n", row.Group, row.Benchmark, mode, subject.Status, benchGoSeconds(subject.Stats.Median), subject.Source, benchGoT2(subject), subject.ExitTotal, "ok")
 			}
 		}
 		return b.String()
 	}
-	b.WriteString("| Benchmark | Mode | Current | HEAD | LuaJIT | Source |\n")
-	b.WriteString("| --- | --- | ---: | ---: | ---: | --- |\n")
+	b.WriteString("| Benchmark | Mode | Current | HEAD | LuaJIT | Source | T2 | Exits |\n")
+	b.WriteString("| --- | --- | ---: | ---: | ---: | --- | ---: | ---: |\n")
 	for _, row := range rows {
 		for _, mode := range cfg.Modes {
 			modeRow := row.Modes[mode]
 			current := modeRow["current"]
 			head := modeRow["head"]
 			luajit := modeRow["luajit"]
-			fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s |\n", row.Group, row.Benchmark, mode, benchGoSeconds(current.Stats.Median), benchGoSeconds(head.Stats.Median), benchGoSeconds(luajit.Stats.Median), current.Source)
+			fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s | %s | %d |\n", row.Group, row.Benchmark, mode, benchGoSeconds(current.Stats.Median), benchGoSeconds(head.Stats.Median), benchGoSeconds(luajit.Stats.Median), current.Source, benchGoT2(current), current.ExitTotal)
 		}
 	}
 	return b.String()
+}
+
+func benchGoT2(subject benchGoSubjectResult) string {
+	return fmt.Sprintf("%d/%d/%d", subject.T2Attempted, subject.T2Entered, subject.T2Failed)
 }
 
 func benchGoSeconds(value *float64) string {
