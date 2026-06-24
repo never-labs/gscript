@@ -2498,6 +2498,46 @@ func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixReleaseDistributionJSONStaysCleanWithoutHostedWorkflows(t *testing.T) {
+	root := findRepoRoot(t)
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "scripts"), 0o755); err != nil {
+		t.Fatalf("mkdir temp scripts: %v", err)
+	}
+	for _, path := range []string{
+		".goreleaser.yaml",
+		"scripts/install.sh",
+		"scripts/release_distribution_check.sh",
+		"scripts/release_snapshot_install_check.sh",
+	} {
+		src := readFileString(t, filepath.Join(root, path))
+		dst := filepath.Join(tmp, path)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(dst), err)
+		}
+		if err := os.WriteFile(dst, []byte(src), 0o755); err != nil {
+			t.Fatalf("write %s: %v", dst, err)
+		}
+	}
+
+	out := runCommand(t, tmp, 30*time.Second, "bash", "scripts/release_distribution_check.sh", "--json")
+	if !strings.HasPrefix(strings.TrimSpace(out), "{") {
+		t.Fatalf("release distribution JSON was prefixed by non-JSON output:\n%s", out)
+	}
+	var report struct {
+		SchemaVersion int      `json:"schema_version"`
+		Status        string   `json:"status"`
+		WorkflowCount int      `json:"workflow_count"`
+		WorkflowFiles []string `json:"workflow_files"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("release distribution JSON without workflows failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.WorkflowCount != 0 || len(report.WorkflowFiles) != 0 {
+		t.Fatalf("release distribution JSON without workflows = %+v, want clean pass with no workflow files", report)
+	}
+}
+
 func TestReleaseMatrixDocGenerateReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "doc", "generate", "--format=json")
