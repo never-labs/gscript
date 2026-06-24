@@ -311,7 +311,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	productionFullCmd := "scripts/run.sh production --full --release-profile --release-version vX.Y.Z"
 	performanceSmokeCmd := "scripts/run.sh perf --smoke"
 	fullPerfGateCmd := "scripts/run.sh perf --full"
-	shellSyntaxCmd := "git ls-files '*.sh' | while IFS= read -r f; do bash -n \"$f\"; done"
+	shellSyntaxCmd := "scripts/run.sh shell-syntax"
 	publicReleaseBlockersCmd := "scripts/run.sh public-blockers --require-resolved"
 	releaseDistributionCmd := "scripts/run.sh release-dist --require-goreleaser"
 	releaseNotesCmd := "scripts/run.sh release-notes --require-ready --version vX.Y.Z"
@@ -602,9 +602,8 @@ func TestReleaseMatrixPackageMetadataPromiseHasProductionGates(t *testing.T) {
 	fullOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")
 	for _, snippet := range []string{
 		"Module Path Gate",
-		`test "$(go list -m)" = "github.com/never-labs/leia"`,
-		"go run ./cmd/leia mod init --module example.com/cli-experience",
-		"go run ./cmd/leia mod check --json",
+		"scripts/run.sh module-path github.com/never-labs/leia",
+		"scripts/run.sh cli-experience",
 	} {
 		if !strings.Contains(fullOut, snippet) {
 			t.Fatalf("production_check.sh --full --list must keep package metadata gate %q; got:\n%s", snippet, fullOut)
@@ -715,7 +714,7 @@ func TestReleaseMatrixDocumentedCIProfilesAreInspectable(t *testing.T) {
 		}
 	}
 	releaseOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--release-profile", "--list")
-	if !strings.Contains(releaseOut, `test "$(go list -m)" = "github.com/never-labs/leia"`) {
+	if !strings.Contains(releaseOut, "scripts/run.sh module-path github.com/never-labs/leia") {
 		t.Fatalf("production release profile must include module path gate output; got:\n%s", releaseOut)
 	}
 }
@@ -3004,6 +3003,8 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 	}
 	for name, want := range map[string]string{
 		"Architecture Health":     "scripts/run.sh arch --json",
+		"Module Path Gate":        "scripts/run.sh module-path github.com/never-labs/leia",
+		"Shell Script Syntax":     "scripts/run.sh shell-syntax",
 		"Public Release Blockers": "scripts/run.sh public-blockers --require-resolved",
 		"Release Distribution":    "scripts/run.sh release-dist --require-goreleaser",
 		"Release Notes":           "scripts/run.sh release-notes-gate --version \"vX.Y.Z\"",

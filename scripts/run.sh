@@ -15,6 +15,7 @@ Tasks:
   editor               Run editor asset checks
   perf                 Run performance gate
   production           Run production readiness gate
+  module-path          Check repository module path
   public-blockers      Check public release blocker decisions
   q                    Run q conformance gate
   q-perf               Run q performance report gate
@@ -28,6 +29,7 @@ Tasks:
   release-smoke        Run release-profile smoke checks
   release-snapshot     Verify a snapshot archive through the installer
   site                 Check rendered static site output
+  shell-syntax         Parse all tracked shell scripts
   cli-experience       Run CLI experience checks
   worktree             Audit git worktrees
 
@@ -292,6 +294,25 @@ USAGE
   go run ./cmd/leia playground --help
 }
 
+run_module_path_task() {
+  local expected="${1:-github.com/never-labs/leia}"
+  local actual
+  actual="$(go list -m)"
+  if [ "$actual" != "$expected" ]; then
+    echo "scripts/run.sh module-path: module path $actual, want $expected" >&2
+    exit 1
+  fi
+  echo "module path: $actual"
+}
+
+run_shell_syntax_task() {
+  local script
+  while IFS= read -r script; do
+    bash -n "$script"
+  done < <(git ls-files '*.sh')
+  echo "shell syntax: ok"
+}
+
 case "$task" in
   -h|--help|help)
     usage
@@ -316,6 +337,9 @@ case "$task" in
     ;;
   production|production-check)
     run_shell_task scripts/production_check.sh "$@"
+    ;;
+  module-path|module-path-check)
+    run_module_path_task "$@"
     ;;
   public-blockers|public-release-blockers|public-release-blockers-check)
     run_shell_task scripts/public_release_blockers_check.sh "$@"
@@ -352,6 +376,9 @@ case "$task" in
     ;;
   site|site-check)
     run_shell_task scripts/site_check.sh "$@"
+    ;;
+  shell-syntax|shell-syntax-check)
+    run_shell_syntax_task "$@"
     ;;
   cli-experience)
     run_cli_experience_task "$@"

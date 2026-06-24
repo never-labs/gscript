@@ -560,11 +560,11 @@ add_module_path_gate() {
         add_skip "Module Path Gate" "missing go"
         return
     fi
-    add_run "Module Path Gate" "test \"\$(go list -m)\" = \"$EXPECTED_MODULE_PATH\""
+    add_run "Module Path Gate" "scripts/run.sh module-path $EXPECTED_MODULE_PATH"
 }
 
 add_shell_script_syntax_gate() {
-    add_run "Shell Script Syntax" "git ls-files '*.sh' | while IFS= read -r f; do bash -n \"\$f\"; done"
+    add_run "Shell Script Syntax" "scripts/run.sh shell-syntax"
 }
 
 add_release_smoke() {
