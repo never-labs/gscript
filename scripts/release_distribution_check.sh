@@ -408,6 +408,7 @@ if [[ -f .github/workflows/pages.yml ]]; then
 fi
 
 if [[ -f .github/workflows/distribution-check.yml ]]; then
+  require_contains .github/workflows/distribution-check.yml "- scripts/run.sh"
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
   require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-snapshot --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
 fi
@@ -438,6 +439,7 @@ if [[ -f .github/workflows/release.yml ]]; then
   require_contains .github/workflows/release.yml '--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"'
 fi
 if [[ -f .github/workflows/distribution-check.yml ]]; then
+  require_contains .github/workflows/distribution-check.yml "- scripts/run.sh"
   require_contains .github/workflows/distribution-check.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
   require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-notes"
   require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-dist --require-goreleaser --require-workflows"
