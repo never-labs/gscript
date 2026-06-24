@@ -160,6 +160,54 @@ func TestBenchCommandDispatchesCompareQuickProfile(t *testing.T) {
 	}
 }
 
+func TestBenchCompareJobsKeepDeterministicResultOrder(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	jsonPath := filepath.Join(t.TempDir(), "jobs.json")
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{
+		"compare",
+		"--dry-run",
+		"--jobs", "2",
+		"--bench", "control/sieve",
+		"--bench", "table/table_array_access",
+		"--no-luajit",
+		"--json", jsonPath,
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report struct {
+		Results []map[string]any `json:"results"`
+	}
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Results) != 2 || report.Results[0]["group"] != "control" || report.Results[0]["benchmark"] != "sieve" || report.Results[1]["group"] != "table" || report.Results[1]["benchmark"] != "table_array_access" {
+		t.Fatalf("results = %#v", report.Results)
+	}
+}
+
+func TestBenchCompareRejectsInvalidJobs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"compare", "--jobs", "0", "--bench", "control/sieve"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runBenchCommand code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "--jobs must be >= 1") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
 func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })

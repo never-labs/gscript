@@ -57,8 +57,9 @@ evidence.
 
 For fast local checks, use `leia bench --quick`. For release-quality evidence,
 write JSON and Markdown reports from the full and strict benchmark commands.
-Pass `--jobs N` explicitly only for exploratory timing runs where local CPU
-contention is acceptable.
+`--jobs N` runs different benchmark selectors concurrently while preserving
+deterministic report row order. Use it for throughput-oriented local sweeps;
+use `--jobs 1` when investigating a single noisy timing row.
 
 ## Timing Modes
 
