@@ -155,6 +155,54 @@ func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
 	}
 }
 
+func TestDocSpecPreviewRendersPublishableHTML(t *testing.T) {
+	dir := t.TempDir()
+	for _, item := range []struct {
+		name string
+		body string
+	}{
+		{
+			name: "index.md",
+			body: "---\nlayout: spec\ntitle: Spec\n---\n# Intro\nSee [Notation](notation.md), [Grammar](grammar.ebnf), and [Source section](source.md#comments).\n<!-- hidden generator marker -->\n```leia\nprint(\"ok\")\n```\n",
+		},
+		{name: "notation.md", body: "# Notation\n"},
+		{name: "source.md", body: "# Source\n"},
+		{name: "lexical.md", body: "# Lexical\n"},
+		{name: "declarations.md", body: "# Declarations\n"},
+		{name: "values.md", body: "# Values\n"},
+		{name: "expressions.md", body: "# Expressions\n"},
+		{name: "statements.md", body: "# Statements\n"},
+		{name: "functions.md", body: "# Functions\n"},
+		{name: "tables.md", body: "# Tables\n"},
+		{name: "concurrency.md", body: "# Concurrency\n"},
+		{name: "dialects.md", body: "# Dialects\n"},
+		{name: "q-dialect.md", body: "# q\n"},
+		{name: "ai-dialect.md", body: "# AI\n"},
+		{name: "modules.md", body: "# Modules\n"},
+		{name: "errors.md", body: "# Errors\n"},
+		{name: "implementation.md", body: "# Implementation\n"},
+		{name: "grammar.ebnf", body: "expr = ident ;\n"},
+	} {
+		if err := os.WriteFile(filepath.Join(dir, item.name), []byte(item.body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	htmlText, err := renderSpecPreview(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"layout: spec", "hidden generator marker", `href="#"`} {
+		if strings.Contains(htmlText, bad) {
+			t.Fatalf("spec preview contains %q:\n%s", bad, htmlText)
+		}
+	}
+	for _, want := range []string{`href="#notation"`, `href="#grammar-appendix"`, `href="#source-code-representation-comments"`, `language-leia leia-code`} {
+		if !strings.Contains(htmlText, want) {
+			t.Fatalf("spec preview missing %q:\n%s", want, htmlText)
+		}
+	}
+}
+
 func docDefaultImportsContain(imports []cliDefaultImport, name, module, member string) bool {
 	for _, item := range imports {
 		if item.Name == name && item.Module == module && item.Member == member {

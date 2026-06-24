@@ -44,7 +44,7 @@ var (
 	specPreviewNumberRE       = regexp.MustCompile(`(?i)(?:0x[0-9a-f](?:_?[0-9a-f])*|0b[01](?:_?[01])*|0o[0-7](?:_?[0-7])*|(?:[0-9](?:_?[0-9])*)\.(?:[0-9](?:_?[0-9])*)?(?:e[+-]?[0-9](?:_?[0-9])*)?|(?:[0-9](?:_?[0-9])*)e[+-]?[0-9](?:_?[0-9])*|[0-9](?:_?[0-9])*)`)
 	specPreviewIdentRE        = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 	specPreviewOLRE           = regexp.MustCompile(`^\d+\. `)
-	specPreviewLinkRE         = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
+	specPreviewLinkRE         = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
 	specPreviewCodeRE         = regexp.MustCompile("`([^`]+)`")
 	specPreviewSlugRE         = regexp.MustCompile(`[^a-z0-9]+`)
 )
@@ -215,7 +215,7 @@ func renderSpecPreview(specDir string) (string, error) {
 }
 
 func specPreviewMarkdownToHTML(text, prefix string) string {
-	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	lines := specPreviewMarkdownLines(text)
 	var out []string
 	var paragraph []string
 	var code []string
@@ -260,6 +260,11 @@ func specPreviewMarkdownToHTML(text, prefix string) string {
 		}
 		if inCode {
 			code = append(code, line)
+			i++
+			continue
+		}
+		trimmedLine := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmedLine, "<!--") && strings.HasSuffix(trimmedLine, "-->") {
 			i++
 			continue
 		}
@@ -352,11 +357,63 @@ func specPreviewMarkdownToHTML(text, prefix string) string {
 	return strings.Join(out, "\n")
 }
 
+func specPreviewMarkdownLines(text string) []string {
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return lines
+	}
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			return lines[i+1:]
+		}
+	}
+	return lines
+}
+
 func specPreviewInlineMarkdown(text string) string {
 	escaped := html.EscapeString(text)
 	escaped = specPreviewCodeRE.ReplaceAllString(escaped, "<code>$1</code>")
-	escaped = specPreviewLinkRE.ReplaceAllString(escaped, `<a href="#">$1</a>`)
+	escaped = specPreviewLinkRE.ReplaceAllStringFunc(escaped, func(match string) string {
+		parts := specPreviewLinkRE.FindStringSubmatch(match)
+		if len(parts) != 3 {
+			return match
+		}
+		return `<a href="` + html.EscapeString(specPreviewPreviewHref(parts[2])) + `">` + parts[1] + `</a>`
+	})
 	return escaped
+}
+
+func specPreviewPreviewHref(target string) string {
+	target = strings.TrimSpace(target)
+	target = strings.Trim(target, `"'`)
+	if target == "" || target == "#" {
+		return "#"
+	}
+	if strings.HasPrefix(target, "#") || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
+		return target
+	}
+	base := target
+	fragment := ""
+	if idx := strings.IndexByte(base, '#'); idx >= 0 {
+		fragment = base[idx+1:]
+		base = base[:idx]
+	}
+	if base == "grammar.ebnf" {
+		if fragment != "" {
+			return "#grammar-appendix-" + specPreviewSlug(fragment)
+		}
+		return "#grammar-appendix"
+	}
+	for _, chapter := range specPreviewChapters {
+		if base == chapter.File {
+			href := "#" + specPreviewSlug(chapter.Title)
+			if fragment != "" {
+				href += "-" + specPreviewSlug(fragment)
+			}
+			return href
+		}
+	}
+	return target
 }
 
 func specPreviewRenderCodeBlock(source, info string) string {

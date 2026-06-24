@@ -156,6 +156,11 @@ while [ "$#" -gt 0 ]; do
             # leave a small margin for 1-2 sample timing jitter. Full/release
             # gates keep the default 0.80 threshold.
             LUAJIT_THRESHOLD=0.85
+            # Strict smoke includes short script-timed rows; keep samples away
+            # from the timer-resolution boundary so one 0.099s sample cannot
+            # make an otherwise healthy truth pass look partial.
+            MIN_SAMPLE_SECONDS=0.300
+            MAX_REPEAT=256
             ;;
         --syntax-smoke)
             PROFILE="syntax_smoke"

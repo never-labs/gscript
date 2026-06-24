@@ -1269,19 +1269,20 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"Public releases require explicit maintainer decisions",
 		"## Required Before Public Release",
 		"| Area | Decision Needed | Current Status |",
-		"| License | Choose the repository license",
-		"| Security reporting | Confirm the private reporting route",
-		"| Platform support | Define tested and supported OS/architecture combinations",
-		"| Release channels | Decide which channels are public",
-		"| Artifact signing | Decide whether SHA256 checksums are sufficient",
-		"| Compatibility policy | Define the pre-1.0 compatibility promise",
-		"The repository has no selected license until a root `LICENSE` file exists.",
-		"whether GitHub private security advisories are enabled",
-		"tested OS/architecture combinations",
-		"whether `scripts/install.sh` is a supported install path",
-		"whether SHA256 checksums are sufficient",
-		"checksum and signing requirements",
+		"| License | Use Apache-2.0",
+		"| Security reporting | Use GitHub private security advisories",
+		"| Platform support | Test and support darwin/linux on amd64/arm64",
+		"| Release channels | Publish GitHub Releases, `scripts/install.sh`, and `go install`",
+		"| Artifact signing | Publish SHA256 checksums for release archives",
+		"| Compatibility policy | Use a pre-1.0 compatibility policy",
+		"authoritative license text",
+		"GitHub private security advisories are the primary route",
+		"Initial supported combinations are `darwin/amd64`, `darwin/arm64`,",
+		"Official initial public channels are GitHub Releases, `scripts/install.sh`,",
+		"SHA256 checksums are sufficient for the initial public release",
+		"checksum and signing policy",
 		"Optimizations, JIT availability, typed kernels, and provider integrations are not compatibility guarantees",
+		"Resolved.",
 	} {
 		if !strings.Contains(decisions, snippet) {
 			t.Fatalf("docs/release/decisions.md must keep maintainer decision snippet %q", snippet)
@@ -1292,18 +1293,12 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 func TestReleaseMatrixPublicReleaseBlockersExplainDecisionWork(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/public_release_blockers_check.sh")
-
-	for _, snippet := range []string{
-		"unresolved release decision: License: Choose the repository license and whether a `NOTICE` file is required. (Open.)",
-		"unresolved release decision: Security reporting: Confirm the private reporting route, contact path, and disclosure policy. (Open.)",
-		"unresolved release decision: Platform support: Define tested and supported OS/architecture combinations for the release. (Open.)",
-		"unresolved release decision: Release channels: Decide which channels are public: GitHub Releases, install script, `go install`, package managers, or others. (Open.)",
-		"unresolved release decision: Artifact signing: Decide whether SHA256 checksums are sufficient or whether cosign, GPG, or another signing flow is required. (Open.)",
-		"unresolved release decision: Compatibility policy: Define the pre-1.0 compatibility promise and the intended v1.0 stable surface. (Open.)",
-	} {
-		if !strings.Contains(out, snippet) {
-			t.Fatalf("public release blocker output must include actionable release decision detail %q; got:\n%s", snippet, out)
-		}
+	if strings.TrimSpace(out) != "public_release_blockers_check.sh: pass" {
+		t.Fatalf("public release blocker audit output = %q, want pass", out)
+	}
+	requireResolvedOut := runCommand(t, root, 30*time.Second, "bash", "scripts/public_release_blockers_check.sh", "--require-resolved")
+	if strings.TrimSpace(requireResolvedOut) != "public_release_blockers_check.sh: pass" {
+		t.Fatalf("public release blocker require-resolved output = %q, want pass", requireResolvedOut)
 	}
 }
 
@@ -1343,8 +1338,8 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("public release blocker JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Status != "blocked" || report.RequireResolved || report.BlockerCount != len(report.Blockers) || report.BlockerCount != len(report.BlockerDetails) {
-		t.Fatalf("public release blocker JSON = %+v, want blocked schema v1 report", report)
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.RequireResolved || report.BlockerCount != len(report.Blockers) || report.BlockerCount != len(report.BlockerDetails) {
+		t.Fatalf("public release blocker JSON = %+v, want passing schema v1 report", report)
 	}
 	kindCounts := map[string]int{}
 	statusCounts := map[string]int{}
@@ -1355,7 +1350,7 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 	if report.MissingFiles != kindCounts["missing_file"] || report.Decisions != kindCounts["release_decision"] || report.StaleText != kindCounts["stale_text"] || report.Unconfirmed != kindCounts["unconfirmed_policy"] || report.MissingGuidance != kindCounts["missing_guidance"] || report.MissingDocs != kindCounts["missing_doc_snippet"] {
 		t.Fatalf("public release blocker kind counts = missing_file:%d/%d release_decision:%d/%d stale_text:%d/%d unconfirmed:%d/%d missing_guidance:%d/%d missing_doc:%d/%d", report.MissingFiles, kindCounts["missing_file"], report.Decisions, kindCounts["release_decision"], report.StaleText, kindCounts["stale_text"], report.Unconfirmed, kindCounts["unconfirmed_policy"], report.MissingGuidance, kindCounts["missing_guidance"], report.MissingDocs, kindCounts["missing_doc_snippet"])
 	}
-	if report.OpenBlockers != statusCounts["Open"] || report.BlockerStatusCount != len(report.BlockerStatuses) || !stringSliceContains(report.BlockerStatuses, "Open") {
+	if report.OpenBlockers != 0 || report.OpenBlockers != statusCounts["Open"] || report.BlockerStatusCount != len(report.BlockerStatuses) || len(report.BlockerStatuses) != 0 {
 		t.Fatalf("public release blocker status counts = open:%d/%d status_count:%d/%d statuses:%+v", report.OpenBlockers, statusCounts["Open"], report.BlockerStatusCount, len(report.BlockerStatuses), report.BlockerStatuses)
 	}
 	if report.BlockerStatusCount != len(report.BlockerStatusDetails) {
@@ -1374,32 +1369,8 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 			t.Fatalf("public release blocker decision areas = %+v, want %q", report.DecisionAreas, area)
 		}
 	}
-	if report.MissingFiles == 0 || report.Decisions == 0 {
-		t.Fatalf("public release blocker JSON = %+v, want current release blockers split by kind", report)
-	}
-	for _, snippet := range []string{
-		"missing root LICENSE file",
-		"unresolved release decision: License: Choose the repository license and whether a `NOTICE` file is required. (Open.)",
-		"unresolved release decision: Compatibility policy: Define the pre-1.0 compatibility promise and the intended v1.0 stable surface. (Open.)",
-	} {
-		if !stringSliceContains(report.Blockers, snippet) {
-			t.Fatalf("public release blocker JSON missing blocker %q: %+v", snippet, report.Blockers)
-		}
-	}
-	var foundLicenseDecision bool
-	for _, detail := range report.BlockerDetails {
-		if detail.Message == "" || detail.Kind == "" {
-			t.Fatalf("public release blocker detail must include message and kind: %+v", detail)
-		}
-		if detail.Area == "License" && detail.Kind == "release_decision" {
-			foundLicenseDecision = true
-			if detail.Action != "Choose the repository license and whether a `NOTICE` file is required." || detail.DecisionStatus != "Open" || detail.Path != "docs/release/decisions.md" {
-				t.Fatalf("license decision detail = %+v, want actionable release decision metadata", detail)
-			}
-		}
-	}
-	if !foundLicenseDecision {
-		t.Fatalf("public release blocker details missing License release decision: %+v", report.BlockerDetails)
+	if report.MissingFiles != 0 || report.Decisions != 0 || report.BlockerCount != 0 || len(report.Blockers) != 0 || len(report.BlockerDetails) != 0 {
+		t.Fatalf("public release blocker JSON = %+v, want resolved blockers", report)
 	}
 }
 
