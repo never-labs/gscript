@@ -4,11 +4,14 @@ Leia repository automation uses one shell launcher:
 
 ```sh
 scripts/run.sh <task> [args...]
+scripts/run.sh help <task>
 ```
 
 The launcher is the boot boundary. It may locate the repository, select a Leia
 binary for `.leia` tasks, and dispatch existing legacy tasks. It must not grow
-repository business logic.
+repository business logic. Every user-facing repository task should be
+discoverable from `scripts/run.sh --help`, and task-specific help should be
+available through `scripts/run.sh help <task>`.
 
 Allowed standalone shell entrypoints:
 
@@ -26,6 +29,7 @@ leia <subcommand>
 ```
 
 Legacy `scripts/*.sh` task files may remain while tests, docs, and CI still
-reference them, but new automation should not add another top-level wrapper.
-When a task is rewritten, put the implementation in Leia or Go and keep
-`scripts/run.sh` as the compatibility dispatcher.
+reference them, but they are implementation files rather than public entrypoints.
+New automation should not add another top-level wrapper. When a task is
+rewritten, put the implementation in Leia or Go and keep `scripts/run.sh` as
+the compatibility dispatcher.

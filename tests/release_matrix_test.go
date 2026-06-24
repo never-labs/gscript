@@ -3061,6 +3061,16 @@ func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
 
 func TestReleaseMatrixLauncherRoutesTaskHelp(t *testing.T) {
 	root := findRepoRoot(t)
+	entrypointsDoc := readFileString(t, filepath.Join(root, "docs", "design", "script-entrypoints.md"))
+	for _, want := range []string{
+		"scripts/run.sh help <task>",
+		"discoverable from `scripts/run.sh --help`",
+		"implementation files rather than public entrypoints",
+	} {
+		if !strings.Contains(entrypointsDoc, want) {
+			t.Fatalf("docs/design/script-entrypoints.md must document launcher help and private task files; missing %q", want)
+		}
+	}
 	for _, tc := range []struct {
 		task string
 		want string
