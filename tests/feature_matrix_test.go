@@ -850,8 +850,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"internal/tooling/evaluate/evaluate_test.go",
 		"cmd/leia/main_playground_test.go",
 		"cmd/leia-lsp/main_test.go",
-		"benchmarks/performance_gate_test.py",
-		"benchmarks/benchmark_discovery_test.py",
+		"benchmarks/performance_gate_test.go",
+		"internal/tooling/benchdisc/discovery_test.go",
 		"examples/tooling/release_evidence_pipeline.leia",
 		"examples/tooling/release_gate_project/main.leia",
 		"docs/guides/tooling.md",
@@ -1036,7 +1036,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"internal/methodjit/diagnose_test.go",
 		"internal/methodjit/exit_resume_check_test.go",
 		"scripts/performance_gate.sh",
-		"benchmarks/performance_gate_test.py",
+		"benchmarks/performance_gate_test.go",
 		"cmd/leia/main_bench_test.go",
 		"benchmarks/manifest.json",
 		"docs/reference/performance/index.md",
@@ -1083,7 +1083,7 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	release := readFileString(t, filepath.Join(root, "docs", "release", "index.md"))
 	gate := readFileString(t, filepath.Join(root, "scripts", "performance_gate.sh"))
 	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
-	benchmarkGateTest := readFileString(t, filepath.Join(root, "benchmarks", "performance_gate_test.py"))
+	benchmarkGateTest := readFileString(t, filepath.Join(root, "benchmarks", "performance_gate_test.go"))
 
 	for _, snippet := range []string{
 		"supported hot paths may run natively, but unsupported",
@@ -1138,9 +1138,9 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 		t.Fatal("production_check.sh must not weaken README execution/performance gates with --no-luajit")
 	}
 	for _, snippet := range []string{
-		"test_jit_fallback_luajit_contract_keeps_gate_refs",
-		"test_validate_only_rejects_luajit_ratio_above_threshold",
-		"test_builtin_gate_selectors_are_registered_manifest_workloads",
+		"TestPerformanceGateJITFallbackLuaJITContractKeepsGateRefs",
+		"TestPerformanceGateValidateOnlyRejectsLuaJITRatioAboveThreshold",
+		"TestPerformanceGateBuiltinSelectorsAreRegisteredManifestWorkloads",
 		"cmd/leia/main_bench_test.go",
 	} {
 		if !strings.Contains(benchmarkGateTest, snippet) {
@@ -1151,7 +1151,7 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	jit := requireFeature(t, loadFeatureMatrixFeatureMap(t, root), "arm64_jit_runtime_fallback")
 	requireFeatureCellRefs(t, jit, "arm64_jit_runtime_fallback", "semantic_gate",
 		"scripts/performance_gate.sh",
-		"benchmarks/performance_gate_test.py",
+		"benchmarks/performance_gate_test.go",
 		"cmd/leia/main_bench_test.go",
 		"benchmarks/manifest.json",
 		"docs/reference/performance/index.md",
