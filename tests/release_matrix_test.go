@@ -311,7 +311,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	productionFullCmd := "scripts/run.sh production --full --release-profile --release-version vX.Y.Z"
 	performanceSmokeCmd := "scripts/run.sh perf --smoke"
 	fullPerfGateCmd := "scripts/run.sh perf --full"
-	shellSyntaxCmd := "for f in scripts/*.sh benchmarks/*.sh; do bash -n \"$f\"; done"
+	shellSyntaxCmd := "git ls-files '*.sh' | while IFS= read -r f; do bash -n \"$f\"; done"
 	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
 	releaseDistributionCmd := "scripts/run.sh release-dist --require-goreleaser"
 	releaseNotesCmd := "scripts/run.sh release-notes --require-ready --version vX.Y.Z"

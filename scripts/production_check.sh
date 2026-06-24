@@ -563,7 +563,7 @@ add_module_path_gate() {
 }
 
 add_shell_script_syntax_gate() {
-    add_run "Shell Script Syntax" "for f in scripts/*.sh benchmarks/*.sh; do bash -n \"\$f\"; done"
+    add_run "Shell Script Syntax" "git ls-files '*.sh' | while IFS= read -r f; do bash -n \"\$f\"; done"
 }
 
 add_release_smoke() {
