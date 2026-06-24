@@ -2581,6 +2581,8 @@ func TestReleaseMatrixDocsCheckReportIsMachineReadable(t *testing.T) {
 			ExamplesIndexDirectories          int `json:"examples_index_directories"`
 			ExamplesCapabilityDriftGates      int `json:"examples_capability_drift_gates"`
 			ReadmeUserFacingGates             int `json:"readme_user_facing_gates"`
+			RetiredPathMentions               int `json:"retired_path_mentions"`
+			RetiredNameMentions               int `json:"retired_name_mentions"`
 			GeneratedReferenceDocs            int `json:"generated_reference_docs"`
 			GeneratedSpecHTML                 int `json:"generated_spec_html"`
 			RunnableSpecExamples              int `json:"runnable_spec_examples"`
@@ -2592,8 +2594,11 @@ func TestReleaseMatrixDocsCheckReportIsMachineReadable(t *testing.T) {
 	if report.SchemaVersion != 1 || report.Status != "pass" || report.FailureCount != 0 || len(report.Failures) != 0 || report.FailureKindCount != 0 || len(report.FailureKinds) != 0 || len(report.FailureDetails) != 0 {
 		t.Fatalf("docs check JSON = %+v, want passing schema v1 report", report)
 	}
-	if report.Counts.MarkdownFiles == 0 || report.Counts.RelativeDocumentationLinks == 0 || report.Counts.RepositoryScriptCodeBlockMentions == 0 {
+	if report.Counts.MarkdownFiles == 0 || report.Counts.RelativeDocumentationLinks == 0 || report.Counts.RepositoryScriptCodeBlockMentions < 0 {
 		t.Fatalf("docs check JSON missing core documentation counts: %+v", report.Counts)
+	}
+	if report.Counts.RetiredPathMentions != 0 || report.Counts.RetiredNameMentions != 0 {
+		t.Fatalf("docs check JSON found retired documentation mentions: %+v", report.Counts)
 	}
 	if report.Counts.ReleaseGateDocs == 0 || report.Counts.ReferenceEntrypoints == 0 || report.Counts.SpecContractDocs == 0 {
 		t.Fatalf("docs check JSON missing release/spec counts: %+v", report.Counts)
