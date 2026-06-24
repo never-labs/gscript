@@ -1314,6 +1314,49 @@ func TestBenchGoHarnessRejectsUnknownSort(t *testing.T) {
 	}
 }
 
+func TestBenchGoStrictWarningsUseConfiguredThresholds(t *testing.T) {
+	row := benchGoBenchmarkResult{
+		Group:     "control",
+		Benchmark: "unit",
+		Strict: map[string]benchGoSubjectResult{
+			"vm":        {Status: "ok", Stats: benchGoComputeStats([]float64{1.0})},
+			"default":   {Status: "ok", Stats: benchGoComputeStats([]float64{0.2})},
+			"no_filter": {Status: "ok", Stats: benchGoComputeStats([]float64{0.5})},
+			"luajit":    {Status: "ok", Stats: benchGoComputeStats([]float64{0.1})},
+		},
+	}
+	annotateBenchGoStrictResult(&row, benchGoHarnessConfig{
+		SuspiciousVMSpeedup:   2.0,
+		SuspiciousLuaJITRatio: 0.75,
+		RelatedConfirmRatio:   0.95,
+	})
+	diagnostic := row.Strict["default"].Diagnostic
+	warnings, _ := diagnostic["warnings"].([]map[string]any)
+	if len(warnings) != 3 {
+		t.Fatalf("warnings = %#v", warnings)
+	}
+	if row.Strict["default"].Note != "3 strict warning(s)" {
+		t.Fatalf("note = %q", row.Strict["default"].Note)
+	}
+	markdown := benchGoMarkdown(benchGoHarnessConfig{Mode: "strict", Modes: []string{"vm", "default", "no_filter", "luajit"}}, []benchGoBenchmarkResult{row})
+	if !strings.Contains(markdown, "| control/unit | default | ok | 0.200000s |  | 0/0/0 | 0 | ok | 3 strict warning(s) |") {
+		t.Fatalf("markdown = %s", markdown)
+	}
+}
+
+func TestBenchGoHarnessRejectsInvalidStrictThresholds(t *testing.T) {
+	var stderr bytes.Buffer
+	_, err := parseBenchGoHarnessConfig("strict", []string{"--suspicious-vm-speedup", "0"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "--suspicious-vm-speedup must be > 0") {
+		t.Fatalf("vm threshold err = %v, stderr = %q", err, stderr.String())
+	}
+	stderr.Reset()
+	_, err = parseBenchGoHarnessConfig("strict", []string{"--related-confirm-ratio", "1.5"}, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "--related-confirm-ratio must be > 0 and <= 1") {
+		t.Fatalf("related threshold err = %v, stderr = %q", err, stderr.String())
+	}
+}
+
 func TestBenchRegressionGuardWritesCSVAndMarkdown(t *testing.T) {
 	vm, def, lua, base, pct := 1.0, 0.5, 0.25, 0.4, 25.0
 	row := benchRegressionResult{

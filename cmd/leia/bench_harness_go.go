@@ -24,32 +24,35 @@ import (
 var benchGoHarnessModes = []string{"default", "vm", "no_filter"}
 
 type benchGoHarnessConfig struct {
-	Mode             string
-	BenchSelectors   []string
-	Groups           []string
-	Modes            []string
-	Runs             int
-	Warmup           int
-	Timeout          time.Duration
-	MinSampleSeconds float64
-	TimerResolution  float64
-	MaxRepeat        int
-	MinWallRepeat    int
-	TimeSource       string
-	NoWallFallback   bool
-	NoLuaJIT         bool
-	AllGroups        bool
-	DryRun           bool
-	Jobs             int
-	JSONPath         string
-	MarkdownPath     string
-	HeadRef          string
-	Progress         bool
-	Sort             string
-	ScaleProfile     string
-	Scale            []string
-	SameWorkload     bool
-	TimeoutRaw       string
+	Mode                  string
+	BenchSelectors        []string
+	Groups                []string
+	Modes                 []string
+	Runs                  int
+	Warmup                int
+	Timeout               time.Duration
+	MinSampleSeconds      float64
+	TimerResolution       float64
+	MaxRepeat             int
+	MinWallRepeat         int
+	TimeSource            string
+	NoWallFallback        bool
+	NoLuaJIT              bool
+	AllGroups             bool
+	DryRun                bool
+	Jobs                  int
+	JSONPath              string
+	MarkdownPath          string
+	HeadRef               string
+	Progress              bool
+	Sort                  string
+	ScaleProfile          string
+	Scale                 []string
+	SameWorkload          bool
+	TimeoutRaw            string
+	SuspiciousVMSpeedup   float64
+	SuspiciousLuaJITRatio float64
+	RelatedConfirmRatio   float64
 }
 
 type benchGoStats struct {
@@ -111,30 +114,31 @@ type benchGoBenchmarkResult struct {
 }
 
 type benchGoReport struct {
-	SchemaVersion    int               `json:"schema_version"`
-	Mode             string            `json:"mode"`
-	Modes            []string          `json:"modes"`
-	Results          []map[string]any  `json:"results"`
-	Timestamp        string            `json:"timestamp,omitempty"`
-	GeneratedAt      string            `json:"generated_at"`
-	DurationSeconds  float64           `json:"duration_seconds"`
-	HeadRef          string            `json:"head_ref,omitempty"`
-	Groups           []string          `json:"groups,omitempty"`
-	Benchmarks       []string          `json:"benchmarks,omitempty"`
-	Runs             int               `json:"runs,omitempty"`
-	Warmup           int               `json:"warmup,omitempty"`
-	TimeoutSeconds   float64           `json:"timeout_seconds,omitempty"`
-	MinSampleSeconds float64           `json:"min_sample_seconds,omitempty"`
-	TimerResolution  float64           `json:"timer_resolution,omitempty"`
-	MaxRepeat        int               `json:"max_repeat,omitempty"`
-	MinWallRepeat    int               `json:"min_wall_repeat,omitempty"`
-	WallFallback     bool              `json:"wall_fallback"`
-	TimeSource       string            `json:"time_source,omitempty"`
-	Sort             string            `json:"sort,omitempty"`
-	ScaleProfile     string            `json:"scale_profile,omitempty"`
-	Scale            []string          `json:"scale,omitempty"`
-	Platform         map[string]string `json:"platform,omitempty"`
-	Notes            []string          `json:"notes,omitempty"`
+	SchemaVersion    int                `json:"schema_version"`
+	Mode             string             `json:"mode"`
+	Modes            []string           `json:"modes"`
+	Results          []map[string]any   `json:"results"`
+	Timestamp        string             `json:"timestamp,omitempty"`
+	GeneratedAt      string             `json:"generated_at"`
+	DurationSeconds  float64            `json:"duration_seconds"`
+	HeadRef          string             `json:"head_ref,omitempty"`
+	Groups           []string           `json:"groups,omitempty"`
+	Benchmarks       []string           `json:"benchmarks,omitempty"`
+	Runs             int                `json:"runs,omitempty"`
+	Warmup           int                `json:"warmup,omitempty"`
+	TimeoutSeconds   float64            `json:"timeout_seconds,omitempty"`
+	MinSampleSeconds float64            `json:"min_sample_seconds,omitempty"`
+	TimerResolution  float64            `json:"timer_resolution,omitempty"`
+	MaxRepeat        int                `json:"max_repeat,omitempty"`
+	MinWallRepeat    int                `json:"min_wall_repeat,omitempty"`
+	WallFallback     bool               `json:"wall_fallback"`
+	TimeSource       string             `json:"time_source,omitempty"`
+	Sort             string             `json:"sort,omitempty"`
+	ScaleProfile     string             `json:"scale_profile,omitempty"`
+	Scale            []string           `json:"scale,omitempty"`
+	StrictThresholds map[string]float64 `json:"strict_thresholds,omitempty"`
+	Platform         map[string]string  `json:"platform,omitempty"`
+	Notes            []string           `json:"notes,omitempty"`
 }
 
 func runBenchCompareCommand(args []string, outw, errw io.Writer) int {
@@ -245,27 +249,27 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 		defaultModes = []string{"vm", "default", "no_filter"}
 	}
 	cfg := benchGoHarnessConfig{
-		Mode:             mode,
-		Groups:           append([]string(nil), defaultGroups...),
-		Runs:             3,
-		Warmup:           1,
-		Timeout:          60 * time.Second,
-		MinSampleSeconds: 0.020,
-		TimerResolution:  0.001,
-		MaxRepeat:        128,
-		MinWallRepeat:    4,
-		TimeSource:       "auto",
-		NoWallFallback:   mode == "strict",
-		Jobs:             1,
-		Sort:             "name",
+		Mode:                  mode,
+		Groups:                append([]string(nil), defaultGroups...),
+		Runs:                  3,
+		Warmup:                1,
+		Timeout:               60 * time.Second,
+		MinSampleSeconds:      0.020,
+		TimerResolution:       0.001,
+		MaxRepeat:             128,
+		MinWallRepeat:         4,
+		TimeSource:            "auto",
+		NoWallFallback:        mode == "strict",
+		Jobs:                  1,
+		Sort:                  "name",
+		SuspiciousVMSpeedup:   2.0,
+		SuspiciousLuaJITRatio: 0.75,
+		RelatedConfirmRatio:   0.95,
 	}
 	var explicitGroups benchStringList
 	var explicitModes benchStringList
 	var repeatOverrides benchStringList
 	var allowWallTime bool
-	var suspiciousVMSpeedup float64
-	var suspiciousLuaJITRatio float64
-	var relatedConfirmRatio float64
 	fs := flag.NewFlagSet("bench "+mode, flag.ContinueOnError)
 	fs.SetOutput(errw)
 	fs.Var((*benchStringList)(&cfg.BenchSelectors), "bench", "Benchmark selector; repeatable.")
@@ -292,14 +296,14 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 	fs.StringVar(&cfg.HeadRef, "head-ref", "", "HEAD/reference name for current-vs-old comparison.")
 	fs.BoolVar(&cfg.Progress, "progress", false, "Print progress.")
 	fs.StringVar(&cfg.Sort, "sort", cfg.Sort, "Sort order: name, luajit-gap, current, or head.")
-	fs.StringVar(&cfg.ScaleProfile, "scale-profile", "", "Scale profile. Accepted for compatibility.")
-	fs.Var((*benchStringList)(&cfg.Scale), "scale", "Scale override. Accepted for compatibility.")
-	fs.Var((*benchStringList)(&cfg.Scale), "param", "Scale override alias. Accepted for compatibility.")
+	fs.StringVar(&cfg.ScaleProfile, "scale-profile", "", "Scale profile.")
+	fs.Var((*benchStringList)(&cfg.Scale), "scale", "Scale override.")
+	fs.Var((*benchStringList)(&cfg.Scale), "param", "Scale override alias.")
 	fs.Var(&repeatOverrides, "repeat", "Repeat override. Accepted for strict compatibility.")
 	fs.IntVar(&cfg.Runs, "measured", cfg.Runs, "Measured runs alias for strict compatibility.")
-	fs.Float64Var(&suspiciousVMSpeedup, "suspicious-vm-speedup", 2.0, "Accepted for strict compatibility.")
-	fs.Float64Var(&suspiciousLuaJITRatio, "suspicious-luajit-ratio", 0.75, "Accepted for strict compatibility.")
-	fs.Float64Var(&relatedConfirmRatio, "related-confirm-ratio", 0.95, "Accepted for strict compatibility.")
+	fs.Float64Var(&cfg.SuspiciousVMSpeedup, "suspicious-vm-speedup", cfg.SuspiciousVMSpeedup, "Warn when VM/default median ratio exceeds this threshold.")
+	fs.Float64Var(&cfg.SuspiciousLuaJITRatio, "suspicious-luajit-ratio", cfg.SuspiciousLuaJITRatio, "Warn when default/LuaJIT median ratio exceeds this threshold.")
+	fs.Float64Var(&cfg.RelatedConfirmRatio, "related-confirm-ratio", cfg.RelatedConfirmRatio, "Warn when related strict modes agree below this ratio.")
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
@@ -307,9 +311,6 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 		fmt.Fprintf(errw, "leia bench %s: unexpected argument %q\n", mode, fs.Arg(0))
 		return cfg, flag.ErrHelp
 	}
-	_ = suspiciousVMSpeedup
-	_ = suspiciousLuaJITRatio
-	_ = relatedConfirmRatio
 	if allowWallTime {
 		cfg.NoWallFallback = false
 	}
@@ -357,6 +358,15 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 	}
 	if cfg.Jobs < 1 {
 		return cfg, fmt.Errorf("--jobs must be >= 1")
+	}
+	if cfg.SuspiciousVMSpeedup <= 0 {
+		return cfg, fmt.Errorf("--suspicious-vm-speedup must be > 0")
+	}
+	if cfg.SuspiciousLuaJITRatio <= 0 {
+		return cfg, fmt.Errorf("--suspicious-luajit-ratio must be > 0")
+	}
+	if cfg.RelatedConfirmRatio <= 0 || cfg.RelatedConfirmRatio > 1 {
+		return cfg, fmt.Errorf("--related-confirm-ratio must be > 0 and <= 1")
 	}
 	return cfg, nil
 }
@@ -442,6 +452,64 @@ func benchGoWorstSubjectMedian(row benchGoBenchmarkResult, cfg benchGoHarnessCon
 
 func benchGoRowID(row benchGoBenchmarkResult) string {
 	return row.Group + "/" + row.Benchmark
+}
+
+func annotateBenchGoStrictResult(row *benchGoBenchmarkResult, cfg benchGoHarnessConfig) {
+	warnings := []map[string]any{}
+	if ratio, ok := benchGoStrictRatio(row.Strict, "vm", "default"); ok && ratio > cfg.SuspiciousVMSpeedup {
+		warnings = append(warnings, map[string]any{
+			"kind":      "suspicious-vm-speedup",
+			"ratio":     ratio,
+			"threshold": cfg.SuspiciousVMSpeedup,
+			"message":   fmt.Sprintf("vm/default median ratio %.3fx exceeds %.3fx", ratio, cfg.SuspiciousVMSpeedup),
+		})
+	}
+	if ratio, ok := benchGoStrictRatio(row.Strict, "default", "luajit"); ok && ratio > cfg.SuspiciousLuaJITRatio {
+		warnings = append(warnings, map[string]any{
+			"kind":      "suspicious-luajit-ratio",
+			"ratio":     ratio,
+			"threshold": cfg.SuspiciousLuaJITRatio,
+			"message":   fmt.Sprintf("default/LuaJIT median ratio %.3fx exceeds %.3fx", ratio, cfg.SuspiciousLuaJITRatio),
+		})
+	}
+	if ratio, ok := benchGoStrictAgreement(row.Strict, "default", "no_filter"); ok && ratio < cfg.RelatedConfirmRatio {
+		warnings = append(warnings, map[string]any{
+			"kind":      "related-confirm-ratio",
+			"ratio":     ratio,
+			"threshold": cfg.RelatedConfirmRatio,
+			"message":   fmt.Sprintf("default/no_filter median agreement %.3fx below %.3fx", ratio, cfg.RelatedConfirmRatio),
+		})
+	}
+	if len(warnings) == 0 {
+		return
+	}
+	subject := row.Strict["default"]
+	subject.Note = appendNote(subject.Note, fmt.Sprintf("%d strict warning(s)", len(warnings)))
+	subject.Diagnostic = map[string]any{"warnings": warnings}
+	row.Strict["default"] = subject
+}
+
+func benchGoStrictRatio(rows map[string]benchGoSubjectResult, numerator, denominator string) (float64, bool) {
+	left, leftOK := rows[numerator]
+	right, rightOK := rows[denominator]
+	if !leftOK || !rightOK || left.Stats.Median == nil || right.Stats.Median == nil || *right.Stats.Median <= 0 {
+		return 0, false
+	}
+	return *left.Stats.Median / *right.Stats.Median, true
+}
+
+func benchGoStrictAgreement(rows map[string]benchGoSubjectResult, leftName, rightName string) (float64, bool) {
+	left, leftOK := rows[leftName]
+	right, rightOK := rows[rightName]
+	if !leftOK || !rightOK || left.Stats.Median == nil || right.Stats.Median == nil || *left.Stats.Median <= 0 || *right.Stats.Median <= 0 {
+		return 0, false
+	}
+	leftSeconds := *left.Stats.Median
+	rightSeconds := *right.Stats.Median
+	if leftSeconds < rightSeconds {
+		return leftSeconds / rightSeconds, true
+	}
+	return rightSeconds / leftSeconds, true
 }
 
 type benchGoSpecRunResult struct {
@@ -548,6 +616,7 @@ func runBenchGoSpec(mode, root, tempDir, leiaBin, headRoot, headLeiaBin, luajitB
 			subject := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, currentSpec, cfg)
 			result.Strict[runMode] = subject
 		}
+		annotateBenchGoStrictResult(&result, cfg)
 		return result, nil
 	}
 	for _, runMode := range cfg.Modes {
@@ -1182,12 +1251,24 @@ func buildBenchGoReport(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult,
 		Sort:             cfg.Sort,
 		ScaleProfile:     cfg.ScaleProfile,
 		Scale:            cfg.Scale,
+		StrictThresholds: benchGoStrictThresholds(cfg),
 		Platform: map[string]string{
 			"go":      runtime.Version(),
 			"machine": runtime.GOARCH,
 			"system":  runtime.GOOS,
 		},
 		Notes: notes,
+	}
+}
+
+func benchGoStrictThresholds(cfg benchGoHarnessConfig) map[string]float64 {
+	if cfg.Mode != "strict" {
+		return nil
+	}
+	return map[string]float64{
+		"suspicious_vm_speedup":   cfg.SuspiciousVMSpeedup,
+		"suspicious_luajit_ratio": cfg.SuspiciousLuaJITRatio,
+		"related_confirm_ratio":   cfg.RelatedConfirmRatio,
 	}
 }
 
@@ -1213,12 +1294,12 @@ func benchGoMarkdown(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult) st
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Leia Bench %s Report\n\n", cfg.Mode)
 	if cfg.Mode == "strict" {
-		b.WriteString("| Benchmark | Mode | Status | Median | Source | T2 | Exits | Checksum |\n")
-		b.WriteString("| --- | --- | --- | ---: | --- | ---: | ---: | --- |\n")
+		b.WriteString("| Benchmark | Mode | Status | Median | Source | T2 | Exits | Checksum | Note |\n")
+		b.WriteString("| --- | --- | --- | ---: | --- | ---: | ---: | --- | --- |\n")
 		for _, row := range rows {
 			for _, mode := range cfg.Modes {
 				subject := row.Strict[mode]
-				fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s | %d | %s |\n", row.Group, row.Benchmark, mode, subject.Status, benchGoSeconds(subject.Stats.Median), subject.Source, benchGoT2(subject), subject.ExitTotal, "ok")
+				fmt.Fprintf(&b, "| %s/%s | %s | %s | %s | %s | %s | %d | %s | %s |\n", row.Group, row.Benchmark, mode, subject.Status, benchGoSeconds(subject.Stats.Median), subject.Source, benchGoT2(subject), subject.ExitTotal, "ok", benchGoMarkdownCell(subject.Note))
 			}
 		}
 		return b.String()
@@ -1235,6 +1316,14 @@ func benchGoMarkdown(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult) st
 		}
 	}
 	return b.String()
+}
+
+func benchGoMarkdownCell(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "-"
+	}
+	return strings.ReplaceAll(value, "|", "\\|")
 }
 
 func benchGoT2(subject benchGoSubjectResult) string {

@@ -111,6 +111,8 @@ in these modes:
 
 The strict pass checks output stability, timing quality, suspicious
 benchmark-only wins, and LuaJIT comparisons where references exist.
+Suspicious strict thresholds are recorded in JSON and emitted as report warnings;
+release failure policy remains in the outer gate.
 
 ## Execution Performance Contract
 
