@@ -82,7 +82,9 @@ objects so automation can distinguish a clean baseline from Tier 2 failures,
 runtime exits, skipped timing, and unavailable benchmark inputs. Optional
 evidence requests such as `--pprof` and `--warm-dump` are reported with separate
 `*_requested` and `*_effective` fields, so pending collection paths are visible
-instead of being mistaken for collected artifacts.
+instead of being mistaken for collected artifacts. Requested pprof controls such
+as `--pprof-min-samples-ms` and `--pprof-max-runs` are carried into the pprof
+evidence summary.
 
 Low-resolution script timers are not treated as wins. The harness can increase
 repeat counts and fall back to repeated command wall time when the script time

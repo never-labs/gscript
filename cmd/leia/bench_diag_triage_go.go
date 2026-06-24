@@ -27,6 +27,8 @@ type benchDiagConfig struct {
 	ScaleProfile string
 	NoTiming     bool
 	PPROF        bool
+	PPROFMinMS   float64
+	PPROFMaxRuns int
 	WarmDump     bool
 }
 
@@ -126,16 +128,23 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 			"runtime_summary":       benchDiagnoseRuntimeSummary(diag),
 			"tier2_call_summary":    benchDiagnoseTier2Summary(diag),
 			"pprof_requested":       cfg.PPROF,
+			"pprof_min_samples_ms":  cfg.PPROFMinMS,
+			"pprof_max_runs":        cfg.PPROFMaxRuns,
 			"pprof_runs":            0,
 			"pprof_script_repeat":   0,
 			"pprof_samples_seconds": 0,
 			"pprof_effective":       false,
-			"pprof_summary":         benchDiagnoseEvidenceSummary(cfg.PPROF, false, "pprof collection is not yet wired for bench diagnose"),
-			"warm_dump_requested":   cfg.WarmDump,
-			"warm_dump_effective":   false,
-			"warm_dump_summary":     benchDiagnoseEvidenceSummary(cfg.WarmDump, false, "warm dump collection is not yet wired for bench diagnose"),
-			"scale":                 scale,
-			"artifact_dir":          artifactDir,
+			"pprof_summary": benchDiagnoseEvidenceSummary(
+				cfg.PPROF,
+				false,
+				"pprof collection is not yet wired for bench diagnose",
+				map[string]any{"min_samples_ms": cfg.PPROFMinMS, "max_runs": cfg.PPROFMaxRuns},
+			),
+			"warm_dump_requested": cfg.WarmDump,
+			"warm_dump_effective": false,
+			"warm_dump_summary":   benchDiagnoseEvidenceSummary(cfg.WarmDump, false, "warm dump collection is not yet wired for bench diagnose", nil),
+			"scale":               scale,
+			"artifact_dir":        artifactDir,
 			"artifacts": map[string]string{
 				"summary_raw_txt": summary,
 				"run_raw_txt":     raw,
@@ -159,7 +168,7 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 }
 
 func parseBenchDiagnoseArgs(args []string, errw io.Writer) (benchDiagConfig, error) {
-	cfg := benchDiagConfig{Groups: []string{"numeric", "recursion", "table", "calls", "string", "app", "control"}, Timeout: "120", Runs: 5, Warmup: 1, ScaleProfile: "none"}
+	cfg := benchDiagConfig{Groups: []string{"numeric", "recursion", "table", "calls", "string", "app", "control"}, Timeout: "120", Runs: 5, Warmup: 1, ScaleProfile: "none", PPROFMinMS: 50, PPROFMaxRuns: 8}
 	fs := flag.NewFlagSet("bench diagnose", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	fs.Var((*benchStringList)(&cfg.Benches), "bench", "Benchmark selector; repeatable.")
@@ -175,16 +184,20 @@ func parseBenchDiagnoseArgs(args []string, errw io.Writer) (benchDiagConfig, err
 	fs.BoolVar(&cfg.NoTiming, "no-timing", false, "Skip timing compare.")
 	fs.BoolVar(&cfg.PPROF, "pprof", false, "Collect pprof evidence when supported.")
 	fs.BoolVar(&cfg.WarmDump, "warm-dump", false, "Collect warm addr map evidence when supported.")
-	var pprofMin float64
-	var pprofMax int
-	fs.Float64Var(&pprofMin, "pprof-min-samples-ms", 50, "Accepted for compatibility.")
-	fs.IntVar(&pprofMax, "pprof-max-runs", 8, "Accepted for compatibility.")
+	fs.Float64Var(&cfg.PPROFMinMS, "pprof-min-samples-ms", cfg.PPROFMinMS, "Minimum requested CPU profile sample milliseconds.")
+	fs.IntVar(&cfg.PPROFMaxRuns, "pprof-max-runs", cfg.PPROFMaxRuns, "Maximum requested CPU profile collection runs.")
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
 	if fs.NArg() != 0 {
 		fmt.Fprintf(errw, "leia bench diagnose: unexpected argument %q\n", fs.Arg(0))
 		return cfg, flag.ErrHelp
+	}
+	if cfg.PPROFMinMS < 0 {
+		return cfg, fmt.Errorf("--pprof-min-samples-ms must be >= 0")
+	}
+	if cfg.PPROFMaxRuns < 1 {
+		return cfg, fmt.Errorf("--pprof-max-runs must be >= 1")
 	}
 	return cfg, nil
 }
@@ -304,7 +317,7 @@ func benchDiagnoseTier2Summary(diag benchDiagnoseRun) map[string]any {
 	return summary
 }
 
-func benchDiagnoseEvidenceSummary(requested, effective bool, reason string) map[string]any {
+func benchDiagnoseEvidenceSummary(requested, effective bool, reason string, params map[string]any) map[string]any {
 	status := "not_requested"
 	if requested {
 		status = "not_collected"
@@ -313,12 +326,16 @@ func benchDiagnoseEvidenceSummary(requested, effective bool, reason string) map[
 		status = "ok"
 		reason = ""
 	}
-	return map[string]any{
+	summary := map[string]any{
 		"requested": requested,
 		"effective": effective,
 		"status":    status,
 		"reason":    reason,
 	}
+	if len(params) > 0 {
+		summary["params"] = params
+	}
+	return summary
 }
 
 type benchTriageConfig struct {
@@ -747,9 +764,26 @@ func benchDiagnoseEvidenceText(value any) string {
 		return "-"
 	}
 	if reason := strings.TrimSpace(fmt.Sprint(summary["reason"])); reason != "" && reason != "<nil>" {
-		return status + ": " + reason
+		return status + ": " + reason + benchDiagnoseEvidenceParamsText(summary["params"])
 	}
-	return status
+	return status + benchDiagnoseEvidenceParamsText(summary["params"])
+}
+
+func benchDiagnoseEvidenceParamsText(value any) string {
+	params, _ := value.(map[string]any)
+	if len(params) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", key, params[key]))
+	}
+	return " (" + strings.Join(parts, ", ") + ")"
 }
 
 func benchDiagnoseArtifactText(row map[string]any) string {

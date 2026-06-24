@@ -237,7 +237,7 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	outDir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing", "--pprof", "--warm-dump", "--out-dir", outDir}, &stdout, &stderr)
+	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing", "--pprof", "--pprof-min-samples-ms", "12.5", "--pprof-max-runs", "3", "--warm-dump", "--out-dir", outDir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
@@ -273,6 +273,10 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	if report.Benchmarks[0]["pprof_requested"] != true || report.Benchmarks[0]["pprof_effective"] != false || pprofSummary["status"] != "not_collected" {
 		t.Fatalf("pprof fields = row %#v summary %#v", report.Benchmarks[0], pprofSummary)
 	}
+	pprofParams, _ := pprofSummary["params"].(map[string]any)
+	if report.Benchmarks[0]["pprof_min_samples_ms"] != float64(12.5) || report.Benchmarks[0]["pprof_max_runs"] != float64(3) || pprofParams["min_samples_ms"] != float64(12.5) || pprofParams["max_runs"] != float64(3) {
+		t.Fatalf("pprof params = row %#v summary %#v", report.Benchmarks[0], pprofSummary)
+	}
 	if report.Benchmarks[0]["warm_dump_requested"] != true || report.Benchmarks[0]["warm_dump_effective"] != false || warmDumpSummary["status"] != "not_collected" {
 		t.Fatalf("warm dump fields = row %#v summary %#v", report.Benchmarks[0], warmDumpSummary)
 	}
@@ -280,9 +284,20 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(md), "pprof not_collected: pprof collection is not yet wired for bench diagnose") ||
+	if !strings.Contains(string(md), "pprof not_collected: pprof collection is not yet wired for bench diagnose (max_runs=3, min_samples_ms=12.5)") ||
 		!strings.Contains(string(md), "warm-dump not_collected: warm dump collection is not yet wired for bench diagnose") {
 		t.Fatalf("diagnostics markdown missing optional evidence state:\n%s", string(md))
+	}
+}
+
+func TestBenchDiagnoseRejectsInvalidPPROFOptions(t *testing.T) {
+	var stderr bytes.Buffer
+	if _, err := parseBenchDiagnoseArgs([]string{"--pprof-min-samples-ms", "-1"}, &stderr); err == nil || !strings.Contains(err.Error(), "--pprof-min-samples-ms must be >= 0") {
+		t.Fatalf("min err = %v, stderr = %q", err, stderr.String())
+	}
+	stderr.Reset()
+	if _, err := parseBenchDiagnoseArgs([]string{"--pprof-max-runs", "0"}, &stderr); err == nil || !strings.Contains(err.Error(), "--pprof-max-runs must be >= 1") {
+		t.Fatalf("max err = %v, stderr = %q", err, stderr.String())
 	}
 }
 
