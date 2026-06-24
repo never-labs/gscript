@@ -152,6 +152,10 @@ while [ "$#" -gt 0 ]; do
             RUNS=1
             WARMUP=0
             TIMEOUT=60
+            # Smoke is a short local signal. Keep LuaJIT evidence enabled, but
+            # leave a small margin for 1-2 sample timing jitter. Full/release
+            # gates keep the default 0.80 threshold.
+            LUAJIT_THRESHOLD=0.85
             ;;
         --syntax-smoke)
             PROFILE="syntax_smoke"

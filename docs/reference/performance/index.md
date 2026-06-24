@@ -51,7 +51,9 @@ scripts/run.sh perf --full
 
 Use `--no-luajit` when LuaJIT is not installed or the workload has no useful
 Lua reference. Without `--no-luajit`, script-timed current/LuaJIT rows are
-validated against `--luajit-threshold` (default `0.80`).
+validated against `--luajit-threshold` (default `0.80`). The short `--smoke`
+profile uses `0.85` to avoid treating 1-2 sample timing jitter as release
+evidence.
 
 For fast local checks, use `leia bench --quick`. For release-quality evidence,
 write JSON and Markdown reports from the full and strict benchmark commands.
