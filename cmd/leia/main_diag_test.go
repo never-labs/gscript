@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -71,21 +72,16 @@ func TestDiagCommandRejectsUnknownMode(t *testing.T) {
 }
 
 func TestDiagnoseCommandDispatchesBenchmarkSelector(t *testing.T) {
-	oldBenchExecCommand := benchExecCommand
-	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
-	var gotArgs []string
-	benchExecCommand = func(name string, args ...string) *exec.Cmd {
-		gotArgs = append([]string(nil), args...)
-		helper, helperArgs := testHelperCommand(t, "bench")
-		return exec.Command(helper, helperArgs...)
-	}
-
+	outDir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	code := runDiagnoseCommand([]string{"table/table_field_access", "--no-timing"}, &stdout, &stderr)
+	code := runDiagnoseCommand([]string{"table/table_field_access", "--no-timing", "--out-dir", outDir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runDiagnoseCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "diagnose.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "table/table_field_access" || gotArgs[3] != "--no-timing" {
-		t.Fatalf("args = %#v, want diagnose.py --bench table/table_field_access --no-timing", gotArgs)
+	if !strings.Contains(stdout.String(), "Wrote diagnostics:") {
+		t.Fatalf("stdout = %q, want diagnostics path", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "diagnostics.json")); err != nil {
+		t.Fatalf("diagnostics.json missing: %v", err)
 	}
 }

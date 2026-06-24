@@ -16,7 +16,7 @@ Sources reviewed:
 - `benchmarks/q_eval_verb_coverage_test.go`
 - `benchmarks/q_eval_jit_script_bench_test.go`
 - `benchmarks/q_columnar_suite.sh`
-- `benchmarks/q_perf_report.py`
+- `go run ./cmd/leia bench q-report`
 - `benchmarks/data/qeval_go_ratio_baseline.json`
 
 ## Coverage Goals
@@ -162,15 +162,15 @@ into a closed constant form silently degrades into a memo-lookup measurement.
 
 `benchmarks/data/qeval_go_ratio_baseline.json` snapshots per-case
 `warm_go_ratio` and `jit_go_ratio` (483 case entries; 459 trusted warm ratios,
-458 trusted jit ratios). `q_perf_report.py --check` enforces:
+458 trusted jit ratios). `leia bench q-report --check` enforces:
 
 - **No-regression ratchet**: each case may not regress beyond its baseline
   ratio x 1.15 (`RATIO_BASELINE_REGRESSION_TOLERANCE`).
 - **Hard caps from `milestone_caps`** in the same file — currently
   `max_leia_go_ratio = 64` and `max_leia_jit_go_ratio = 8` (tightened from
   320/56 after wave 2), plus typed-hit/fallback/alloc envelope caps.
-- Baselines are refreshed deliberately with `--update-ratio-baseline` after an
-  optimization wave lands; the file records its capture date.
+- Baselines are refreshed deliberately after an optimization wave lands; the
+  file records its capture date.
 
 Current state (baseline captured 2026-06-11, post wave-2, origin/main `6e3d6cd3`):
 
@@ -276,7 +276,7 @@ The two suites therefore measure different things, and both are kept:
   cap), tiny 8-row vectors, and a 600-source plan-cache thrash case.
 
 The annex reports through its own `realdata_go_ratio` family in
-`q_perf_report.py` ("Real-Data Annex" section), with per-case ratios captured
+`leia bench q-report` ("Real-Data Annex" section), with per-case ratios captured
 under `realdata_cases` in `qeval_go_ratio_baseline.json`, a separate hard cap
 (`milestone_caps.max_leia_realdata_go_ratio`), and the same 1.15x
 no-regression ratchet. The realdata geomean is **never folded into the

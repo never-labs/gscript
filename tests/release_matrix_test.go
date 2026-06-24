@@ -5043,7 +5043,7 @@ func releaseMatrixRefIsExecutableGate(ref string) bool {
 		return true
 	case strings.HasPrefix(ref, "examples/") && strings.HasSuffix(ref, ".leia"):
 		return true
-	case strings.HasPrefix(ref, "benchmarks/") && (strings.HasSuffix(ref, ".leia") || strings.HasSuffix(ref, "_test.py") || strings.HasSuffix(ref, "_test.go")):
+	case strings.HasPrefix(ref, "benchmarks/") && (strings.HasSuffix(ref, ".leia") || strings.HasSuffix(ref, "_test.go")):
 		return true
 	case strings.HasPrefix(ref, "scripts/") && strings.HasSuffix(ref, ".sh"):
 		return true

@@ -58,7 +58,7 @@ go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
 
 # Real-data annex: env-injected dense columns where lazy carriers and
 # closed-form kernels cannot fire. Feeds the realdata_go_ratio family in
-# q_perf_report.py (reported and ratcheted separately from the synthetic
+# leia bench q-report (reported and ratcheted separately from the synthetic
 # suite). The Test* run checksum-verifies q results against the Go baselines.
 go test ./benchmarks -run '^TestQEvalRealDataMatchesGoBaseline$' \
   -bench 'BenchmarkQEvalRealData(Warm|GoBaseline)' \
@@ -67,7 +67,7 @@ go test ./benchmarks -run '^TestQEvalRealDataMatchesGoBaseline$' \
   -count="${LEIA_GO_BENCHCOUNT}"
 
 # JIT/VM script-binding warm benches feeding the jit_script/vm_script Go-ratio
-# families in q_perf_report.py. Tolerant while these benches land: `-bench`
+# families in leia bench q-report. Tolerant while these benches land: `-bench`
 # with zero matches still exits 0 and simply contributes no rows.
 if [[ "$JIT_FULL" == "1" ]]; then
   Q_SCRIPT_BENCH='BenchmarkQEval(JIT|VM)ScriptWarm'

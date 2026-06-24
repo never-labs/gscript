@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -47,6 +46,12 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "strict" {
 		return runBenchStrictCommand(harnessArgs, outw, errw)
 	}
+	if mode == "diagnose" {
+		return runBenchDiagnoseCommand(harnessArgs, outw, errw)
+	}
+	if mode == "triage" {
+		return runBenchTriageCommand(harnessArgs, outw, errw)
+	}
 	if mode == "audit" {
 		return runBenchAuditCommand(harnessArgs, outw, errw)
 	}
@@ -90,7 +95,8 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 		return runBenchShellScript("q_general_compute_suite.sh", harnessArgs, outw, errw)
 	}
 
-	return runBenchHarness(mode, harnessArgs, outw, errw)
+	fmt.Fprintf(errw, "leia bench: unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-columnar, q-general, q-report, audit, rank-luajit-gaps, debug-artifact, gate-validate, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)\n", mode)
+	return 2
 }
 
 func runBenchShellScript(script string, args []string, outw, errw io.Writer) int {
@@ -114,43 +120,12 @@ func runBenchShellScript(script string, args []string, outw, errw io.Writer) int
 	return 0
 }
 
-func runBenchHarness(mode string, harnessArgs []string, outw, errw io.Writer) int {
-	script, err := benchScriptForMode(mode)
-	if err != nil {
-		fmt.Fprintf(errw, "leia bench: %v\n", err)
-		return 2
-	}
-	path, err := findBenchmarkScript(script)
-	if err != nil {
-		fmt.Fprintf(errw, "leia bench: %v\n", err)
-		return 1
-	}
-	python := os.Getenv("LEIA_BENCH_PYTHON")
-	if python == "" {
-		python = "python3"
-	}
-	cmdArgs := append([]string{path}, harnessArgs...)
-	cmd := benchExecCommand(python, cmdArgs...)
-	cmd.Stdout = outw
-	cmd.Stderr = errw
-	cmd.Dir = filepath.Dir(filepath.Dir(path))
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode()
-		}
-		fmt.Fprintf(errw, "leia bench: %v\n", err)
-		return 1
-	}
-	return 0
-}
-
 func runDiagnoseCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(errw, "usage: leia diagnose <benchmark> [diagnose-flags...]")
 		return 2
 	}
-	return runBenchHarness("diagnose", normalizeBenchmarkSelectorArgs(args), outw, errw)
+	return runBenchDiagnoseCommand(normalizeBenchmarkSelectorArgs(args), outw, errw)
 }
 
 func benchProfileArgs(args []string) (string, []string, []string, bool) {
@@ -185,19 +160,6 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	default:
 		return true
-	}
-}
-
-func benchScriptForMode(mode string) (string, error) {
-	switch mode {
-	case "diagnose":
-		return "diagnose.py", nil
-	case "triage":
-		return "triage.py", nil
-	case "help", "-h", "--help":
-		return "", flag.ErrHelp
-	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-columnar, q-general, q-report, audit, rank-luajit-gaps, debug-artifact, gate-validate, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)", mode)
 	}
 }
 

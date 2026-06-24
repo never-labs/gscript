@@ -13,7 +13,7 @@ package benchmarks
 //
 // Naming: BenchmarkQEvalRealDataWarm/<case> vs
 // BenchmarkQEvalRealDataGoBaseline/<case>. The ratio family in
-// q_perf_report.py is realdata_go_ratio, reported separately from the
+// leia bench q-report is realdata_go_ratio, reported separately from the
 // synthetic families.
 
 import (

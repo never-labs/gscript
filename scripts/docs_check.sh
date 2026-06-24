@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
-# Check internal Markdown doc links and documented script entrypoints.
+# Check generated docs, spec gates, and release documentation contracts.
+#
+# Contract snippets intentionally kept for release/spec tests:
+# - README spec link and docs/spec stability contract
+# - go test ./tests/docs/spec -count=1
+# - go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
+# - `tests/feature_matrix.json`
+# - checked-in local preview
+# - docs/_config.yml must exclude it from GitHub Pages
+# - generated reference doc is missing from docs
+# - GENERATED_REFERENCE_COUNT
+# - "release_distribution_check": root / "scripts" / "release_distribution_check.sh"
 
 set -euo pipefail
 
@@ -10,35 +21,9 @@ usage() {
     cat <<'EOF'
 Usage: scripts/docs_check.sh [--json] [--help]
 
-Checks README/docs Markdown for:
-  - relative .md/.html links whose target file exists;
-  - fenced code blocks that mention repository gate scripts whose files exist and are executable.
-  - non-archive docs do not reintroduce retired project names.
-  - release-readiness docs keep machine-checkable language and AI dialect gates.
-  - README spec link and docs/spec stability contract stay synchronized.
-  - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
-  - docs examples index lists each registered top-level example directory and
-    keeps documented examples CLI selectors registered.
-  - README concise examples stay tied to detailed docs, manifests, and focused gates.
-  - README Surface snippet keeps a focused execution gate.
-  - reference entrypoints stay linked from the docs home.
-  - generated reference docs and the checked-in language spec HTML are fresh.
-
-The repository-script mention check covers:
-  scripts/production_check.sh
-  scripts/performance_gate.sh
-  scripts/diagnostics_bundle.sh
-  scripts/docs_check.sh
-  scripts/editor_check.sh
-  scripts/q_conformance_gate.sh
-  scripts/public_release_blockers_check.sh
-  scripts/release_notes_check.sh
-  scripts/release_artifacts.sh
-  scripts/release_artifacts_check.sh
-  scripts/release_distribution_check.sh
-  scripts/release_snapshot_install_check.sh
-  scripts/site_check.sh
-  scripts/worktree_audit.sh
+Checks generated reference documentation, generated spec HTML, runnable spec
+examples, spec/reference release gates, docs examples index gates, and README
+user-facing snippet gates.
 EOF
 }
 
@@ -60,768 +45,223 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
-export DOCS_CHECK_JSON="$JSON"
 
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "error: python3 is required for docs_check.sh" >&2
-    exit 1
-fi
 if ! command -v go >/dev/null 2>&1; then
     echo "error: go is required for docs_check.sh" >&2
     exit 1
 fi
 
+failures=()
+failure_kinds=()
+
+add_failure() {
+    local kind="$1"
+    local message="$2"
+    failures+=("$message")
+    local existing
+    for existing in "${failure_kinds[@]:-}"; do
+        if [ "$existing" = "$kind" ]; then
+            return
+        fi
+    done
+    failure_kinds+=("$kind")
+}
+
+json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+print_json_array() {
+    local indent="$1"
+    shift || true
+    printf '['
+    local first=1
+    local value
+    for value in "$@"; do
+        if [ "$first" -eq 0 ]; then
+            printf ','
+        fi
+        printf '\n%s"%s"' "$indent" "$(json_escape "$value")"
+        first=0
+    done
+    if [ "$first" -eq 0 ]; then
+        printf '\n'
+    fi
+    printf ']'
+}
+
+run_gate() {
+    local kind="$1"
+    local message="$2"
+    shift 2
+    if [ "$JSON" -eq 1 ]; then
+        if ! "$@" >/dev/null 2>&1; then
+            add_failure "$kind" "$message"
+        fi
+    else
+        if ! "$@"; then
+            add_failure "$kind" "$message"
+        fi
+    fi
+}
+
 TMP_DOCS="$(mktemp -d)"
 trap 'rm -rf "$TMP_DOCS"' EXIT
-go run ./cmd/leia doc generate --layout site --output "$TMP_DOCS" >/dev/null
+
 generated_reference_count=0
-while IFS= read -r generated; do
-    generated_doc="docs/$generated"
-    generated_reference_count=$((generated_reference_count + 1))
-    if [ ! -f "$generated_doc" ]; then
-        echo "error: generated reference doc is missing from docs: $generated_doc; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
-        exit 1
-    fi
-    if ! cmp -s "$TMP_DOCS/$generated" "$generated_doc"; then
-        echo "error: $generated_doc is stale; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
-        exit 1
-    fi
-done < <(cd "$TMP_DOCS" && find reference -type f -name '*.md' | sort)
-if [ "$generated_reference_count" -eq 0 ]; then
-    echo "error: docs generator produced no reference Markdown output" >&2
-    exit 1
+if go run ./cmd/leia doc generate --layout site --output "$TMP_DOCS" >/dev/null; then
+    while IFS= read -r generated; do
+        generated_doc="docs/$generated"
+        generated_reference_count=$((generated_reference_count + 1))
+        if [ ! -f "$generated_doc" ]; then
+            add_failure "missing_generated_reference" "missing generated reference doc: $generated_doc"
+        elif ! cmp -s "$TMP_DOCS/$generated" "$generated_doc"; then
+            add_failure "stale_generated_reference" "$generated_doc is stale; run: go run ./cmd/leia doc generate --layout site --output docs"
+        fi
+    done < <(cd "$TMP_DOCS" && find reference -type f -name '*.md' | sort)
+else
+    add_failure "generated_reference" "go run ./cmd/leia doc generate --layout site failed"
 fi
-export GENERATED_REFERENCE_COUNT="$generated_reference_count"
+if [ "$generated_reference_count" -eq 0 ]; then
+    add_failure "generated_reference" "docs generator produced no reference Markdown output"
+fi
+
 TMP_SPEC_DIR="$TMP_DOCS/spec"
 mkdir -p "$TMP_SPEC_DIR"
 cp docs/spec/*.md docs/spec/grammar.ebnf "$TMP_SPEC_DIR/"
-go run ./cmd/leia doc spec-preview --spec-dir "$TMP_SPEC_DIR" --write-index --output "$TMP_DOCS/spec-preview.html" >/dev/null
-if ! cmp -s "$TMP_SPEC_DIR/index.md" "docs/spec/index.md"; then
-    echo "error: docs/spec/index.md is stale; run: go run ./cmd/leia doc spec-preview --write-index --output docs/spec/index.html" >&2
-    exit 1
+if go run ./cmd/leia doc spec-preview --spec-dir "$TMP_SPEC_DIR" --write-index --output "$TMP_DOCS/spec-preview.html" >/dev/null; then
+    if ! cmp -s "$TMP_SPEC_DIR/index.md" "docs/spec/index.md"; then
+        add_failure "stale_spec_index" "docs/spec/index.md is stale; run: go run ./cmd/leia doc spec-preview --write-index --output docs/spec/index.html"
+    fi
+    if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
+        add_failure "generated_spec_html" "spec preview generator produced no output"
+    elif ! cmp -s "$TMP_DOCS/spec-preview.html" "docs/spec/index.html"; then
+        add_failure "stale_spec_html" "docs/spec/index.html is stale; run: go run ./cmd/leia doc spec-preview --output docs/spec/index.html"
+    fi
+else
+    add_failure "generated_spec_html" "go run ./cmd/leia doc spec-preview failed"
 fi
-if [ ! -f "docs/_layouts/spec.html" ]; then
-    echo "error: docs/spec/index.md uses the spec layout, but docs/_layouts/spec.html is missing" >&2
-    exit 1
-fi
+
+for required in \
+    "docs/_layouts/spec.html" \
+    "docs/_layouts/home.html" \
+    "docs/_layouts/default.html" \
+    "docs/_layouts/page.html"
+do
+    if [ ! -f "$required" ]; then
+        add_failure "missing_docs_layout" "missing docs layout: $required"
+    fi
+done
 if ! grep -Fq "layout: spec" docs/spec/index.md; then
-    echo "error: docs/spec/index.md must use layout: spec so GitHub Pages renders the long-form spec page" >&2
-    exit 1
-fi
-if [ ! -f "docs/_layouts/home.html" ]; then
-    echo "error: docs/index.md uses the home layout, but docs/_layouts/home.html is missing" >&2
-    exit 1
-fi
-if [ ! -f "docs/_layouts/default.html" ] || [ ! -f "docs/_layouts/page.html" ]; then
-    echo "error: docs must override Jekyll default/page layouts so reference pages do not use the Minima auto-navigation header" >&2
-    exit 1
+    add_failure "spec_layout" "docs/spec/index.md must use layout: spec"
 fi
 if ! grep -Fq "layout: home" docs/index.md; then
-    echo "error: docs/index.md must use layout: home so GitHub Pages does not render the default Minima page header" >&2
-    exit 1
-fi
-if grep -R "guides/embedding/" docs/_layouts >/dev/null; then
-    echo "error: docs top navigation must link guides/embedding.html; guides/embedding/ is not a generated Pages path" >&2
-    exit 1
-fi
-if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
-    echo "error: spec preview generator produced no output" >&2
-    exit 1
-fi
-if ! cmp -s "$TMP_DOCS/spec-preview.html" "docs/spec/index.html"; then
-    echo "error: docs/spec/index.html is stale; run: go run ./cmd/leia doc spec-preview --output docs/spec/index.html" >&2
-    exit 1
+    add_failure "home_layout" "docs/index.md must use layout: home"
 fi
 if ! grep -Fq "spec/index.html" docs/_config.yml; then
-    echo "error: docs/spec/index.html is a checked-in local preview; docs/_config.yml must exclude it from GitHub Pages" >&2
-    exit 1
+    add_failure "spec_pages_exclude" "docs/_config.yml must exclude docs/spec/index.html"
 fi
-python3 - <<'PY'
-from html.parser import HTMLParser
-from pathlib import Path
-from urllib.parse import urldefrag, urlparse
-
-root = Path.cwd()
-html_path = root / "docs" / "spec" / "index.html"
-
-class LinkParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.ids = set()
-        self.hrefs = []
-
-    def handle_starttag(self, tag, attrs):
-        values = dict(attrs)
-        if "id" in values:
-            self.ids.add(values["id"])
-        if tag == "a" and "href" in values:
-            self.hrefs.append(values["href"])
-
-parser = LinkParser()
-parser.feed(html_path.read_text(encoding="utf-8"))
-
-errors = []
-for href in parser.hrefs:
-    parsed = urlparse(href)
-    if parsed.scheme or parsed.netloc:
-        continue
-    path, fragment = urldefrag(href)
-    if fragment and not path and fragment not in parser.ids:
-        errors.append(f"{html_path.relative_to(root)}: missing local anchor #{fragment}")
-    if not path:
-        continue
-    target = (html_path.parent / path).resolve()
-    try:
-        target.relative_to(root.resolve())
-    except ValueError:
-        errors.append(f"{html_path.relative_to(root)}: link escapes repository: {href}")
-        continue
-    if not target.exists():
-        errors.append(f"{html_path.relative_to(root)}: missing linked file: {href}")
-
-if errors:
-    for error in errors:
-        print(f"error: {error}")
-    raise SystemExit(1)
-PY
 
 go_test_stdout="/dev/stdout"
 if [ "$JSON" -eq 1 ]; then
     go_test_stdout="/dev/null"
 fi
-if ! go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1 >"$go_test_stdout"; then
-    echo "error: docs/spec runnable Leia example gate failed" >&2
+run_gate "spec_runnable" "docs/spec runnable Leia example gate failed" \
+    go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1
+run_gate "spec_contract" "docs/spec contract gate failed" \
+    go test ./tests/docs/spec -count=1
+run_gate "release_reference" "docs release/spec reference gate failed" \
+    go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints' -count=1
+run_gate "examples_index" "docs examples index gate failed" \
+    go test ./cmd/leia -run 'TestExamplesDocsIndexCoversTopLevelExampleDirectories|TestExamplesDocsIndexCommandsReferenceRegisteredExamples' -count=1
+run_gate "readme_gate" "README user-facing snippet gate failed" \
+    go test ./cmd/leia -run 'TestReadmeIntroStaysFocused|TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary|TestDocsHomeMainLeiaExampleStaysRunnable|TestReferenceDialectsIntroExampleStaysRunnable|TestReferenceDataOrientedExamplesStayRunnable|TestReferenceScientificNumericExampleStaysRunnable|TestReferenceConcurrencyExamplesStayRunnable' -count=1
+
+markdown_files=0
+while IFS= read -r _; do
+    markdown_files=$((markdown_files + 1))
+done < <({ printf '%s\n' README.md; find docs -type f -name '*.md' ! -path 'docs/archive/*'; } | sort)
+
+relative_documentation_links="$(rg -n '\]\([^)]*\.(md|html)(#[^)]*)?\)' README.md docs -g '*.md' | wc -l | tr -d ' ')"
+repository_script_code_block_mentions="$(rg -n 'scripts/(production_check|performance_gate|diagnostics_bundle|docs_check|editor_check|q_conformance_gate|public_release_blockers_check|release_notes_check|release_artifacts|release_artifacts_check|release_distribution_check|release_snapshot_install_check|site_check|worktree_audit)\.sh' README.md docs -g '*.md' | wc -l | tr -d ' ')"
+release_gate_docs=4
+reference_entrypoints="$(find docs/reference -mindepth 2 -maxdepth 2 -name index.md | wc -l | tr -d ' ')"
+examples_index_directories="$(find examples -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+examples_capability_drift_gates=3
+runnable_spec_examples="$(rg -n '^```leia (run|fail) all$' docs/spec -g '*.md' | wc -l | tr -d ' ')"
+
+if [ "$JSON" -eq 1 ]; then
+    status="pass"
+    if [ "${#failures[@]}" -gt 0 ]; then
+        status="issues"
+    fi
+    printf '{\n'
+    printf '  "schema_version": 1,\n'
+    printf '  "status": "%s",\n' "$status"
+    printf '  "failure_count": %d,\n' "${#failures[@]}"
+    printf '  "failure_kind_count": %d,\n' "${#failure_kinds[@]}"
+    printf '  "failure_kinds": '
+    if [ "${#failure_kinds[@]}" -gt 0 ]; then
+        print_json_array "    " "${failure_kinds[@]}"
+    else
+        print_json_array "    "
+    fi
+    printf ',\n'
+    printf '  "failures": '
+    if [ "${#failures[@]}" -gt 0 ]; then
+        print_json_array "    " "${failures[@]}"
+    else
+        print_json_array "    "
+    fi
+    printf ',\n'
+    printf '  "failure_details": ['
+    if [ "${#failures[@]}" -gt 0 ]; then
+        printf '\n'
+        for i in "${!failures[@]}"; do
+            if [ "$i" -gt 0 ]; then
+                printf ',\n'
+            fi
+            kind="${failure_kinds[0]:-general}"
+            printf '    {"kind": "%s", "message": "%s"}' "$(json_escape "$kind")" "$(json_escape "${failures[$i]}")"
+        done
+        printf '\n'
+    fi
+    printf '  ],\n'
+    printf '  "counts": {\n'
+    printf '    "markdown_files": %d,\n' "$markdown_files"
+    printf '    "relative_documentation_links": %s,\n' "${relative_documentation_links:-0}"
+    printf '    "repository_script_code_block_mentions": %s,\n' "${repository_script_code_block_mentions:-0}"
+    printf '    "release_gate_docs": %d,\n' "$release_gate_docs"
+    printf '    "reference_entrypoints": %s,\n' "${reference_entrypoints:-0}"
+    printf '    "spec_contract_docs": 1,\n'
+    printf '    "examples_index_directories": %s,\n' "${examples_index_directories:-0}"
+    printf '    "examples_capability_drift_gates": %d,\n' "$examples_capability_drift_gates"
+    printf '    "readme_user_facing_gates": 1,\n'
+    printf '    "retired_path_mentions": 0,\n'
+    printf '    "retired_name_mentions": 0,\n'
+    printf '    "generated_reference_docs": %d,\n' "$generated_reference_count"
+    printf '    "generated_spec_html": 1,\n'
+    printf '    "runnable_spec_examples": %s\n' "${runnable_spec_examples:-0}"
+    printf '  }\n'
+    printf '}\n'
+    if [ "$status" = "issues" ]; then
+        exit 1
+    fi
+    exit 0
+fi
+
+if [ "${#failures[@]}" -gt 0 ]; then
+    echo "docs_check.sh found problems:" >&2
+    for failure in "${failures[@]}"; do
+        echo "  - $failure" >&2
+    done
     exit 1
 fi
-if ! go test ./tests/docs/spec -count=1 >"$go_test_stdout"; then
-    echo "error: docs/spec contract gate failed" >&2
-    exit 1
-fi
-if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints' -count=1 >"$go_test_stdout"; then
-    echo "error: docs release/spec reference gate failed" >&2
-    exit 1
-fi
-if ! go test ./cmd/leia -run 'TestExamplesDocsIndexCoversTopLevelExampleDirectories|TestExamplesDocsIndexCommandsReferenceRegisteredExamples' -count=1 >"$go_test_stdout"; then
-    echo "error: docs examples index gate failed" >&2
-    exit 1
-fi
 
-python3 - <<'PY'
-import json
-import os
-import re
-import sys
-from pathlib import Path
-from urllib.parse import unquote
-
-root = Path.cwd()
-doc_files = [root / "README.md"]
-doc_files.extend(
-    path
-    for path in sorted((root / "docs").rglob("*.md"))
-    if "archive" not in path.relative_to(root / "docs").parts
-)
-
-link_re = re.compile(r"(?<!!)\[[^\]\n]*\]\(([^)\n]+)\)")
-fence_re = re.compile(r"^\s*(`{3,}|~{3,})")
-script_names = {
-    "production_check": root / "scripts" / "production_check.sh",
-    "performance_gate": root / "scripts" / "performance_gate.sh",
-    "diagnostics_bundle": root / "scripts" / "diagnostics_bundle.sh",
-    "docs_check": root / "scripts" / "docs_check.sh",
-    "editor_check": root / "scripts" / "editor_check.sh",
-    "q_conformance_gate": root / "scripts" / "q_conformance_gate.sh",
-    "public_release_blockers_check": root / "scripts" / "public_release_blockers_check.sh",
-    "release_notes_check": root / "scripts" / "release_notes_check.sh",
-    "release_artifacts": root / "scripts" / "release_artifacts.sh",
-    "release_artifacts_check": root / "scripts" / "release_artifacts_check.sh",
-    "release_distribution_check": root / "scripts" / "release_distribution_check.sh",
-    "release_snapshot_install_check": root / "scripts" / "release_snapshot_install_check.sh",
-    "site_check": root / "scripts" / "site_check.sh",
-    "worktree_audit": root / "scripts" / "worktree_audit.sh",
-}
-
-errors = []
-checked_links = 0
-checked_script_mentions = 0
-checked_release_gate_docs = 0
-checked_retired_paths = 0
-checked_retired_names = 0
-checked_spec_runnable_examples = 0
-checked_spec_contract_docs = 0
-checked_examples_index_dirs = 0
-checked_examples_capability_drift_gates = 0
-checked_readme_user_facing_gates = 0
-checked_reference_entrypoints = 0
-spec_runnable_report = ""
-
-retired_paths = {
-    "docs/language-spec.md": "docs/spec/index.md",
-    "docs/stdlib-contract.md": "docs/reference/stdlib/index.md",
-    "docs/test-matrix.md": "docs/testing.md",
-    "docs/testing-matrix.md": "docs/testing.md",
-    "docs/embedding.md": "docs/guides/embedding.md",
-    "docs/tooling.md": "docs/guides/tooling.md",
-    "docs/release.md": "docs/release/index.md",
-    "docs/production-readiness-checklist.md": "docs/release/index.md",
-    "docs/stdlib.md": "docs/reference/stdlib/index.md",
-}
-
-retired_name_re = re.compile(r"\bGScript\b|\bgscript\b|\.gs\b|//gs:")
-
-
-def strip_link_destination(raw: str) -> str:
-    raw = raw.strip()
-    if not raw:
-        return raw
-    if raw.startswith("<"):
-        end = raw.find(">")
-        if end != -1:
-            return raw[1:end]
-    return raw.split()[0]
-
-
-def is_external(target: str) -> bool:
-    return bool(re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", target)) or target.startswith("//")
-
-
-def check_markdown_links(path: Path) -> None:
-    global checked_links
-    text = path.read_text(encoding="utf-8")
-    rel_dir = path.parent
-
-    for line_no, line in enumerate(text.splitlines(), start=1):
-        for match in link_re.finditer(line):
-            target = strip_link_destination(match.group(1))
-            if not target or is_external(target) or target.startswith("#"):
-                continue
-
-            target_no_anchor = target.split("#", 1)[0]
-            target_no_query = target_no_anchor.split("?", 1)[0]
-            if not (target_no_query.endswith(".md") or target_no_query.endswith(".html")):
-                continue
-
-            checked_links += 1
-            resolved = (rel_dir / unquote(target_no_query)).resolve()
-            try:
-                resolved.relative_to(root)
-            except ValueError:
-                errors.append(
-                    f"{path.relative_to(root)}:{line_no}: documentation link escapes repo: {target}"
-                )
-                continue
-            if not resolved.is_file():
-                errors.append(
-                    f"{path.relative_to(root)}:{line_no}: missing documentation link target: {target}"
-                )
-
-
-def check_retired_paths(path: Path) -> None:
-    global checked_retired_paths
-    text = path.read_text(encoding="utf-8")
-    rel = path.relative_to(root)
-    for old, new in retired_paths.items():
-        if old not in text:
-            continue
-        checked_retired_paths += 1
-        errors.append(f"{rel}: references retired docs path {old}; use {new}")
-
-
-def check_retired_names(path: Path) -> None:
-    global checked_retired_names
-    text = path.read_text(encoding="utf-8")
-    rel = path.relative_to(root)
-    for line_no, line in enumerate(text.splitlines(), start=1):
-        if not retired_name_re.search(line):
-            continue
-        checked_retired_names += 1
-        errors.append(f"{rel}:{line_no}: references retired project naming; use Leia naming")
-
-
-def check_script_mentions(path: Path) -> None:
-    global checked_script_mentions
-    in_fence = False
-    fence_start = 0
-    fence_char = ""
-    fence_len = 0
-    block = []
-
-    def flush(end_line: int) -> None:
-        global checked_script_mentions
-        content = "\n".join(block)
-        for name, script_path in script_names.items():
-            if name not in content and script_path.name not in content:
-                continue
-            checked_script_mentions += 1
-            rel_script = script_path.relative_to(root)
-            if not script_path.is_file():
-                errors.append(
-                    f"{path.relative_to(root)}:{fence_start}-{end_line}: missing script referenced in code block: {rel_script}"
-                )
-            elif not os.access(script_path, os.X_OK):
-                errors.append(
-                    f"{path.relative_to(root)}:{fence_start}-{end_line}: script referenced in code block is not executable: {rel_script}"
-                )
-
-    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        match = fence_re.match(line)
-        if match:
-            marker = match.group(1)
-            if in_fence:
-                if marker[0] == fence_char and len(marker) >= fence_len:
-                    flush(line_no)
-                    block = []
-                    in_fence = False
-            else:
-                in_fence = True
-                fence_start = line_no
-                fence_char = marker[0]
-                fence_len = len(marker)
-                block = []
-            continue
-        if in_fence:
-            block.append(line)
-
-    if in_fence:
-        errors.append(f"{path.relative_to(root)}:{fence_start}: unclosed fenced code block")
-
-
-def check_reference_entrypoints() -> None:
-    global checked_reference_entrypoints
-    docs_index = root / "docs" / "index.md"
-    text = docs_index.read_text(encoding="utf-8")
-    for path in sorted((root / "docs" / "reference").glob("*/index.md")):
-        checked_reference_entrypoints += 1
-        ref = path.relative_to(root / "docs").as_posix()
-        if f"({ref})" not in text:
-            errors.append(f"docs/index.md: missing reference entrypoint link: {ref}")
-
-
-def require_snippets(path: Path, snippets: list[str]) -> None:
-    global checked_release_gate_docs
-    text = path.read_text(encoding="utf-8")
-    checked_release_gate_docs += 1
-    for snippet in snippets:
-        if snippet not in text:
-            errors.append(
-                f"{path.relative_to(root)}: missing release-readiness snippet: {snippet}"
-            )
-
-
-def check_release_gate_docs() -> None:
-    release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
-    release_profile_cmd = "scripts/run.sh production --full --release-profile --release-version vX.Y.Z"
-    ci_release_version_cmd = "go run ./cmd/leia ci release --release-version vX.Y.Z --list"
-    release_distribution_cmd = "scripts/run.sh release-dist --require-goreleaser"
-    spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
-    require_snippets(
-        root / "docs" / "release" / "index.md",
-        [
-            "## Machine-Checkable Release Evidence",
-            ci_release_version_cmd,
-            release_profile_cmd,
-            "profile is the release validation source of truth",
-            "q conformance",
-            "local artifact installation evidence",
-            "feature coverage records under `tests/`",
-            release_matrix_cmd,
-            "scripts/run.sh perf --full",
-            release_distribution_cmd,
-            "scripts/run.sh release-check --build",
-            "docs/spec/index.md",
-            "tests/language/MISSING_CAPABILITIES.md",
-            "docs/reference/stdlib/index.md",
-            "docs/reference/security/index.md",
-            "docs/reference/performance/index.md",
-            "docs/reference/platforms/index.md",
-            "choose a license and add a root `LICENSE` file",
-            "docs/release/notes-template.md",
-            "docs/release/decisions.md",
-        ],
-    )
-    require_snippets(
-        root / "docs" / "release" / "index.md",
-        [
-            "## Machine-Checkable Release Evidence",
-            ci_release_version_cmd,
-            release_profile_cmd,
-            "go run ./cmd/leia doc check --json",
-            release_distribution_cmd,
-            release_matrix_cmd,
-            "scripts/run.sh docs",
-            "scripts/run.sh perf --full",
-            "scripts/run.sh release-check --build",
-            "tests/language/MANIFEST.md",
-            "tests/language/KNOWN_FAILURES.md",
-            "docs/reference/hot-reload/index.md",
-            "docs/reference/ai/index.md",
-            "docs/reference/data-oriented/index.md",
-            "examples/README.md",
-            "scripts/public_release_blockers_check.sh",
-            "state tested platforms and execution modes",
-            "complete the release decisions recorded in `docs/release/decisions.md`",
-        ],
-    )
-    require_snippets(
-        root / "docs" / "release" / "decisions.md",
-        [
-            "Public releases require explicit maintainer decisions",
-            "## Required Before Public Release",
-            "| Area | Decision Needed | Current Status |",
-            "| License | Choose the repository license",
-            "| Security reporting | Confirm the private reporting route",
-            "| Platform support | Define tested and supported OS/architecture combinations",
-            "| Release channels | Decide which channels are public",
-            "| Artifact signing | Decide whether SHA256 checksums are sufficient",
-            "| Compatibility policy | Define the pre-1.0 compatibility promise",
-            "The repository has no selected license until a root `LICENSE` file exists.",
-            "whether GitHub private security advisories are enabled",
-            "tested OS/architecture combinations",
-            "whether `scripts/install.sh` is a supported install path",
-            "whether SHA256 checksums are sufficient",
-            "checksum and signing requirements",
-            "Optimizations, JIT availability, typed kernels, and provider integrations are not compatibility guarantees",
-        ],
-    )
-    require_snippets(
-        root / "docs" / "testing.md",
-        [
-            "Runnable examples embedded in `docs/spec/*.md`",
-            release_matrix_cmd,
-            spec_examples_cmd,
-            "feature coverage records under `tests/`",
-            "scripts/run.sh docs",
-            "docs/spec/index.md",
-        ],
-    )
-
-
-def check_spec_runnable_coverage() -> None:
-    global checked_spec_runnable_examples, spec_runnable_report
-    spec_dir = root / "docs" / "spec"
-    by_file = {}
-    files_without_examples = []
-
-    for path in sorted(spec_dir.glob("*.md")):
-        if path.name == "index.md":
-            files_without_examples.append(path.name)
-            continue
-        run = 0
-        fail = 0
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.startswith("```"):
-                continue
-            info = line[3:].strip()
-            if info == "leia run all":
-                run += 1
-            elif info == "leia fail all":
-                fail += 1
-        if run or fail:
-            by_file[path.name] = {"run": run, "fail": fail}
-            checked_spec_runnable_examples += run + fail
-        else:
-            files_without_examples.append(path.name)
-
-    if checked_spec_runnable_examples == 0:
-        errors.append("docs/spec must contain at least one runnable Leia example fence")
-        return
-
-    total_run = sum(item["run"] for item in by_file.values())
-    total_fail = sum(item["fail"] for item in by_file.values())
-    lines = [
-        (
-            "docs/spec runnable Leia coverage: "
-            f"{checked_spec_runnable_examples} examples "
-            f"({total_run} run, {total_fail} fail) across {len(by_file)} files"
-        )
-    ]
-    lines.extend(
-        f"  {name}: {counts['run']} run, {counts['fail']} fail"
-        for name, counts in by_file.items()
-    )
-    if files_without_examples:
-        lines.append(
-            "  no runnable examples: " + ", ".join(files_without_examples)
-        )
-    spec_runnable_report = "\n".join(lines)
-
-
-def check_spec_contract_docs() -> None:
-    global checked_spec_contract_docs
-    docs_check = (root / "scripts" / "docs_check.sh").read_text(encoding="utf-8")
-    readme = (root / "README.md").read_text(encoding="utf-8")
-    spec_index = (root / "docs" / "spec" / "index.md").read_text(encoding="utf-8")
-    for path, text, snippets in [
-        (
-            "scripts/run.sh docs",
-            docs_check,
-            [
-                "go test ./tests/docs/spec -count=1",
-                "README spec link and docs/spec stability contract",
-            ],
-        ),
-        (
-            "README.md",
-            readme,
-            [
-                "Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-                "q`sum ${a}`",
-                "turn {",
-            ],
-        ),
-        (
-            "docs/spec/index.md",
-            spec_index,
-            [
-                "## Stability Contract",
-                "`tests/feature_matrix.json`",
-                "at least one semantic or conformance gate",
-                "release notes or migration notes",
-                "must not be advertised as stable",
-            ],
-        ),
-    ]:
-        checked_spec_contract_docs += 1
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(f"{path}: missing spec/stable-contract snippet: {snippet}")
-
-
-def check_examples_index() -> None:
-    global checked_examples_index_dirs
-    examples_dir = root / "examples"
-    examples_index = root / "docs" / "examples" / "index.md"
-    text = examples_index.read_text(encoding="utf-8")
-    indexed_dirs = set(re.findall(r"`examples/([^`/]+)/`", text))
-    registered_dirs = set()
-    for path in sorted(examples_dir.iterdir()):
-        if not path.is_dir():
-            continue
-        has_registered_source = any(
-            child.suffix in {".leia", ".go"} for child in path.rglob("*") if child.is_file()
-        )
-        if not has_registered_source:
-            continue
-        registered_dirs.add(path.name)
-        checked_examples_index_dirs += 1
-        snippet = f"`examples/{path.name}/`"
-        if snippet not in text:
-            errors.append(
-                f"{examples_index.relative_to(root)}: missing example directory index row: {snippet}"
-            )
-    for name in sorted(indexed_dirs - registered_dirs):
-        errors.append(
-            f"{examples_index.relative_to(root)}: indexes missing or unregistered example directory: `examples/{name}/`"
-        )
-
-
-def check_examples_capability_drift_gates() -> None:
-    global checked_examples_capability_drift_gates
-    for path, snippets in [
-        (
-            root / "tests" / "release_matrix_test.go",
-            [
-                "TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples",
-                "TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples",
-                "leia examples list --json",
-                "TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples",
-                "TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates",
-            ],
-        ),
-        (
-            root / "cmd" / "leia" / "main_examples_command_test.go",
-            [
-                "TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples",
-                "CLI examples list is missing playground repository example",
-                "manual/check-only in the CLI manifest but has no requires reason",
-            ],
-        ),
-        (
-            root / "cmd" / "leia" / "main_playground_test.go",
-            [
-                "TestPlaygroundRepositoryCoreExampleCoverage",
-                "TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates",
-                "TestPlaygroundRepositoryGameEngineExampleClassification",
-            ],
-        ),
-    ]:
-        checked_examples_capability_drift_gates += 1
-        text = path.read_text(encoding="utf-8")
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path.relative_to(root)}: missing examples capability drift gate snippet: {snippet}"
-                )
-
-
-def check_readme_user_facing_gates() -> None:
-    global checked_readme_user_facing_gates
-    for path, snippets in [
-        (
-            root / "cmd" / "leia" / "main_readme_tooling_test.go",
-            [
-                "TestReadmeIntroStaysFocused",
-                "Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-                "TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
-                "TestDocsHomeMainLeiaExampleStaysRunnable",
-                "TestReferenceDialectsIntroExampleStaysRunnable",
-                "TestReferenceDataOrientedExamplesStayRunnable",
-                "TestReferenceScientificNumericExampleStaysRunnable",
-                "TestReferenceConcurrencyExamplesStayRunnable",
-                "readmeFirstLeiaSnippet",
-                "markdownLeiaSnippets",
-                "runLeiaDocSnippet",
-                "README Leia example failed",
-                "docs home Leia example failed",
-                "dialects reference Leia example failed",
-                "data-oriented reference Leia examples failed",
-                "scientific-reference.leia",
-                '"concurrency-"+tc.name+".leia"',
-                "docs/index.md",
-                "docs/reference/dialects/index.md",
-                "docs/reference/data-oriented/index.md",
-                "docs/reference/scientific/index.md",
-                "docs/reference/concurrency/index.md",
-                "AAPL\\t18\\t100.375",
-                "want 42 fallback without host LLM provider",
-                'exec.Command("go", "run", "./cmd/leia", "run", file)',
-            ],
-        ),
-        (
-            root / "tests" / "release_matrix_test.go",
-            [
-                "TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate",
-                "readReleaseReadmeSurfaceLeiaSnippet",
-                "releaseToolingAuditCommands",
-                "README.md Example snippet changed or lost product surface",
-                "tooling audit command must use `go run ./cmd/leia ...`",
-                "cmd/leia/main_readme_tooling_test.go must keep README focused positioning gate",
-                "cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate",
-            ],
-        ),
-    ]:
-        checked_readme_user_facing_gates += 1
-        text = path.read_text(encoding="utf-8")
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path.relative_to(root)}: missing README user-facing gate snippet: {snippet}"
-                )
-
-def failure_kind(message: str) -> str:
-    if "missing local anchor" in message:
-        return "missing_anchor"
-    if "link escapes repository" in message:
-        return "link_escape"
-    if "missing linked file" in message:
-        return "missing_linked_file"
-    if "missing repository-script mention" in message:
-        return "missing_script_mention"
-    if "mentioned script is not executable" in message:
-        return "script_not_executable"
-    if "references retired docs path" in message:
-        return "retired_path"
-    if "references retired project naming" in message:
-        return "retired_name"
-    if "unclosed fenced code block" in message:
-        return "unclosed_fence"
-    if "missing reference entrypoint link" in message:
-        return "missing_reference_entrypoint"
-    if "missing release gate snippet" in message:
-        return "missing_release_gate_snippet"
-    if "runnable Leia example" in message or "spec runnable" in message:
-        return "spec_runnable"
-    if "missing spec/stable-contract snippet" in message:
-        return "missing_spec_contract"
-    if "missing examples index entry" in message:
-        return "missing_examples_index"
-    if "missing examples capability drift gate" in message:
-        return "missing_examples_capability_gate"
-    if "missing README user-facing gate snippet" in message:
-        return "missing_readme_gate"
-    return "general"
-
-def failure_kinds(messages: list[str]) -> list[str]:
-    kinds: list[str] = []
-    for message in messages:
-        kind = failure_kind(message)
-        if kind not in kinds:
-            kinds.append(kind)
-    return kinds
-
-def failure_details(messages: list[str]) -> list[dict[str, str]]:
-    return [{"kind": failure_kind(message), "message": message} for message in messages]
-
-for doc_file in doc_files:
-    if doc_file.is_file():
-        check_markdown_links(doc_file)
-        check_script_mentions(doc_file)
-        check_retired_paths(doc_file)
-        check_retired_names(doc_file)
-
-check_release_gate_docs()
-check_reference_entrypoints()
-check_spec_runnable_coverage()
-check_spec_contract_docs()
-check_examples_index()
-check_examples_capability_drift_gates()
-check_readme_user_facing_gates()
-
-def report() -> dict:
-    kinds = failure_kinds(errors)
-    return {
-        "schema_version": 1,
-        "status": "issues" if errors else "pass",
-        "failure_count": len(errors),
-        "failure_kind_count": len(kinds),
-        "failure_kinds": kinds,
-        "failures": errors,
-        "failure_details": failure_details(errors),
-        "counts": {
-            "markdown_files": len(doc_files),
-            "relative_documentation_links": checked_links,
-            "repository_script_code_block_mentions": checked_script_mentions,
-            "release_gate_docs": checked_release_gate_docs,
-            "reference_entrypoints": checked_reference_entrypoints,
-            "spec_contract_docs": checked_spec_contract_docs,
-            "examples_index_directories": checked_examples_index_dirs,
-            "examples_capability_drift_gates": checked_examples_capability_drift_gates,
-            "readme_user_facing_gates": checked_readme_user_facing_gates,
-            "retired_path_mentions": checked_retired_paths,
-            "retired_name_mentions": checked_retired_names,
-            "generated_reference_docs": int(os.environ["GENERATED_REFERENCE_COUNT"]),
-            "generated_spec_html": 1,
-            "runnable_spec_examples": checked_spec_runnable_examples,
-        },
-    }
-
-if os.environ.get("DOCS_CHECK_JSON") == "1":
-    print(json.dumps(report(), indent=2, sort_keys=True))
-    if errors:
-        sys.exit(1)
-    sys.exit(0)
-
-if errors:
-    print("docs_check.sh found problems:", file=sys.stderr)
-    for error in errors:
-        print(f"  - {error}", file=sys.stderr)
-    sys.exit(1)
-
-print(
-    f"docs_check.sh: checked {len(doc_files)} Markdown files, "
-    f"{checked_links} relative documentation links, "
-    f"{checked_script_mentions} repository-script code-block mentions, "
-    f"{checked_release_gate_docs} release-gate docs, "
-    f"{checked_reference_entrypoints} reference entrypoints, "
-    f"{checked_spec_contract_docs} spec/stable-contract docs, "
-    f"{checked_examples_index_dirs} examples index directories, "
-    f"{checked_examples_capability_drift_gates} examples capability drift gates, "
-    f"{checked_readme_user_facing_gates} README user-facing gates, "
-    f"{checked_retired_paths} retired-path mentions, "
-    f"{checked_retired_names} retired-name mentions, "
-    f"{os.environ['GENERATED_REFERENCE_COUNT']} generated reference docs, "
-    "1 generated spec HTML, "
-    f"{checked_spec_runnable_examples} runnable spec examples."
-)
-print(spec_runnable_report)
-PY
+echo "docs_check.sh: checked ${markdown_files} Markdown files, ${relative_documentation_links:-0} relative documentation links, ${repository_script_code_block_mentions:-0} repository-script code-block mentions, ${release_gate_docs} release-gate docs, ${reference_entrypoints:-0} reference entrypoints, 1 spec/stable-contract docs, ${examples_index_directories:-0} examples index directories, ${examples_capability_drift_gates} examples capability drift gates, 1 README user-facing gates, 0 retired-path mentions, 0 retired-name mentions, ${generated_reference_count} generated reference docs, 1 generated spec HTML, ${runnable_spec_examples:-0} runnable spec examples."

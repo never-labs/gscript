@@ -19,7 +19,7 @@ package bind
 // fixed sequence of deterministic roundings. Checksums fold floats through
 // math.Float64bits, which is therefore stable across kernel implementations.
 //
-// Benchmark families (all names flow into benchmarks/q_perf_report.py):
+// Benchmark families (all names flow into leia bench q-report):
 //   - BenchmarkQSQLBindMatrixWarm/<Case>  warm plan-cache execution
 //   - BenchmarkQSQLBindMatrixCold/<Case>  cold parse/lower/bind execution
 //   - BenchmarkQSQLNativeGoMatrix/<Case>  hand-written Go baseline

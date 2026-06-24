@@ -379,10 +379,6 @@ add_go_test() {
 add_performance_gate() {
     local cmd="scripts/run.sh perf --full"
 
-    if ! have_cmd python3; then
-        add_skip "Performance Gate" "missing python3"
-        return
-    fi
     if [ ! -f scripts/performance_gate.sh ]; then
         add_skip "Performance Gate" "missing scripts/performance_gate.sh"
         return
@@ -430,20 +426,12 @@ add_documentation_references() {
         add_skip "Documentation References" "missing go"
         return
     fi
-    if ! have_cmd python3; then
-        add_skip "Documentation References" "missing python3"
-        return
-    fi
     add_run "Documentation References" "scripts/run.sh docs"
 }
 
 add_architecture_health_gate() {
     if [ ! -f scripts/arch_check.sh ]; then
         add_skip "Architecture Health" "missing scripts/arch_check.sh"
-        return
-    fi
-    if ! have_cmd python3; then
-        add_skip "Architecture Health" "missing python3"
         return
     fi
     add_run "Architecture Health" "bash scripts/arch_check.sh --json"
@@ -465,10 +453,6 @@ add_language_conformance_gate() {
 add_q_conformance_gate() {
     if ! have_cmd go; then
         add_skip "Q Conformance Gate" "missing go"
-        return
-    fi
-    if ! have_cmd python3; then
-        add_skip "Q Conformance Gate" "missing python3"
         return
     fi
     if [ ! -f scripts/q_conformance_gate.sh ]; then

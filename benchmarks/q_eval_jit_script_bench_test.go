@@ -7,7 +7,7 @@
 // benches go through the public embedding API (leia.New + vm.Exec + vm.Call)
 // so the loop itself tiers up through the bytecode VM into Tier 2 native code.
 //
-// Bench naming contract (consumed by q_perf_report.py):
+// Bench naming contract (consumed by leia bench q-report):
 //   - BenchmarkQEvalJITScriptWarm/<case>  — JIT enabled (leia.WithJIT())
 //   - BenchmarkQEvalVMScriptWarm/<case>   — bytecode VM only (leia.WithVM())
 //

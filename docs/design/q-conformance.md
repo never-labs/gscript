@@ -33,7 +33,7 @@ The matrix is intentionally a coverage ledger. It does not imply full kdb+ compa
 - every matrix path points at an existing q test, example, or benchmark;
 - `supported` and `rejected` rows have at least one q language test.
 
-The Python unit coverage for these rules lives in `tests/manifest_test.py`.
+The Go unit coverage for these rules lives in the release and manifest tests.
 
 ## Runtime boundary
 

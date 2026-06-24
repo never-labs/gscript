@@ -55,8 +55,8 @@ func TestBenchCommandDispatchesCompareHarness(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if gotName == "python3" {
-		t.Fatalf("compare dispatched to python")
+	if gotName == "" {
+		t.Fatalf("compare did not invoke build command")
 	}
 	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
 		t.Fatalf("stdout = %q, want JSON write", stdout.String())
@@ -79,8 +79,8 @@ func TestBenchCommandDefaultsToQuickCompare(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if containsString(gotArgs, filepath.Join("benchmarks", "timing_compare.py")) {
-		t.Fatalf("default quick compare dispatched to python: %#v", gotArgs)
+	if len(gotArgs) == 0 {
+		t.Fatalf("default quick compare did not invoke build command")
 	}
 	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
 		t.Fatalf("stdout = %q, want JSON write", stdout.String())
@@ -103,8 +103,8 @@ func TestBenchCommandDispatchesBenchmarkSelector(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if containsString(gotArgs, filepath.Join("benchmarks", "timing_compare.py")) {
-		t.Fatalf("selector compare dispatched to python: %#v", gotArgs)
+	if len(gotArgs) == 0 {
+		t.Fatalf("selector compare did not invoke build command")
 	}
 	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
 		t.Fatalf("stdout = %q, want JSON write", stdout.String())
@@ -131,10 +131,8 @@ func TestBenchCommandDispatchesProfiles(t *testing.T) {
 	if code := runBenchCommand([]string{"--guard", "--no-luajit", "--json", filepath.Join(t.TempDir(), "guard.json")}, &stdout, &stderr); code != 0 {
 		t.Fatalf("guard code = %d, stderr = %q", code, stderr.String())
 	}
-	for _, call := range calls {
-		if len(call) > 0 && call[0] == "python3" {
-			t.Fatalf("profile dispatched to python: %#v", calls)
-		}
+	if len(calls) == 0 {
+		t.Fatalf("profiles did not invoke build command")
 	}
 }
 
@@ -154,8 +152,8 @@ func TestBenchCommandDispatchesCompareQuickProfile(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if containsString(gotArgs, filepath.Join("benchmarks", "timing_compare.py")) {
-		t.Fatalf("quick compare dispatched to python: %#v", gotArgs)
+	if len(gotArgs) == 0 {
+		t.Fatalf("quick compare did not invoke build command")
 	}
 	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
 		t.Fatalf("stdout = %q, want JSON write", stdout.String())
@@ -178,8 +176,8 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if containsString(gotArgs, filepath.Join("benchmarks", "strict_guard.py")) {
-		t.Fatalf("strict dispatched to python: %#v", gotArgs)
+	if len(gotArgs) == 0 {
+		t.Fatalf("strict did not invoke build command")
 	}
 	if !strings.Contains(stdout.String(), "wrote "+jsonPath) {
 		t.Fatalf("stdout = %q, want JSON write", stdout.String())
@@ -187,42 +185,32 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 }
 
 func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
-	oldBenchExecCommand := benchExecCommand
-	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
-	var gotArgs []string
-	benchExecCommand = func(name string, args ...string) *exec.Cmd {
-		gotArgs = append([]string(nil), args...)
-		helper, helperArgs := testHelperCommand(t, "bench")
-		return exec.Command(helper, helperArgs...)
-	}
-
+	outDir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing"}, &stdout, &stderr)
+	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing", "--out-dir", outDir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "diagnose.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "control/sieve" || gotArgs[3] != "--no-timing" {
-		t.Fatalf("args = %#v, want diagnose.py --bench control/sieve --no-timing", gotArgs)
+	if !strings.Contains(stdout.String(), "Wrote diagnostics:") {
+		t.Fatalf("stdout = %q, want diagnostics path", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "diagnostics.json")); err != nil {
+		t.Fatalf("diagnostics.json missing: %v", err)
 	}
 }
 
 func TestBenchCommandDispatchesTriageHarness(t *testing.T) {
-	oldBenchExecCommand := benchExecCommand
-	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
-	var gotArgs []string
-	benchExecCommand = func(name string, args ...string) *exec.Cmd {
-		gotArgs = append([]string(nil), args...)
-		helper, helperArgs := testHelperCommand(t, "bench")
-		return exec.Command(helper, helperArgs...)
-	}
-
+	outDir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"triage", "--bench", "numeric/spectral_norm", "--runs", "1"}, &stdout, &stderr)
+	code := runBenchCommand([]string{"triage", "--bench", "numeric/spectral_norm", "--runs", "1", "--out-dir", outDir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 5 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "triage.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "numeric/spectral_norm" || gotArgs[3] != "--runs" || gotArgs[4] != "1" {
-		t.Fatalf("args = %#v, want triage.py --bench numeric/spectral_norm --runs 1", gotArgs)
+	if !strings.Contains(stdout.String(), "# Performance Triage") {
+		t.Fatalf("stdout = %q, want triage markdown", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "triage.json")); err != nil {
+		t.Fatalf("triage.json missing: %v", err)
 	}
 }
 

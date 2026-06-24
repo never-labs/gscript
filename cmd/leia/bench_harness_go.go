@@ -151,6 +151,7 @@ func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
 		return 1
 	}
+	cfg.Groups = benchGroupsForSelectors(cfg.Groups, cfg.BenchSelectors)
 	specs, err := benchdisc.Discover(root, cfg.Groups)
 	if err != nil {
 		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
