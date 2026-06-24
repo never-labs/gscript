@@ -24,6 +24,7 @@ Tasks:
   release-check        Check local release artifacts
   release-dist         Check release distribution config
   release-notes        Check release notes evidence
+  release-notes-gate   Run release notes gate with release-profile defaults
   release-snapshot     Verify a snapshot archive through the installer
   site                 Check rendered static site output
   worktree             Audit git worktrees
@@ -171,6 +172,59 @@ USAGE
   run_shell_task scripts/release_artifacts_check.sh "${args[@]}"
 }
 
+run_release_notes_gate_task() {
+  local version=""
+  local require_ready=1
+  local args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --version)
+        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+          echo "scripts/run.sh release-notes-gate: --version requires a value" >&2
+          exit 2
+        fi
+        version="$2"
+        shift 2
+        ;;
+      --version=*)
+        version="${1#--version=}"
+        shift
+        ;;
+      --audit)
+        require_ready=0
+        shift
+        ;;
+      -h|--help)
+        cat <<'USAGE'
+Usage: scripts/run.sh release-notes-gate [--version VERSION] [--audit]
+
+Runs release notes validation with release-profile defaults. By default the
+gate requires ready release notes. VERSION, LEIA_RELEASE_ARTIFACT_VERSION, or
+LEIA_RELEASE_REQUIRE_TAG=1 selects the release notes file to validate.
+USAGE
+        return
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+  if [ -z "$version" ] && [ -n "${LEIA_RELEASE_ARTIFACT_VERSION:-}" ]; then
+    version="$LEIA_RELEASE_ARTIFACT_VERSION"
+  fi
+  if [ -z "$version" ] && [ -n "${LEIA_RELEASE_REQUIRE_TAG:-}" ]; then
+    version="$(git describe --tags --exact-match)"
+  fi
+  if [ "$require_ready" -eq 1 ]; then
+    args+=(--require-ready)
+  fi
+  if [ -n "$version" ]; then
+    args+=(--version "$version")
+  fi
+  run_shell_task scripts/release_notes_check.sh "${args[@]}"
+}
+
 case "$task" in
   -h|--help|help)
     usage
@@ -219,6 +273,9 @@ case "$task" in
     ;;
   release-notes|release-notes-check)
     run_shell_task scripts/release_notes_check.sh "$@"
+    ;;
+  release-notes-gate)
+    run_release_notes_gate_task "$@"
     ;;
   release-snapshot|release-snapshot-install|release-snapshot-install-check)
     run_shell_task scripts/release_snapshot_install_check.sh "$@"

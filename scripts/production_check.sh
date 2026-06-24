@@ -513,11 +513,11 @@ add_release_notes_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ] && [ -n "$RELEASE_VERSION" ]; then
-        add_run "Release Notes" "scripts/run.sh release-notes --require-ready --version \"$RELEASE_VERSION\""
+        add_run "Release Notes" "scripts/run.sh release-notes-gate --version \"$RELEASE_VERSION\""
         return
     fi
-    if [ "$RELEASE_PROFILE" -eq 1 ] && [ -n "${LEIA_RELEASE_REQUIRE_TAG:-}" ]; then
-        add_run "Release Notes" "notes_version=\"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"; scripts/run.sh release-notes --require-ready --version \"\$notes_version\""
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_run "Release Notes" "scripts/run.sh release-notes-gate"
         return
     fi
     add_run "Release Notes" "scripts/run.sh release-notes"

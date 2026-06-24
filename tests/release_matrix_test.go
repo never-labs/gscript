@@ -3013,7 +3013,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		"Architecture Health":     "scripts/run.sh arch --json",
 		"Public Release Blockers": "scripts/run.sh public-blockers --require-resolved",
 		"Release Distribution":    "scripts/run.sh release-dist --require-goreleaser",
-		"Release Notes":           "scripts/run.sh release-notes --require-ready --version \"vX.Y.Z\"",
+		"Release Notes":           "scripts/run.sh release-notes-gate --version \"vX.Y.Z\"",
 		"Release Artifacts":       "scripts/run.sh release-artifacts-gate",
 		"Q Performance Gate":      "scripts/run.sh q-perf",
 	} {
