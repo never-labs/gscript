@@ -29,7 +29,7 @@ LEIA_SKIP_TIMING_COMPARE=1 go run ./cmd/leia bench q-suite > /tmp/leia-q-perf-ou
 go run ./cmd/leia bench q-report --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md
 scripts/run.sh editor --json
 bash scripts/public_release_blockers_check.sh --json
-bash scripts/release_notes_check.sh --json --version vX.Y.Z
+scripts/run.sh release-notes --json --version vX.Y.Z
 scripts/run.sh release-dist --json
 bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json
 bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json
@@ -187,7 +187,7 @@ Every public tag must have release notes. The notes must identify:
 - evidence links for the spec, feature coverage, security reference, platform
   reference, and performance validation.
 
-`scripts/release_notes_check.sh --json --version vX.Y.Z` reports
+`scripts/run.sh release-notes --json --version vX.Y.Z` reports
 `checked_file_count`, `required_artifact_count`, `artifact_checksum_count`,
 `failure_kind_count`, and `failure_count`. Its `checked_file_details` and
 `required_artifact_details` fields expose checked file roles, existence, and

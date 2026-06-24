@@ -314,7 +314,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	shellSyntaxCmd := "for f in scripts/*.sh benchmarks/*.sh; do bash -n \"$f\"; done"
 	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
 	releaseDistributionCmd := "scripts/run.sh release-dist --require-goreleaser"
-	releaseNotesCmd := "bash scripts/release_notes_check.sh --require-ready --version vX.Y.Z"
+	releaseNotesCmd := "scripts/run.sh release-notes --require-ready --version vX.Y.Z"
 	strictReleaseArtifactsCmd := "scripts/run.sh release-check --build --require-clean --require-tag --version vX.Y.Z"
 
 	for _, item := range []struct {
@@ -1206,7 +1206,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"go run ./cmd/leia bench q-report --from-output /tmp/leia-q-perf-output.txt --check --json /tmp/leia-q-perf-report.json --markdown /tmp/leia-q-perf-report.md",
 		"scripts/run.sh editor --json",
 		"bash scripts/public_release_blockers_check.sh --json",
-		"bash scripts/release_notes_check.sh --json --version vX.Y.Z",
+		"scripts/run.sh release-notes --json --version vX.Y.Z",
 		"scripts/run.sh release-dist --json",
 		"bash scripts/install.sh --version vX.Y.Z --os darwin --arch arm64 --bin-dir /tmp/leia-bin --dry-run --json",
 		"bash scripts/release_artifacts.sh --dry-run --version vX.Y.Z --json",
@@ -3009,7 +3009,7 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		"Architecture Health":     "bash scripts/arch_check.sh --json",
 		"Public Release Blockers": "bash scripts/public_release_blockers_check.sh --require-resolved",
 		"Release Distribution":    "scripts/run.sh release-dist --require-goreleaser",
-		"Release Notes":           "bash scripts/release_notes_check.sh --require-ready --version \"vX.Y.Z\"",
+		"Release Notes":           "scripts/run.sh release-notes --require-ready --version \"vX.Y.Z\"",
 		"Release Artifacts":       "scripts/run.sh release-check",
 		"Q Performance Gate":      "go run ./cmd/leia bench q-suite | tee \"$q_perf_dir/output.txt\" && go run ./cmd/leia bench q-report --from-output \"$q_perf_dir/output.txt\" --check --json \"$q_perf_dir/q_perf_report.json\" --markdown \"$q_perf_dir/q_perf_report.md\"",
 	} {

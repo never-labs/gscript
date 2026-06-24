@@ -19,6 +19,9 @@ Tasks:
   release-artifacts    Build local release artifacts
   release-check        Check local release artifacts
   release-dist         Check release distribution config
+  release-notes        Check release notes evidence
+  release-snapshot     Verify a snapshot archive through the installer
+  site                 Check rendered static site output
   worktree             Audit git worktrees
 
 Bootstrap-only entrypoints stay outside this launcher:
@@ -95,6 +98,15 @@ case "$task" in
     ;;
   release-dist|release-distribution|release-distribution-check)
     run_shell_task scripts/release_distribution_check.sh "$@"
+    ;;
+  release-notes|release-notes-check)
+    run_shell_task scripts/release_notes_check.sh "$@"
+    ;;
+  release-snapshot|release-snapshot-install|release-snapshot-install-check)
+    run_shell_task scripts/release_snapshot_install_check.sh "$@"
+    ;;
+  site|site-check)
+    run_shell_task scripts/site_check.sh "$@"
     ;;
   worktree|worktree-audit)
     run_shell_task scripts/worktree_audit.sh "$@"

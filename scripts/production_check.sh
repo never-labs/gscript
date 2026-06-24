@@ -512,14 +512,14 @@ add_release_notes_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ] && [ -n "$RELEASE_VERSION" ]; then
-        add_run "Release Notes" "bash scripts/release_notes_check.sh --require-ready --version \"$RELEASE_VERSION\""
+        add_run "Release Notes" "scripts/run.sh release-notes --require-ready --version \"$RELEASE_VERSION\""
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ] && [ -n "${LEIA_RELEASE_REQUIRE_TAG:-}" ]; then
-        add_run "Release Notes" "notes_version=\"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"; bash scripts/release_notes_check.sh --require-ready --version \"\$notes_version\""
+        add_run "Release Notes" "notes_version=\"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"; scripts/run.sh release-notes --require-ready --version \"\$notes_version\""
         return
     fi
-    add_run "Release Notes" "bash scripts/release_notes_check.sh"
+    add_run "Release Notes" "scripts/run.sh release-notes"
 }
 
 add_public_release_blockers_gate() {
