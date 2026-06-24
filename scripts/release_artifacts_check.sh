@@ -36,7 +36,7 @@ expected_module_path="github.com/never-labs/leia"
 
 build="false"
 out_dir=""
-version="smoke-check"
+version="v0.0.0-local"
 keep_output="false"
 require_clean="false"
 require_tag="false"
@@ -374,7 +374,7 @@ require_file "$install_script"
 require_file "$repo_root/$smoke_script"
 
 if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ && "$version" != "smoke-check" ]]; then
-  fail "invalid_version" "release artifact check version must match vMAJOR.MINOR.PATCH, prerelease, or smoke-check: $version" 2
+  fail "invalid_version" "release artifact check version must match vMAJOR.MINOR.PATCH, prerelease, or smoke-check legacy smoke version: $version" 2
 fi
 
 if [[ "$require_clean" == "true" && -n "$(git status --porcelain)" ]]; then

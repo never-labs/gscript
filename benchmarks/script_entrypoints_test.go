@@ -1,6 +1,7 @@
 package benchmarks
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -166,7 +167,8 @@ func TestReleaseProfileRequiresReleaseOnlyToolSmokes(t *testing.T) {
 		requireContains(t, production, want)
 	}
 	requireContains(t, distribution, "--require-goreleaser")
-	requireContains(t, distribution, "goreleaser CLI is required for release distribution profile")
+	requireContains(t, distribution, "github.com/goreleaser/goreleaser/v2@v2.16.0")
+	requireContains(t, distribution, "pinned go-run fallback")
 	requireContains(t, ci, `"--full", "--release-profile"`)
 }
 
@@ -186,17 +188,27 @@ func TestProductionReleaseProfileListIncludesRequiredToolFlags(t *testing.T) {
 	}
 }
 
-func TestReleaseDistributionRequireGoreleaserFailsWithoutCLI(t *testing.T) {
+func TestReleaseDistributionRequireGoreleaserFailsWithoutCLIOrGo(t *testing.T) {
 	root := repoRootForScriptEntrypoints(t)
-	env := append(os.Environ(), "PATH=/usr/bin:/bin")
-	if _, code := runScriptEntrypointCommand(t, root, env, "bash", "-lc", "command -v goreleaser >/dev/null 2>&1"); code == 0 {
-		t.Skip("goreleaser is available on the restricted PATH")
+	tmpBin := t.TempDir()
+	for _, name := range []string{"awk", "bash", "chmod", "cp", "dirname", "env", "grep", "install", "mkdir", "mktemp", "openssl", "rm", "sh", "shasum", "sha256sum", "tar", "unzip", "zip"} {
+		path, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+		if err := os.Symlink(path, filepath.Join(tmpBin, name)); err != nil && !errors.Is(err, os.ErrExist) {
+			t.Fatalf("symlink %s into test PATH: %v", name, err)
+		}
 	}
+	if _, err := os.Stat(filepath.Join(tmpBin, "bash")); err != nil {
+		t.Fatalf("test PATH needs bash: %v", err)
+	}
+	env := append(os.Environ(), "PATH="+tmpBin)
 	out, code := runScriptEntrypointCommand(t, root, env, "bash", "scripts/release_distribution_check.sh", "--require-goreleaser")
 	if code != 1 {
 		t.Fatalf("release_distribution_check exit %d, want 1:\n%s", code, out)
 	}
-	requireContains(t, out, "goreleaser CLI is required for release distribution profile")
+	requireContains(t, out, "goreleaser check requires a local goreleaser CLI or go for pinned go-run fallback")
 }
 
 func TestScriptsHaveValidTypeSpecificSyntax(t *testing.T) {
