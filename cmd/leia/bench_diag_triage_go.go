@@ -372,13 +372,14 @@ func runBenchTriageCommand(args []string, outw, errw io.Writer) int {
 		"bottlenecks":        bottlenecks,
 		"recommendations":    recommendations,
 		"artifacts":          artifacts,
-		"exit_summary":       map[string]any{"total": 0, "by_code": map[string]any{}, "by_reason": map[string]any{}, "top_sites": []any{}, "statuses": map[string]any{}},
-		"pprof_summary":      map[string]any{},
-		"pcmap_summary":      map[string]any{},
-		"memprofile_summary": map[string]any{},
-		"runtime_stats":      map[string]any{},
+		"exit_summary":       benchTriageExitSummary(timing),
+		"pprof_summary":      benchTriageNotCollectedSummary("pass --pprof after selecting a benchmark that needs CPU profile evidence"),
+		"pcmap_summary":      benchTriageNotCollectedSummary("pass --warm-dump with pprof evidence when JIT PC mapping is needed"),
+		"memprofile_summary": benchTriageNotCollectedSummary("pass --memprofile when allocation evidence is needed"),
+		"runtime_stats":      benchTriageNotCollectedSummary("pass --runtime-stats or run diagnose for runtime counter evidence"),
 		"speculation_state": map[string]any{
 			"status": "not_collected",
+			"reason": "pass --spec-state when Tier 2 speculation state is needed",
 		},
 	}
 	jsonPath := filepath.Join(outDir, "triage.json")
@@ -557,6 +558,36 @@ func benchTriageRecommendations(timing []map[string]any) []string {
 		return []string{"Use timing.json for detailed ratios; run leia bench diagnose when per-run raw output is needed."}
 	}
 	return recs
+}
+
+func benchTriageExitSummary(timing []map[string]any) map[string]any {
+	total := 0
+	statuses := map[string]int{}
+	for _, row := range timing {
+		if exits, ok := benchTriageInt(row["exits"]); ok {
+			total += exits
+		}
+		if statusMap, ok := row["status"].(map[string]any); ok {
+			for subject, status := range statusMap {
+				key := subject + ":" + fmt.Sprint(status)
+				statuses[key]++
+			}
+		}
+	}
+	return map[string]any{
+		"total":     total,
+		"by_code":   map[string]any{},
+		"by_reason": map[string]any{},
+		"top_sites": []any{},
+		"statuses":  statuses,
+	}
+}
+
+func benchTriageNotCollectedSummary(reason string) map[string]any {
+	return map[string]any{
+		"status": "not_collected",
+		"reason": reason,
+	}
 }
 
 func benchTriageBottlenecks(timing []map[string]any) []map[string]any {

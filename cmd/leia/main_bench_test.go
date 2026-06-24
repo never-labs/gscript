@@ -336,6 +336,26 @@ func TestBenchTriageRowsKeepRuntimeCounters(t *testing.T) {
 	}
 }
 
+func TestBenchTriageTopLevelSummariesAreStructured(t *testing.T) {
+	rows := []map[string]any{
+		{
+			"benchmark": "control/sieve",
+			"mode":      "default",
+			"exits":     float64(3),
+			"status":    map[string]any{"current": "ok", "head": "ok", "luajit": "missing"},
+		},
+	}
+	exitSummary := benchTriageExitSummary(rows)
+	statuses, _ := exitSummary["statuses"].(map[string]int)
+	if exitSummary["total"] != 3 || statuses["current:ok"] != 1 || statuses["luajit:missing"] != 1 {
+		t.Fatalf("exit summary = %#v", exitSummary)
+	}
+	pprof := benchTriageNotCollectedSummary("unit")
+	if pprof["status"] != "not_collected" || pprof["reason"] != "unit" {
+		t.Fatalf("not collected summary = %#v", pprof)
+	}
+}
+
 func TestBenchCommandRunsGoQReportFromOutput(t *testing.T) {
 	oldBenchExecCommand := benchExecCommand
 	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
