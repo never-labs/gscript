@@ -1826,7 +1826,7 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		matches       []releaseReportCountMatch
 		wantFailure   bool
 	}{
-		{reportCommand: "scripts/run.sh arch --json", args: []string{"scripts/run.sh", "arch", "--json"}, scalars: []string{"module"}, counts: []string{"source_file_count", "source_line_count", "test_file_count", "test_line_count", "test_ratio_pct", "top_file_count", "large_file_count", "pass_pipeline_line_count", "debt_marker_count", "missing_test_count", "same_name_test_gap_count"}, fields: []string{"top_file_details", "large_file_details", "pass_pipeline_lines", "debt_marker_details", "missing_test_files"}, matches: []releaseReportCountMatch{{"top_file_count", "top_file_details"}, {"large_file_count", "large_file_details"}, {"pass_pipeline_line_count", "pass_pipeline_lines"}, {"debt_marker_count", "debt_marker_details"}, {"missing_test_count", "missing_test_files"}, {"same_name_test_gap_count", "missing_test_files"}}},
+		{reportCommand: "scripts/run.sh arch --json", args: []string{"scripts/run.sh", "arch", "--json"}, scalars: []string{"module"}, counts: []string{"source_file_count", "source_line_count", "test_file_count", "test_line_count", "test_ratio_pct", "top_file_count", "large_file_count", "pass_pipeline_line_count", "tiering_manager_mention_count", "debt_marker_count", "missing_test_count", "same_name_test_gap_count"}, fields: []string{"top_file_details", "large_file_details", "pass_pipeline_lines", "tiering_manager_mentions", "debt_marker_details", "missing_test_files"}, matches: []releaseReportCountMatch{{"top_file_count", "top_file_details"}, {"large_file_count", "large_file_details"}, {"pass_pipeline_line_count", "pass_pipeline_lines"}, {"tiering_manager_mention_count", "tiering_manager_mentions"}, {"debt_marker_count", "debt_marker_details"}, {"missing_test_count", "missing_test_files"}, {"same_name_test_gap_count", "missing_test_files"}}},
 		{reportCommand: "scripts/run.sh diagnostics --json", args: []string{"scripts/run.sh", "diagnostics", "--output", diagScriptOutDir, "--skip-go-tests", "--skip-benchmarks", "--json"}, scalars: []string{"output_dir"}, counts: []string{"failure_count", "file_count"}, fields: []string{"failure_details", "files"}, itemFields: []string{"files[]"}, matches: []releaseReportCountMatch{{"failure_count", "failure_details"}, {"file_count", "files"}}},
 		{reportCommand: "scripts/run.sh docs --json", args: []string{"scripts/run.sh", "docs", "--json"}, counts: []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}, fields: []string{"failures", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}}},
 		{reportCommand: "scripts/run.sh editor --json", args: []string{"scripts/run.sh", "editor", "--json"}, scalars: []string{"require_tree_sitter", "tree_sitter_status", "tree_sitter_command", "emacs_status", "emacs_command"}, counts: []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}, fields: []string{"failure_kinds", "failure_details", "textmate_grammars", "vscode_assets", "tree_sitter_assets", "smoke_tests"}, itemFields: []string{"textmate_grammars[]", "vscode_assets[]", "tree_sitter_assets[]", "smoke_tests[]"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"textmate_grammar_count", "textmate_grammars"}, {"vscode_asset_count", "vscode_assets"}, {"tree_sitter_asset_count", "tree_sitter_assets"}, {"smoke_test_count", "smoke_tests"}}},
@@ -1883,21 +1883,22 @@ func TestReleaseMatrixArchitectureReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/arch_check.sh", "--json")
 	var report struct {
-		SchemaVersion         int    `json:"schema_version"`
-		Status                string `json:"status"`
-		Module                string `json:"module"`
-		SourceFileCount       int    `json:"source_file_count"`
-		SourceLineCount       int    `json:"source_line_count"`
-		TestFileCount         int    `json:"test_file_count"`
-		TestLineCount         int    `json:"test_line_count"`
-		TestRatioPct          int    `json:"test_ratio_pct"`
-		TopFileCount          int    `json:"top_file_count"`
-		LargeFileCount        int    `json:"large_file_count"`
-		PassPipelineLineCount int    `json:"pass_pipeline_line_count"`
-		DebtMarkerCount       int    `json:"debt_marker_count"`
-		MissingTestCount      int    `json:"missing_test_count"`
-		SameNameTestGapCount  int    `json:"same_name_test_gap_count"`
-		TopFileDetails        []struct {
+		SchemaVersion              int    `json:"schema_version"`
+		Status                     string `json:"status"`
+		Module                     string `json:"module"`
+		SourceFileCount            int    `json:"source_file_count"`
+		SourceLineCount            int    `json:"source_line_count"`
+		TestFileCount              int    `json:"test_file_count"`
+		TestLineCount              int    `json:"test_line_count"`
+		TestRatioPct               int    `json:"test_ratio_pct"`
+		TopFileCount               int    `json:"top_file_count"`
+		LargeFileCount             int    `json:"large_file_count"`
+		PassPipelineLineCount      int    `json:"pass_pipeline_line_count"`
+		TieringManagerMentionCount int    `json:"tiering_manager_mention_count"`
+		DebtMarkerCount            int    `json:"debt_marker_count"`
+		MissingTestCount           int    `json:"missing_test_count"`
+		SameNameTestGapCount       int    `json:"same_name_test_gap_count"`
+		TopFileDetails             []struct {
 			Path  string `json:"path"`
 			Lines int    `json:"lines"`
 		} `json:"top_file_details"`
@@ -1906,8 +1907,9 @@ func TestReleaseMatrixArchitectureReportIsMachineReadable(t *testing.T) {
 			Lines    int    `json:"lines"`
 			Severity string `json:"severity"`
 		} `json:"large_file_details"`
-		PassPipelineLines []string `json:"pass_pipeline_lines"`
-		DebtMarkerDetails []struct {
+		PassPipelineLines      []string `json:"pass_pipeline_lines"`
+		TieringManagerMentions []string `json:"tiering_manager_mentions"`
+		DebtMarkerDetails      []struct {
 			Path string `json:"path"`
 			Line int    `json:"line"`
 			Text string `json:"text"`
@@ -1923,8 +1925,8 @@ func TestReleaseMatrixArchitectureReportIsMachineReadable(t *testing.T) {
 	if report.SourceFileCount <= 0 || report.SourceLineCount <= 0 || report.TestFileCount <= 0 || report.TestLineCount <= 0 || report.TestRatioPct < 0 {
 		t.Fatalf("architecture summary counts = %+v, want positive source/test summary", report)
 	}
-	if report.TopFileCount != len(report.TopFileDetails) || report.LargeFileCount != len(report.LargeFileDetails) || report.PassPipelineLineCount != len(report.PassPipelineLines) || report.DebtMarkerCount != len(report.DebtMarkerDetails) || report.MissingTestCount != len(report.MissingTestFiles) || report.SameNameTestGapCount != len(report.MissingTestFiles) {
-		t.Fatalf("architecture JSON count mismatch: top %d/%d large %d/%d pass %d/%d debt %d/%d missing %d/%d same-name %d/%d", report.TopFileCount, len(report.TopFileDetails), report.LargeFileCount, len(report.LargeFileDetails), report.PassPipelineLineCount, len(report.PassPipelineLines), report.DebtMarkerCount, len(report.DebtMarkerDetails), report.MissingTestCount, len(report.MissingTestFiles), report.SameNameTestGapCount, len(report.MissingTestFiles))
+	if report.TopFileCount != len(report.TopFileDetails) || report.LargeFileCount != len(report.LargeFileDetails) || report.PassPipelineLineCount != len(report.PassPipelineLines) || report.TieringManagerMentionCount != len(report.TieringManagerMentions) || report.PassPipelineLineCount != report.TieringManagerMentionCount || report.DebtMarkerCount != len(report.DebtMarkerDetails) || report.MissingTestCount != len(report.MissingTestFiles) || report.SameNameTestGapCount != len(report.MissingTestFiles) {
+		t.Fatalf("architecture JSON count mismatch: top %d/%d large %d/%d pass %d/%d tiering %d/%d debt %d/%d missing %d/%d same-name %d/%d", report.TopFileCount, len(report.TopFileDetails), report.LargeFileCount, len(report.LargeFileDetails), report.PassPipelineLineCount, len(report.PassPipelineLines), report.TieringManagerMentionCount, len(report.TieringManagerMentions), report.DebtMarkerCount, len(report.DebtMarkerDetails), report.MissingTestCount, len(report.MissingTestFiles), report.SameNameTestGapCount, len(report.MissingTestFiles))
 	}
 	if report.TopFileCount == 0 || !strings.HasPrefix(report.TopFileDetails[0].Path, "internal/methodjit/") || report.TopFileDetails[0].Lines <= 0 {
 		t.Fatalf("architecture top file details = %+v, want methodjit file entries", report.TopFileDetails)

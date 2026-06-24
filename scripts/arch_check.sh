@@ -274,6 +274,7 @@ print_json_report() {
   printf '  "top_file_count": %d,\n' "${#top_file_paths[@]}"
   printf '  "large_file_count": %d,\n' "${#large_file_paths[@]}"
   printf '  "pass_pipeline_line_count": %d,\n' "${#pass_pipeline_lines[@]}"
+  printf '  "tiering_manager_mention_count": %d,\n' "${#pass_pipeline_lines[@]}"
   printf '  "debt_marker_count": %d,\n' "${#debt_marker_paths[@]}"
   printf '  "missing_test_count": %d,\n' "${#missing_test_files[@]}"
   printf '  "same_name_test_gap_count": %d,\n' "${#missing_test_files[@]}"
@@ -284,6 +285,9 @@ print_json_report() {
   print_json_large_file_details "  "
   printf ',\n'
   printf '  "pass_pipeline_lines": '
+  print_json_string_array "  " "${pass_pipeline_lines[@]}"
+  printf ',\n'
+  printf '  "tiering_manager_mentions": '
   print_json_string_array "  " "${pass_pipeline_lines[@]}"
   printf ',\n'
   printf '  "debt_marker_details": '

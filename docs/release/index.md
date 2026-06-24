@@ -163,10 +163,12 @@ and reports `artifact_entries` for the verified release artifact roles.
 snapshot archive through `scripts/install.sh` with a staged local `file://`
 release directory.
 `scripts/run.sh arch --json` reports methodjit source/test size,
-`large_file_details`, `debt_marker_details`, and same-name `missing_test_files`
-so architecture debt is visible to release dashboards. `missing_test_count` is
-kept as a compatibility alias for `same_name_test_gap_count`; it is a mechanical
-same-name test-file signal, not a coverage percentage.
+`large_file_details`, `tiering_manager_mentions`, `debt_marker_details`, and
+same-name `missing_test_files` so architecture debt is visible to release
+dashboards. `pass_pipeline_line_count` and `missing_test_count` are kept as
+compatibility aliases for `tiering_manager_mention_count` and
+`same_name_test_gap_count`; the latter is a mechanical same-name test-file
+signal, not a coverage percentage.
 `scripts/run.sh site --json` reports rendered-site HTML, local link, asset,
 fragment-anchor, and failure details after the GitHub Pages build.
 

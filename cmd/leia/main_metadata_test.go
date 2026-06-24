@@ -440,7 +440,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod tidy --json", []string{"removed_count", "missing_count", "diagnostic_count"}},
 		{"leia mod vendor --json", []string{"module_count", "diagnostic_count"}},
 		{"leia mod verify --json", []string{"diagnostic_count", "graph.file_count", "graph.diagnostic_count"}},
-		{"scripts/run.sh arch --json", []string{"source_file_count", "source_line_count", "test_file_count", "test_line_count", "test_ratio_pct", "top_file_count", "large_file_count", "pass_pipeline_line_count", "debt_marker_count", "missing_test_count", "same_name_test_gap_count"}},
+		{"scripts/run.sh arch --json", []string{"source_file_count", "source_line_count", "test_file_count", "test_line_count", "test_ratio_pct", "top_file_count", "large_file_count", "pass_pipeline_line_count", "tiering_manager_mention_count", "debt_marker_count", "missing_test_count", "same_name_test_gap_count"}},
 		{"scripts/run.sh diagnostics --json", []string{"failure_count", "file_count"}},
 		{"scripts/run.sh docs --json", []string{"failure_count", "failure_kind_count", "counts.markdown_files", "counts.relative_documentation_links", "counts.runnable_spec_examples"}},
 		{"scripts/run.sh editor --json", []string{"failure_kind_count", "failure_count", "textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}},
