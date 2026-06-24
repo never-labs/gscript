@@ -36,16 +36,34 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+usage() {
+    cat <<'USAGE'
+Usage: scripts/diag.sh <benchmark|all|domain>
+
+Dump production-parity Tier 2 diagnostics for benchmark scripts.
+
+Selectors:
+  all                  Dump every domain benchmark
+  numeric             Dump a benchmark domain
+  table/table_array_access
+                       Dump a single benchmark
+
+Options:
+  -h, --help           Show this help
+USAGE
+}
+
 BENCHMARK=""
 for arg in "$@"; do
     case "$arg" in
+        -h|--help) usage; exit 0 ;;
         all|numeric|recursion|table|calls|string|concurrency|data|app|control|precision) BENCHMARK="$arg" ;;
         *) BENCHMARK="$arg" ;;
     esac
 done
 
 if [ -z "$BENCHMARK" ]; then
-    echo "Usage: $0 <benchmark|all|domain>" >&2
+    usage >&2
     exit 2
 fi
 

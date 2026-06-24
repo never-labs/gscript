@@ -100,7 +100,7 @@ go run ./cmd/leia bench diagnose \
   --bench=table/groupby_nested_agg \
   --out-dir=/tmp/leia-diagnose
 
-bash scripts/diag.sh table/table_array_access
+scripts/run.sh diag table/table_array_access
 ```
 
 `leia bench compare` is the primary local optimization harness. It records timing

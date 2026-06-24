@@ -62,22 +62,22 @@ status field, stable scalar fields, top-level count fields, collection fields,
 and object-array item fields. The advertised field names are listed in `leia capabilities --json` under `tooling.reports`. Nested report fields use dotted
 JSON paths, and `[]` marks per-item array paths.
 In particular,
-`scripts/public_release_blockers_check.sh --json` exposes `blocker_count` and
+`scripts/run.sh public-blockers --json` exposes `blocker_count` and
 kind counts for missing files, open release decisions, stale text, unconfirmed
 policies, missing guidance, missing documentation snippets, plus
 `open_blocker_count`, `blocker_status_count`, `blocker_statuses`,
 `decision_area_count`, and `decision_areas` for the required maintainer
 decision domains.
 `leia diag bundle --json` and
-`scripts/diagnostics_bundle.sh --json` expose `file_count` for the generated
+`scripts/run.sh diagnostics --json` expose `file_count` for the generated
 bundle files listed in `files`, and `failure_details` for failed collected
 checks.
-`leia doc check --json` and `scripts/docs_check.sh --json` expose
+`leia doc check --json` and `scripts/run.sh docs --json` expose
 `failure_kind_count`, `failure_kinds`, and `failure_details` for documentation
 gate failures.
-`scripts/editor_check.sh --json` uses the same failure fields for editor asset
+`scripts/run.sh editor --json` uses the same failure fields for editor asset
 and optional tool checks.
-`scripts/performance_gate.sh --validate-only FILE --json` exposes
+`scripts/run.sh perf --validate-only FILE --json` exposes
 `failure_kind_count`, `failure_kinds`, `failure_details`, and
 `output_line_count` for captured validation output.
 `scripts/run.sh release-notes --json` exposes `failure_kind_count`,
@@ -100,7 +100,7 @@ Current lint codes:
 leia diag dump
 leia diag bundle --output /tmp/leia-diag --skip-benchmarks
 leia diag bundle --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
-bash scripts/diagnostics_bundle.sh --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
+scripts/run.sh diagnostics --output /tmp/leia-diag --skip-go-tests --skip-benchmarks --json
 ```
 
 Bundles are intended for compiler/runtime investigations. User-facing tooling

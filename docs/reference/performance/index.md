@@ -150,7 +150,7 @@ leia bench strict \
   --markdown /tmp/leia_strict.md
 ```
 
-`scripts/performance_gate.sh --validate-only FILE --json` validates an
+`scripts/run.sh perf --validate-only FILE --json` validates an
 existing timing report and exposes `failure_kind_count`, `failure_kinds`,
 `failure_details`, `validate_target`, and captured `output_lines` for release
 dashboards. `validate_target` records the checked timing report path, whether

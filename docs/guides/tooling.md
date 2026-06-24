@@ -43,8 +43,8 @@ machine-readable release evidence. Field names use dotted JSON paths; `[]`
 marks per-item array paths such as `commands[].args`.
 Release dashboards should read those fields instead of scraping human output;
 for example,
-`scripts/public_release_blockers_check.sh --json` exposes blocker kind counts
-and `scripts/production_check.sh --list --json` exposes runnable, skipped, and
+`scripts/run.sh public-blockers --json` exposes blocker kind counts
+and `scripts/run.sh production --list --json` exposes runnable, skipped, and
 release-critical run/skip counts plus structured skip details and the configured
 release-critical names.
 

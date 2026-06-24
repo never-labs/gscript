@@ -11,7 +11,7 @@ assignees: ""
 ## Benchmark Command
 
 ```bash
-bash scripts/performance_gate.sh --bench selector/name --runs 5 --warmup 1
+scripts/run.sh perf --bench selector/name --runs 5 --warmup 1
 ```
 
 ## Results
