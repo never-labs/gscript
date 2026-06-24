@@ -205,26 +205,44 @@ func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
 		if cfg.Progress {
 			fmt.Fprintf(errw, "bench %s\n", spec.ID())
 		}
+		scale, err := benchGoScaleForSpec(root, spec, cfg)
+		if err != nil {
+			fmt.Fprintf(errw, "leia bench %s: %s: %v\n", mode, spec.ID(), err)
+			return 2
+		}
+		currentSpec, err := benchGoPrepareScaledSpec(spec, filepath.Join(tempDir, "scaled", "current", spec.Group+"__"+spec.Name), scale)
+		if err != nil {
+			fmt.Fprintf(errw, "leia bench %s: %s: %v\n", mode, spec.ID(), err)
+			return 2
+		}
 		result := benchGoBenchmarkResult{
 			Benchmark: spec.Name,
 			Group:     spec.Group,
 			Base:      spec.Base,
 			Modes:     map[string]map[string]benchGoSubjectResult{},
 			Strict:    map[string]benchGoSubjectResult{},
-			Scale:     map[string]string{},
+			Scale:     scale,
 		}
 		if mode == "strict" {
 			for _, runMode := range cfg.Modes {
-				subject := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, spec, cfg)
+				subject := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, currentSpec, cfg)
 				result.Strict[runMode] = subject
 			}
 		} else {
 			for _, runMode := range cfg.Modes {
-				current := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, spec, cfg)
+				current := runBenchGoSubject("current", runMode, root, leiaBin, luajitBin, currentSpec, cfg)
 				head := current
 				head.Subject = "head"
 				if cfg.HeadRef != "" {
-					headSpec := benchGoHeadSpec(spec, headRoot, cfg.SameWorkload)
+					headSpec := currentSpec
+					if !cfg.SameWorkload {
+						headSpec = benchGoHeadSpec(spec, headRoot, false)
+						headSpec, err = benchGoPrepareScaledSpec(headSpec, filepath.Join(tempDir, "scaled", "head", spec.Group+"__"+spec.Name), scale)
+						if err != nil {
+							fmt.Fprintf(errw, "leia bench %s: %s head: %v\n", mode, spec.ID(), err)
+							return 2
+						}
+					}
 					head = runBenchGoSubject("head", runMode, headRoot, headLeiaBin, luajitBin, headSpec, cfg)
 				}
 				modeRow := map[string]benchGoSubjectResult{
@@ -482,6 +500,190 @@ func benchGoHeadSpec(spec benchdisc.Benchmark, headRoot string, sameWorkload boo
 	return head
 }
 
+func benchGoScaleForSpec(root string, spec benchdisc.Benchmark, cfg benchGoHarnessConfig) (map[string]string, error) {
+	scale := map[string]string{}
+	if cfg.ScaleProfile != "" && cfg.ScaleProfile != "none" {
+		profileScale, err := benchGoScaleProfileForSpec(root, spec, cfg.ScaleProfile)
+		if err != nil {
+			return nil, err
+		}
+		for key, value := range profileScale {
+			scale[key] = value
+		}
+	}
+	for _, raw := range cfg.Scale {
+		selector, assignments, ok := strings.Cut(raw, ":")
+		if !ok {
+			assignments = selector
+			selector = ""
+		}
+		if selector != "" && !benchGoScaleSelectorMatches(selector, spec) {
+			continue
+		}
+		parsed, err := benchGoParseScaleAssignments(assignments)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --scale %q: %w", raw, err)
+		}
+		for key, value := range parsed {
+			scale[key] = value
+		}
+	}
+	if len(scale) == 0 {
+		return nil, nil
+	}
+	return scale, nil
+}
+
+func benchGoScaleProfileForSpec(root string, spec benchdisc.Benchmark, profile string) (map[string]string, error) {
+	data, err := os.ReadFile(filepath.Join(root, "benchmarks", "manifest.json"))
+	if err != nil {
+		return nil, err
+	}
+	var manifest struct {
+		Workloads []struct {
+			ID               string                    `json:"id"`
+			RecommendedScale map[string]map[string]any `json:"recommended_scale"`
+			Params           map[string]any            `json:"params"`
+		} `json:"workloads"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, err
+	}
+	for _, workload := range manifest.Workloads {
+		if workload.ID != spec.ID() {
+			continue
+		}
+		raw := workload.RecommendedScale[profile]
+		out := map[string]string{}
+		for key, value := range raw {
+			text := fmt.Sprint(value)
+			if err := benchGoValidateScaleValue(text); err != nil {
+				return nil, fmt.Errorf("manifest scale %s.%s: %w", spec.ID(), key, err)
+			}
+			out[key] = text
+		}
+		if len(out) == 0 {
+			return nil, nil
+		}
+		return out, nil
+	}
+	return nil, nil
+}
+
+func benchGoScaleSelectorMatches(selector string, spec benchdisc.Benchmark) bool {
+	selector = strings.TrimPrefix(strings.TrimSuffix(selector, ".leia"), "benchmarks/")
+	return selector == spec.ID() || selector == spec.Name || selector == spec.Group+"/"+spec.Name
+}
+
+func benchGoParseScaleAssignments(raw string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		key, value, ok := strings.Cut(part, "=")
+		if !ok {
+			return nil, fmt.Errorf("expected KEY=VALUE")
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if !benchGoScaleNameRE.MatchString(key) {
+			return nil, fmt.Errorf("invalid key %q", key)
+		}
+		if err := benchGoValidateScaleValue(value); err != nil {
+			return nil, err
+		}
+		out[key] = value
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no assignments")
+	}
+	return out, nil
+}
+
+var (
+	benchGoScaleNameRE  = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+	benchGoScaleValueRE = regexp.MustCompile(`^-?[0-9]+(?:\.[0-9]+)?$`)
+)
+
+func benchGoValidateScaleValue(value string) error {
+	if !benchGoScaleValueRE.MatchString(value) {
+		return fmt.Errorf("invalid value %q; scale values must be numeric literals", value)
+	}
+	return nil
+}
+
+func benchGoPrepareScaledSpec(spec benchdisc.Benchmark, outDir string, scale map[string]string) (benchdisc.Benchmark, error) {
+	if len(scale) == 0 {
+		return spec, nil
+	}
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return spec, err
+	}
+	scaled := spec
+	leiaPath, err := benchGoWriteScaledSource(spec.Leia, filepath.Join(outDir, filepath.Base(spec.Leia)), scale, "leia")
+	if err != nil {
+		return spec, err
+	}
+	scaled.Leia = leiaPath
+	if spec.LuaJIT != "" && benchFileExists(spec.LuaJIT) {
+		luaPath, err := benchGoWriteScaledSource(spec.LuaJIT, filepath.Join(outDir, filepath.Base(spec.LuaJIT)), scale, "lua")
+		if err != nil {
+			return spec, err
+		}
+		scaled.LuaJIT = luaPath
+	}
+	return scaled, nil
+}
+
+func benchGoWriteScaledSource(src, dest string, scale map[string]string, syntax string) (string, error) {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return "", err
+	}
+	text := string(data)
+	for _, key := range benchGoSortedScaleKeys(scale) {
+		next, ok := benchGoReplaceScaleConstant(text, key, scale[key], syntax)
+		if !ok {
+			return "", fmt.Errorf("%s has no top-level %s constant for scale override", src, key)
+		}
+		text = next
+	}
+	if err := os.WriteFile(dest, []byte(text), 0o644); err != nil {
+		return "", err
+	}
+	return dest, nil
+}
+
+func benchGoSortedScaleKeys(scale map[string]string) []string {
+	keys := make([]string, 0, len(scale))
+	for key := range scale {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func benchGoReplaceScaleConstant(text, key, value, syntax string) (string, bool) {
+	quoted := regexp.QuoteMeta(key)
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?m)^(\s*` + quoted + `\s*:=\s*)[^\r\n]+`),
+	}
+	if syntax == "lua" {
+		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`(?m)^(\s*local\s+` + quoted + `\s*=\s*)[^\r\n]+`),
+			regexp.MustCompile(`(?m)^(\s*` + quoted + `\s*=\s*)[^\r\n]+`),
+		}
+	}
+	for _, pattern := range patterns {
+		if pattern.MatchString(text) {
+			return pattern.ReplaceAllString(text, "${1}"+value), true
+		}
+	}
+	return text, false
+}
+
 func parseBenchGoTimeout(raw string) (time.Duration, error) {
 	if raw == "" {
 		return 60 * time.Second, nil
@@ -707,6 +909,9 @@ func buildBenchGoReport(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult,
 		if row.Base != "" {
 			item["base"] = row.Base
 		}
+		if len(row.Scale) > 0 {
+			item["scale"] = row.Scale
+		}
 		if cfg.Mode == "strict" {
 			item["modes"] = row.Strict
 		} else {
@@ -715,9 +920,6 @@ func buildBenchGoReport(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult,
 		results = append(results, item)
 	}
 	notes := []string{}
-	if cfg.ScaleProfile != "" || len(cfg.Scale) > 0 {
-		notes = append(notes, "scale flags accepted for compatibility; source rewriting is still pending in the Go harness")
-	}
 	benchmarks := make([]string, 0, len(rows))
 	for _, row := range rows {
 		benchmarks = append(benchmarks, row.Group+"/"+row.Benchmark)
