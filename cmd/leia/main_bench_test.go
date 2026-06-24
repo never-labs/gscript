@@ -237,7 +237,7 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	outDir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing", "--pprof", "--pprof-min-samples-ms", "12.5", "--pprof-max-runs", "3", "--warm-dump", "--out-dir", outDir}, &stdout, &stderr)
+	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing", "--pprof", "--pprof-min-samples-ms", "12.5", "--pprof-max-runs", "3", "--out-dir", outDir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
@@ -277,7 +277,7 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	if report.Benchmarks[0]["pprof_min_samples_ms"] != float64(12.5) || report.Benchmarks[0]["pprof_max_runs"] != float64(3) || pprofParams["min_samples_ms"] != float64(12.5) || pprofParams["max_runs"] != float64(3) {
 		t.Fatalf("pprof params = row %#v summary %#v", report.Benchmarks[0], pprofSummary)
 	}
-	if report.Benchmarks[0]["warm_dump_requested"] != true || report.Benchmarks[0]["warm_dump_effective"] != false || warmDumpSummary["status"] != "not_collected" {
+	if report.Benchmarks[0]["warm_dump_requested"] != false || report.Benchmarks[0]["warm_dump_effective"] != false || warmDumpSummary["status"] != "not_requested" {
 		t.Fatalf("warm dump fields = row %#v summary %#v", report.Benchmarks[0], warmDumpSummary)
 	}
 	md, err := os.ReadFile(filepath.Join(outDir, "diagnostics.md"))
@@ -285,8 +285,37 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(md), "pprof not_collected: pprof collection is not yet wired for bench diagnose (max_runs=3, min_samples_ms=12.5)") ||
-		!strings.Contains(string(md), "warm-dump not_collected: warm dump collection is not yet wired for bench diagnose") {
+		!strings.Contains(string(md), "warm-dump not_requested: warm dump not requested") {
 		t.Fatalf("diagnostics markdown missing optional evidence state:\n%s", string(md))
+	}
+}
+
+func TestBenchDiagnoseWarmDumpSummaryAndArgs(t *testing.T) {
+	dir := t.TempDir()
+	warmDir := filepath.Join(dir, "warm")
+	if err := os.MkdirAll(warmDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"manifest.json", "pcmap.json", "jit-symbols.txt"} {
+		if err := os.WriteFile(filepath.Join(warmDir, name), []byte("{}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	args := benchDiagnoseWarmDumpArgs([]string{"leia", "-jit", "-jit-stats", "bench.leia"}, warmDir)
+	if !reflect.DeepEqual(args, []string{"leia", "-jit", "-jit-stats", "-jit-dump-warm", warmDir, "bench.leia"}) {
+		t.Fatalf("args = %#v", args)
+	}
+	summary := benchDiagnoseWarmDumpSummary(warmDir, benchTextCommandResult{Status: "ok", WallSeconds: 0.25, ExitCode: intPtr(0)})
+	if summary["status"] != "ok" || summary["effective"] != true {
+		t.Fatalf("summary = %#v", summary)
+	}
+	params, _ := summary["params"].(map[string]any)
+	if params["file_count"] != 3 || params["manifest_exists"] != true || params["pcmap_exists"] != true || params["jit_symbols_exists"] != true {
+		t.Fatalf("params = %#v", params)
+	}
+	artifacts := benchDiagnoseWarmDumpArtifacts(warmDir, filepath.Join(dir, "warm.raw.txt"))
+	if artifacts["warm_dump_manifest_json"] == "" || artifacts["warm_dump_pcmap_json"] == "" || artifacts["warm_dump_jit_symbols"] == "" {
+		t.Fatalf("artifacts = %#v", artifacts)
 	}
 }
 

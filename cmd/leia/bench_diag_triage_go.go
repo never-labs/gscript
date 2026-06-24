@@ -73,7 +73,7 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
 		return 2
 	}
-	if !cfg.NoTiming {
+	if !cfg.NoTiming || cfg.WarmDump {
 		leiaBin = filepath.Join(tempDir, "leia-current")
 		if err := benchBuildLeia(root, leiaBin, "build failed in {root} with exit {exit_code}", errw); err != nil {
 			fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
@@ -108,6 +108,14 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 			fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
 			return 1
 		}
+		warmDump := benchCollectDiagnoseWarmDump(runSpec, leiaBin, artifactDir, timeout, cfg)
+		artifacts := map[string]string{
+			"summary_raw_txt": summary,
+			"run_raw_txt":     raw,
+		}
+		for pathName, pathValue := range warmDump.Artifacts {
+			artifacts[pathName] = pathValue
+		}
 		rows = append(rows, map[string]any{
 			"benchmark":             spec.Name,
 			"group":                 spec.Group,
@@ -141,14 +149,11 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 				map[string]any{"min_samples_ms": cfg.PPROFMinMS, "max_runs": cfg.PPROFMaxRuns},
 			),
 			"warm_dump_requested": cfg.WarmDump,
-			"warm_dump_effective": false,
-			"warm_dump_summary":   benchDiagnoseEvidenceSummary(cfg.WarmDump, false, "warm dump collection is not yet wired for bench diagnose", nil),
+			"warm_dump_effective": warmDump.Effective,
+			"warm_dump_summary":   warmDump.Summary,
 			"scale":               scale,
 			"artifact_dir":        artifactDir,
-			"artifacts": map[string]string{
-				"summary_raw_txt": summary,
-				"run_raw_txt":     raw,
-			},
+			"artifacts":           artifacts,
 		})
 	}
 	payload := map[string]any{"out_dir": outDir, "benchmarks": rows}
@@ -213,6 +218,12 @@ type benchDiagnoseRun struct {
 	RawOutput   string
 }
 
+type benchDiagnoseWarmDump struct {
+	Effective bool
+	Summary   map[string]any
+	Artifacts map[string]string
+}
+
 func benchRunDiagnoseSpec(spec benchdisc.Benchmark, leiaBin string, timeout time.Duration, cfg benchDiagConfig) benchDiagnoseRun {
 	if cfg.NoTiming {
 		return benchDiagnoseRun{Status: "skipped", RawOutput: "diagnose timing skipped by --no-timing\n"}
@@ -261,6 +272,121 @@ func benchRunDiagnoseSpec(spec benchdisc.Benchmark, leiaBin string, timeout time
 		WallSeconds: last.WallSeconds,
 		RawOutput:   last.Output,
 	}
+}
+
+func benchCollectDiagnoseWarmDump(spec benchdisc.Benchmark, leiaBin, artifactDir string, timeout time.Duration, cfg benchDiagConfig) benchDiagnoseWarmDump {
+	if !cfg.WarmDump {
+		return benchDiagnoseWarmDump{Summary: benchDiagnoseEvidenceSummary(false, false, "warm dump not requested", nil), Artifacts: map[string]string{}}
+	}
+	warmDir := filepath.Join(artifactDir, "warm-dump")
+	rawPath := filepath.Join(artifactDir, "warm-dump.raw.txt")
+	if leiaBin == "" {
+		return benchDiagnoseWarmDump{
+			Summary:   benchDiagnoseEvidenceSummary(true, false, "leia binary unavailable for warm dump", map[string]any{"dir": warmDir}),
+			Artifacts: map[string]string{"warm_dump_dir": warmDir, "warm_dump_raw_txt": rawPath},
+		}
+	}
+	cmd, err := benchBenchmarkModeCommand("default", leiaBin, spec.Leia, "", "")
+	if err != nil {
+		return benchDiagnoseWarmDump{
+			Summary:   benchDiagnoseEvidenceSummary(true, false, err.Error(), map[string]any{"dir": warmDir}),
+			Artifacts: map[string]string{"warm_dump_dir": warmDir, "warm_dump_raw_txt": rawPath},
+		}
+	}
+	if cmd.Unavailable != "" {
+		return benchDiagnoseWarmDump{
+			Summary:   benchDiagnoseEvidenceSummary(true, false, "input unavailable: "+cmd.Unavailable, map[string]any{"dir": warmDir}),
+			Artifacts: map[string]string{"warm_dump_dir": warmDir, "warm_dump_raw_txt": rawPath},
+		}
+	}
+	args := benchDiagnoseWarmDumpArgs(cmd.Args, warmDir)
+	run := benchRunTextCommand(args, timeout, cmd.Env)
+	_ = os.WriteFile(rawPath, []byte(run.Output), 0o644)
+	summary := benchDiagnoseWarmDumpSummary(warmDir, run)
+	return benchDiagnoseWarmDump{
+		Effective: benchDiagnoseBool(summary["effective"]),
+		Summary:   summary,
+		Artifacts: benchDiagnoseWarmDumpArtifacts(warmDir, rawPath),
+	}
+}
+
+func benchDiagnoseWarmDumpArgs(args []string, warmDir string) []string {
+	if len(args) <= 1 {
+		return append(append([]string(nil), args...), "-jit-dump-warm", warmDir)
+	}
+	out := make([]string, 0, len(args)+2)
+	out = append(out, args[:len(args)-1]...)
+	out = append(out, "-jit-dump-warm", warmDir)
+	out = append(out, args[len(args)-1])
+	return out
+}
+
+func benchDiagnoseWarmDumpSummary(warmDir string, run benchTextCommandResult) map[string]any {
+	files := benchDiagnoseWarmDumpFiles(warmDir)
+	manifest := filepath.Join(warmDir, "manifest.json")
+	pcmap := filepath.Join(warmDir, "pcmap.json")
+	jitSymbols := filepath.Join(warmDir, "jit-symbols.txt")
+	effective := run.Status == "ok" && len(files) > 0
+	reason := ""
+	if !effective {
+		reason = "warm dump command did not produce artifacts"
+		if run.Status != "ok" {
+			reason = "warm dump command status: " + run.Status
+		}
+	}
+	summary := benchDiagnoseEvidenceSummary(true, effective, reason, map[string]any{
+		"dir":                warmDir,
+		"files":              files,
+		"file_count":         len(files),
+		"manifest_exists":    fileExists(manifest),
+		"pcmap_exists":       fileExists(pcmap),
+		"jit_symbols_exists": fileExists(jitSymbols),
+		"command_status":     run.Status,
+		"wall_seconds":       run.WallSeconds,
+	})
+	if run.ExitCode != nil {
+		summary["exit_code"] = *run.ExitCode
+	}
+	return summary
+}
+
+func benchDiagnoseWarmDumpFiles(warmDir string) []string {
+	var files []string
+	_ = filepath.WalkDir(warmDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(warmDir, path)
+		if relErr == nil {
+			files = append(files, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	sort.Strings(files)
+	return files
+}
+
+func benchDiagnoseWarmDumpArtifacts(warmDir, rawPath string) map[string]string {
+	artifacts := map[string]string{
+		"warm_dump_dir":     warmDir,
+		"warm_dump_raw_txt": rawPath,
+	}
+	for key, name := range map[string]string{
+		"warm_dump_manifest_json": "manifest.json",
+		"warm_dump_pcmap_json":    "pcmap.json",
+		"warm_dump_jit_symbols":   "jit-symbols.txt",
+	} {
+		path := filepath.Join(warmDir, name)
+		if fileExists(path) {
+			artifacts[key] = path
+		}
+	}
+	return artifacts
+}
+
+func benchDiagnoseBool(value any) bool {
+	out, _ := value.(bool)
+	return out
 }
 
 func benchDiagnoseSummaryText(spec benchdisc.Benchmark, diag benchDiagnoseRun) string {

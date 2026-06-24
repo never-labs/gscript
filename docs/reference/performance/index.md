@@ -80,10 +80,11 @@ The same counters are preserved in `leia bench triage` JSON and Markdown rows.
 directory. Its JSON rows include `runtime_summary` and `tier2_call_summary`
 objects so automation can distinguish a clean baseline from Tier 2 failures,
 runtime exits, skipped timing, and unavailable benchmark inputs. Optional
-evidence requests such as `--pprof` and `--warm-dump` are reported with separate
-`*_requested` and `*_effective` fields, so pending collection paths are visible
-instead of being mistaken for collected artifacts. Requested pprof controls such
-as `--pprof-min-samples-ms` and `--pprof-max-runs` are carried into the pprof
+evidence requests are reported with separate `*_requested` and `*_effective`
+fields. `--warm-dump` collects production Tier 2 warm-dump artifacts under the
+benchmark artifact directory; pprof requests remain explicit until CPU profile
+collection is wired. Requested pprof controls such as
+`--pprof-min-samples-ms` and `--pprof-max-runs` are carried into the pprof
 evidence summary.
 
 Low-resolution script timers are not treated as wins. The harness can increase
