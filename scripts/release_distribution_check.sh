@@ -389,7 +389,7 @@ optional_workflow() {
   elif [[ "$require_workflows" == "true" ]]; then
     fail "missing_workflow" "required hosted workflow not found: $file"
   else
-    echo "release_distribution_check.sh: $file not present; skipping hosted workflow check"
+    log_info "release_distribution_check.sh: $file not present; skipping hosted workflow check"
   fi
 }
 

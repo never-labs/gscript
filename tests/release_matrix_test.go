@@ -804,6 +804,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				".github/workflows/release.yml",
 				".github/workflows/distribution-check.yml",
 				".github/workflows/pages.yml",
+				"log_info \"release_distribution_check.sh: $file not present; skipping hosted workflow check\"",
 				`require_contains .github/workflows/distribution-check.yml "- scripts/run.sh"`,
 				"require_file docs/_config.yml",
 				"require_contains docs/_config.yml \"spec/index.html\"",
