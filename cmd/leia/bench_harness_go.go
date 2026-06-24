@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/tar"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -46,6 +47,7 @@ type benchGoHarnessConfig struct {
 	Sort             string
 	ScaleProfile     string
 	Scale            []string
+	SameWorkload     bool
 	TimeoutRaw       string
 }
 
@@ -179,6 +181,20 @@ func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
 		return 1
 	}
+	headRoot := ""
+	headLeiaBin := ""
+	if mode == "compare" && cfg.HeadRef != "" {
+		headRoot = filepath.Join(tempDir, "head-src")
+		if err := benchExportGitRef(root, cfg.HeadRef, headRoot); err != nil {
+			fmt.Fprintf(errw, "leia bench %s: export --head-ref %s: %v\n", mode, cfg.HeadRef, err)
+			return 1
+		}
+		headLeiaBin = filepath.Join(tempDir, "leia-head")
+		if err := benchBuildLeia(headRoot, headLeiaBin, "head build failed in {root} with exit {exit_code}", errw); err != nil {
+			fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
+			return 1
+		}
+	}
 	luajitBin := ""
 	if !cfg.NoLuaJIT {
 		luajitBin = findExecutable("luajit")
@@ -208,7 +224,8 @@ func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
 				head := current
 				head.Subject = "head"
 				if cfg.HeadRef != "" {
-					head.Note = appendNote(head.Note, "head_ref comparison currently reuses the built current binary; clean snapshot execution is the next migration step")
+					headSpec := benchGoHeadSpec(spec, headRoot, cfg.SameWorkload)
+					head = runBenchGoSubject("head", runMode, headRoot, headLeiaBin, luajitBin, headSpec, cfg)
 				}
 				modeRow := map[string]benchGoSubjectResult{
 					"current": current,
@@ -269,7 +286,6 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 	var explicitModes benchStringList
 	var repeatOverrides benchStringList
 	var allowWallTime bool
-	var sameWorkload bool
 	var suspiciousVMSpeedup float64
 	var suspiciousLuaJITRatio float64
 	var relatedConfirmRatio float64
@@ -292,7 +308,7 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 	fs.BoolVar(&cfg.NoLuaJIT, "no-luajit", false, "Skip LuaJIT.")
 	fs.BoolVar(&cfg.AllGroups, "all-groups", false, "Run all groups.")
 	fs.BoolVar(&cfg.DryRun, "dry-run", false, "Write selected benchmark metadata without running commands.")
-	fs.BoolVar(&sameWorkload, "same-workload", false, "Accepted for timing_compare compatibility.")
+	fs.BoolVar(&cfg.SameWorkload, "same-workload", false, "Run the current benchmark scripts against the head binary.")
 	fs.IntVar(&cfg.Jobs, "jobs", cfg.Jobs, "Parallel jobs. Accepted for compatibility; execution remains deterministic.")
 	fs.StringVar(&cfg.JSONPath, "json", "", "JSON report path.")
 	fs.StringVar(&cfg.MarkdownPath, "markdown", "", "Markdown report path.")
@@ -314,7 +330,6 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 		fmt.Fprintf(errw, "leia bench %s: unexpected argument %q\n", mode, fs.Arg(0))
 		return cfg, flag.ErrHelp
 	}
-	_ = sameWorkload
 	_ = suspiciousVMSpeedup
 	_ = suspiciousLuaJITRatio
 	_ = relatedConfirmRatio
@@ -361,6 +376,110 @@ func parseBenchGoHarnessConfig(mode string, args []string, errw io.Writer) (benc
 		return cfg, fmt.Errorf("unknown --time-source %q", cfg.TimeSource)
 	}
 	return cfg, nil
+}
+
+func benchExportGitRef(root, ref, dest string) error {
+	if ref == "" {
+		return errors.New("empty git ref")
+	}
+	cmd := benchExecCommand("git", "archive", "--format=tar", ref)
+	cmd.Dir = root
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	readErr := benchUntar(pipe, dest)
+	waitErr := cmd.Wait()
+	if readErr != nil {
+		return readErr
+	}
+	if waitErr != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail != "" {
+			return fmt.Errorf("%w: %s", waitErr, detail)
+		}
+		return waitErr
+	}
+	return nil
+}
+
+func benchUntar(r io.Reader, dest string) error {
+	tr := tar.NewReader(r)
+	cleanDest := filepath.Clean(dest)
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		name := filepath.Clean(hdr.Name)
+		if name == "." || strings.HasPrefix(name, ".."+string(filepath.Separator)) || filepath.IsAbs(name) {
+			return fmt.Errorf("unsafe archive path %q", hdr.Name)
+		}
+		target := filepath.Join(cleanDest, name)
+		if target != cleanDest && !strings.HasPrefix(target, cleanDest+string(filepath.Separator)) {
+			return fmt.Errorf("unsafe archive target %q", hdr.Name)
+		}
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg, tar.TypeRegA:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			mode := hdr.FileInfo().Mode()
+			if mode == 0 {
+				mode = 0o644
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+			if err != nil {
+				return err
+			}
+			_, copyErr := io.Copy(f, tr)
+			closeErr := f.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+		case tar.TypeSymlink:
+			if hdr.Linkname == "" {
+				return fmt.Errorf("empty symlink target for %q", hdr.Name)
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			if err := os.Symlink(hdr.Linkname, target); err != nil {
+				return err
+			}
+		default:
+			// Git archives should not need devices or other special entries for benchmarks.
+		}
+	}
+}
+
+func benchGoHeadSpec(spec benchdisc.Benchmark, headRoot string, sameWorkload bool) benchdisc.Benchmark {
+	head := spec
+	if sameWorkload {
+		head.Leia = spec.Leia
+		head.LuaJIT = spec.LuaJIT
+		return head
+	}
+	head.Leia = filepath.Join(headRoot, filepath.FromSlash(spec.LeiaRel()))
+	if spec.LuaJIT != "" {
+		head.LuaJIT = filepath.Join(headRoot, filepath.FromSlash(spec.LuaJITRel()))
+	}
+	return head
 }
 
 func parseBenchGoTimeout(raw string) (time.Duration, error) {
@@ -596,9 +715,6 @@ func buildBenchGoReport(cfg benchGoHarnessConfig, rows []benchGoBenchmarkResult,
 		results = append(results, item)
 	}
 	notes := []string{}
-	if cfg.HeadRef != "" && cfg.Mode == "compare" {
-		notes = append(notes, "--head-ref accepted; clean head snapshot execution is still pending in the Go harness")
-	}
 	if cfg.ScaleProfile != "" || len(cfg.Scale) > 0 {
 		notes = append(notes, "scale flags accepted for compatibility; source rewriting is still pending in the Go harness")
 	}
