@@ -80,7 +80,7 @@ and optional tool checks.
 `scripts/performance_gate.sh --validate-only FILE --json` exposes
 `failure_kind_count`, `failure_kinds`, `failure_details`, and
 `output_line_count` for captured validation output.
-`scripts/release_notes_check.sh --json` exposes `failure_kind_count`,
+`scripts/run.sh release-notes --json` exposes `failure_kind_count`,
 `failure_kinds`, and `failure_details` so release note issues can be grouped
 without parsing human-readable failure strings.
 

@@ -26,13 +26,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: bash scripts/docs_check.sh
+      - run: scripts/run.sh docs
       - uses: actions/configure-pages@v5
       - uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
           destination: ./_site
-      - run: bash scripts/site_check.sh --site-dir ./_site
+      - run: scripts/run.sh site --site-dir ./_site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./_site

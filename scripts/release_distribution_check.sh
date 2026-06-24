@@ -401,14 +401,15 @@ if [[ -f .github/workflows/pages.yml ]]; then
   require_file docs/_config.yml
   require_contains docs/_config.yml "exclude:"
   require_contains docs/_config.yml "spec/index.html"
-  require_contains .github/workflows/pages.yml "bash scripts/docs_check.sh"
+  require_contains .github/workflows/pages.yml "scripts/run.sh docs"
   require_contains .github/workflows/pages.yml "source: ./docs"
   require_contains .github/workflows/pages.yml "destination: ./_site"
+  require_contains .github/workflows/pages.yml "scripts/run.sh site --site-dir ./_site"
 fi
 
 if [[ -f .github/workflows/distribution-check.yml ]]; then
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
-  require_contains .github/workflows/distribution-check.yml "bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
+  require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-snapshot --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
 fi
 
 require_contains .goreleaser.yaml "version: 2"
@@ -431,15 +432,14 @@ if [[ -f .github/workflows/release.yml ]]; then
   require_contains .github/workflows/release.yml 'LEIA_RELEASE_ARTIFACT_VERSION="${GITHUB_REF_NAME}"'
   require_contains .github/workflows/release.yml 'go run ./cmd/leia ci release --release-version "${GITHUB_REF_NAME}"'
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" --version'
-  require_contains .github/workflows/release.yml 'bash scripts/release_notes_check.sh --require-ready --version "${GITHUB_REF_NAME}"'
-  require_contains .github/workflows/release.yml "bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
+  require_contains .github/workflows/release.yml 'scripts/run.sh release-notes --require-ready --version "${GITHUB_REF_NAME}"'
+  require_contains .github/workflows/release.yml "scripts/run.sh release-snapshot --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" release --clean'
   require_contains .github/workflows/release.yml '--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"'
 fi
 if [[ -f .github/workflows/distribution-check.yml ]]; then
   require_contains .github/workflows/distribution-check.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
-  require_contains .github/workflows/distribution-check.yml "scripts/release_notes_check.sh"
-  require_contains .github/workflows/distribution-check.yml "bash scripts/release_notes_check.sh"
+  require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-notes"
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" --version'
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
 fi

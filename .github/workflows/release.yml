@@ -53,10 +53,10 @@ jobs:
             go run ./cmd/leia ci release
           fi
       - if: github.ref_type == 'tag'
-        run: bash scripts/release_notes_check.sh --require-ready --version "${GITHUB_REF_NAME}"
+        run: scripts/run.sh release-notes --require-ready --version "${GITHUB_REF_NAME}"
       - if: github.event_name == 'workflow_dispatch'
         run: '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
       - if: github.event_name == 'workflow_dispatch'
-        run: bash scripts/release_snapshot_install_check.sh --dist-dir dist --bin-dir /tmp/leia-snapshot-bin
+        run: scripts/run.sh release-snapshot --dist-dir dist --bin-dir /tmp/leia-snapshot-bin
       - if: github.event_name == 'push'
         run: '"$(go env GOPATH)/bin/goreleaser" release --clean --release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"'
