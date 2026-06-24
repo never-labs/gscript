@@ -228,7 +228,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		"scripts/run.sh release-check --json",
 		"scripts/run.sh release-dist --json",
 		"scripts/run.sh release-notes --json",
-		"scripts/run.sh release-snapshot --dist-dir DIR --bin-dir DIR --json",
+		"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json",
 		"scripts/run.sh site --json",
 		"scripts/run.sh worktree --json",
 	} {
@@ -250,6 +250,23 @@ func TestCapabilitiesJSON(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		command string
+		params  []string
+	}{
+		{"scripts/run.sh perf --validate-only FILE --json", []string{"FILE"}},
+		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", []string{"DIST_DIR", "BIN_DIR"}},
+	} {
+		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
+		if report == nil || !report.Template {
+			t.Fatalf("%s report capability = %+v, want template report", tc.command, report)
+		}
+		for _, param := range tc.params {
+			if !capabilitiesHaveTemplateParameter(report.TemplateParameters, param) {
+				t.Fatalf("%s template parameters = %+v, want %q", tc.command, report.TemplateParameters, param)
+			}
+		}
+	}
+	for _, tc := range []struct {
+		command string
 		scalars []string
 	}{
 		{"scripts/run.sh diagnostics --json", []string{"output_dir"}},
@@ -263,7 +280,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/run.sh release-check --json", []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}},
 		{"scripts/run.sh release-dist --json", []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}},
 		{"scripts/run.sh release-notes --json", []string{"require_ready", "version"}},
-		{"scripts/run.sh release-snapshot --dist-dir DIR --bin-dir DIR --json", []string{"dist_dir", "goos", "goarch", "archive", "archive_name", "snapshot_version", "installer_version", "staged_asset", "staged_release_dir", "bin_dir"}},
+		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", []string{"dist_dir", "goos", "goarch", "archive", "archive_name", "snapshot_version", "installer_version", "staged_asset", "staged_release_dir", "bin_dir"}},
 		{"scripts/run.sh site --json", []string{"site_dir"}},
 		{"scripts/run.sh worktree --json", []string{"fail_on_findings"}},
 	} {
@@ -326,8 +343,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/run.sh release-dist --json", "install_target_details"},
 		{"scripts/run.sh release-notes --json", "checked_file_details"},
 		{"scripts/run.sh release-notes --json", "required_artifact_details"},
-		{"scripts/run.sh release-snapshot --dist-dir DIR --bin-dir DIR --json", "installed_paths"},
-		{"scripts/run.sh release-snapshot --dist-dir DIR --bin-dir DIR --json", "failure_details"},
+		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", "installed_paths"},
+		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", "failure_details"},
 		{"scripts/run.sh site --json", "failure_kinds"},
 		{"scripts/run.sh site --json", "failure_details"},
 		{"scripts/run.sh worktree --json", "finding_statuses"},
@@ -436,7 +453,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"scripts/run.sh release-check --json", []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}},
 		{"scripts/run.sh release-dist --json", []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}},
 		{"scripts/run.sh release-notes --json", []string{"checked_file_count", "required_artifact_count", "artifact_checksum_count", "failure_kind_count", "failure_count"}},
-		{"scripts/run.sh release-snapshot --dist-dir DIR --bin-dir DIR --json", []string{"install_count", "failure_kind_count", "failure_count"}},
+		{"scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json", []string{"install_count", "failure_kind_count", "failure_count"}},
 		{"scripts/run.sh site --json", []string{"html_file_count", "local_link_count", "asset_ref_count", "fragment_check_count", "failure_kind_count", "failure_count"}},
 		{"scripts/run.sh worktree --json", []string{"finding_count", "finding_status_count"}},
 	} {
@@ -526,6 +543,15 @@ func capabilitiesReport(reports []cliReportCapability, command string) *cliRepor
 		}
 	}
 	return nil
+}
+
+func capabilitiesHaveTemplateParameter(params []cliReportTemplateParameter, name string) bool {
+	for _, param := range params {
+		if param.Name == name && strings.TrimSpace(param.Description) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func capabilitiesHaveStdlibModule(layers []cliStdlibLayer, layerName, moduleName string) bool {

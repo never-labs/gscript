@@ -41,6 +41,9 @@ Each registry entry advertises `status_field`, `scalar_fields`, `count_fields`,
 `collection_fields`, and `collection_item_fields` when the report exposes
 machine-readable release evidence. Field names use dotted JSON paths; `[]`
 marks per-item array paths such as `commands[].args`.
+Entries with `template: true` contain placeholders such as `FILE`, `DIST_DIR`,
+or `BIN_DIR`; callers must substitute the listed `template_parameters` before
+executing the command.
 Release dashboards should read those fields instead of scraping human output;
 for example,
 `scripts/run.sh public-blockers --json` exposes blocker kind counts

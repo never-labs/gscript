@@ -159,7 +159,7 @@ machine-readable.
 `scripts/run.sh release-check --json` uses the same failure fields for
 version, tag, clean-worktree, checksum, artifact, and local install failures,
 and reports `artifact_entries` for the verified release artifact roles.
-`scripts/run.sh release-snapshot --dist-dir DIR --bin-dir DIR --json` verifies the GoReleaser
+`scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json` verifies the GoReleaser
 snapshot archive through `scripts/install.sh` with a staged local `file://`
 release directory.
 `scripts/run.sh arch --json` reports methodjit source/test size,

@@ -61,6 +61,8 @@ Release scripts that emit JSON follow the same pattern: a `schema_version`,
 status field, stable scalar fields, top-level count fields, collection fields,
 and object-array item fields. The advertised field names are listed in `leia capabilities --json` under `tooling.reports`. Nested report fields use dotted
 JSON paths, and `[]` marks per-item array paths.
+Some registry commands are templates. Template entries set `template: true`
+and list `template_parameters`; replace those placeholders before execution.
 In particular,
 `scripts/run.sh public-blockers --json` exposes `blocker_count` and
 kind counts for missing files, open release decisions, stale text, unconfirmed
