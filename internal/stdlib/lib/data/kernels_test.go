@@ -665,6 +665,50 @@ func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
 	if want := 11.5; floatMovingSum != want {
 		t.Fatalf("float msum sum = %#v, want %.1f", floatMovingSum, want)
 	}
+
+	base, err := TakeRepeat(NewI64([]int64{0}), 16)
+	if err != nil {
+		t.Fatalf("TakeRepeat sparse moving base: %v", err)
+	}
+	sparse, handled, err := TryTypedAmendAddIndexArray(base, NewI64([]int64{2, 5, 9}), NewI64([]int64{20, 50, 90}))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendAddIndexArray sparse moving handled=%v err=%v; want true,nil", handled, err)
+	}
+	sparseMovingSum, handled, err := TryTypedMovingNumericSumSum(sparse, 4, false)
+	if err != nil || !handled || sparseMovingSum != int64(640) {
+		t.Fatalf("sparse zero msum sum = %#v,%v,%v; want 640,true,nil", sparseMovingSum, handled, err)
+	}
+	sparseMovingAvg, handled, err := TryTypedMovingNumericSumSum(sparse, 4, true)
+	sparseMovingAvgValue, _ := sparseMovingAvg.(float64)
+	if err != nil || !handled || math.Abs(sparseMovingAvgValue-(485.0/3.0)) > 1e-9 {
+		t.Fatalf("sparse zero mavg sum = %#v,%v,%v; want %v,true,nil", sparseMovingAvg, handled, err, 485.0/3.0)
+	}
+}
+
+func TestTypedFbySumSparseZeroAmend(t *testing.T) {
+	base, err := TakeRepeat(NewI64([]int64{0}), 12)
+	if err != nil {
+		t.Fatalf("TakeRepeat sparse fby base: %v", err)
+	}
+	sparse, handled, err := TryTypedAmendAddIndexArray(base, NewI64([]int64{1, 4, 7, 10}), NewI64([]int64{10, 40, 70, 100}))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedAmendAddIndexArray sparse fby handled=%v err=%v; want true,nil", handled, err)
+	}
+	groups, err := TakeRepeat(NewSymbols([]string{"a", "b", "c"}), 12)
+	if err != nil {
+		t.Fatalf("TakeRepeat groups: %v", err)
+	}
+	fby, handled, err := typedKernels.FbySum(sparse, groups)
+	if err != nil || !handled {
+		t.Fatalf("FbySum sparse zero handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := fby.Values(), []any{int64(0), int64(220), int64(0), int64(0), int64(220), int64(0), int64(0), int64(220), int64(0), int64(0), int64(220), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("FbySum sparse zero values = %#v, want %#v", got, want)
+	}
+	total, handled, err := typedKernels.FbySumTotal(sparse, groups)
+	if err != nil || !handled || total != int64(880) {
+		t.Fatalf("FbySumTotal sparse zero = %#v,%v,%v; want 880,true,nil", total, handled, err)
+	}
 }
 
 func TestTypedBinScalarAndVectorBoundaries(t *testing.T) {

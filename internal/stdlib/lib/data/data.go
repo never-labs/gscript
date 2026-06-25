@@ -4525,6 +4525,9 @@ func TryTypedAmendIndexes(array Array, indexes []int, values []any) (Array, bool
 // using the bulk flatteners when the carrier supports them.
 func amendI64SourceCopy(array Array) ([]int64, bool, error) {
 	out := make([]int64, array.Len())
+	if isZeroLikeI64Array(array) {
+		return out, true, nil
+	}
 	if values, owned, ok := TryBulkI64(array); ok && len(values) == len(out) {
 		copy(out, values)
 		BulkI64Release(values, owned)
@@ -4729,6 +4732,37 @@ func tryBulkI64AmendAddIndexArray(array Array, indexes Array, values any) (Array
 		out[index] += vals[row]
 	}
 	return newI64Trusted(out), true, nil
+}
+
+func isZeroLikeI64Array(array Array) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		return isZeroLikeI64Array(a.array)
+	case columnArray[int64]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case columnArray[int32]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case columnArray[int16]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case columnArray[int8]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case columnArray[uint64]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case columnArray[uint32]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case columnArray[uint16]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case columnArray[uint8]:
+		return len(a.data) == 1 && a.data[0] == 0
+	case i64RangeArray:
+		return a.start == 0 && a.step == 0
+	case tiledArray:
+		return isZeroLikeI64Array(a.source)
+	case i64FillArray:
+		return a.fill == 0 && isZeroLikeI64Array(a.source)
+	default:
+		return false
+	}
 }
 
 const maxSparseAmendAddIndexes = 256

@@ -7851,6 +7851,12 @@ func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, boo
 		}
 		return movingSumSumI64Range(values, width), true, nil
 	}
+	if sparse, ok := array.(i64SparseAmendArray); ok && isZeroLikeI64Array(sparse.source) {
+		if average {
+			return movingAvgSumI64SparseZeroAmend(sparse, width), true, nil
+		}
+		return movingSumSumI64SparseZeroAmend(sparse, width), true, nil
+	}
 	if array.Kind() != KindF64 && array.Kind() != KindF32 {
 		// Null-free integer carriers flatten once and run the identical
 		// sliding-window accumulation over a dense slice, replacing the
@@ -8006,6 +8012,45 @@ func movingAvgSumI64Range(values i64RangeArray, width int) float64 {
 	firstStable := float64(values.start) + float64(values.step)*float64(width-1)/2
 	lastStable := firstStable + float64(stableLen-1)*float64(values.step)
 	return total + float64(stableLen)*(firstStable+lastStable)/2
+}
+
+func movingSumSumI64SparseZeroAmend(values i64SparseAmendArray, width int) int64 {
+	n := values.Len()
+	var total int64
+	for i, row := range values.indexes {
+		if row < 0 || row >= n {
+			continue
+		}
+		count := width
+		if remaining := n - row; remaining < count {
+			count = remaining
+		}
+		total += values.values[i] * int64(count)
+	}
+	return total
+}
+
+func movingAvgSumI64SparseZeroAmend(values i64SparseAmendArray, width int) float64 {
+	n := values.Len()
+	var total float64
+	for i, row := range values.indexes {
+		if row < 0 || row >= n {
+			continue
+		}
+		last := row + width - 1
+		if last >= n {
+			last = n - 1
+		}
+		value := float64(values.values[i])
+		for outRow := row; outRow <= last; outRow++ {
+			count := outRow + 1
+			if count > width {
+				count = width
+			}
+			total += value / float64(count)
+		}
+	}
+	return total
 }
 
 // TryTypedDeltas applies q-style deltas for dense typed numeric arrays.
@@ -9044,6 +9089,18 @@ func fbySumTotalIntegerArray(values Array, groups Array) (any, bool, error) {
 func fbySparseAmendGroupSums(values i64SparseAmendArray, rowGroups []int, groupCount int) ([]int64, []int64, bool, error) {
 	sums := make([]int64, groupCount)
 	counts := make([]int64, groupCount)
+	if isZeroLikeI64Array(values.source) {
+		for _, group := range rowGroups {
+			counts[group]++
+		}
+		for i, row := range values.indexes {
+			if row < 0 || row >= len(rowGroups) {
+				return nil, nil, true, fmt.Errorf("amend index %d out of range", row)
+			}
+			sums[rowGroups[row]] += values.values[i]
+		}
+		return sums, counts, true, nil
+	}
 	for row, group := range rowGroups {
 		value, ok, err := integerArrayAt(values.source, row)
 		if err != nil || !ok {
@@ -11479,7 +11536,7 @@ func isNumericArray(array Array) bool {
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
-		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
+		i64SparseAmendArray, i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
 		castF32Array, castI64Array,
 		qRatiosArray, i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray, f64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray, fbyF64BroadcastArray, fbyF64TiledBroadcastArray:
