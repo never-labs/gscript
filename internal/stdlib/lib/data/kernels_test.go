@@ -3441,6 +3441,42 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := indexes.Values(), []any{int64(0), int64(3), int64(6), int64(9)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedModuloCompareIndexesI64 values = %v, want %v", got, want)
 	}
+	rotated, ok, err := TryTypedRotate(NewI64Range(0, 1, 16), 11)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedRotate = %v,%v; want handled nil", ok, err)
+	}
+	rotatedIndexes, ok, err := TryTypedModuloCompareIndexesI64(rotated, int64(5), OpEQ, int64(1))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedModuloCompareIndexesI64 rotated = %v,%v; want handled nil", ok, err)
+	}
+	if _, ok := rotatedIndexes.(i64SegmentArray); !ok {
+		t.Fatalf("rotated modulo indexes = %T, want i64SegmentArray", rotatedIndexes)
+	}
+	if got, want := rotatedIndexes.Values(), []any{int64(0), int64(6), int64(11)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("rotated modulo indexes = %v, want %v", got, want)
+	}
+	rotatedSum, ok, err := TryTypedNumericSumByI64Indexes(rotated, rotatedIndexes)
+	if err != nil || !ok || rotatedSum != int64(18) {
+		t.Fatalf("rotated modulo gather sum = %v,%v,%v; want 18,true,nil", rotatedSum, ok, err)
+	}
+	rotatedMod, ok, err := TryTypedIntegerDyadic(OpMod, rotated, int64(5))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic rotated mod = %v,%v; want handled nil", ok, err)
+	}
+	rotatedMask, ok, err := TryTypedDyadic(OpEQ, rotatedMod.(Array), int64(1))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedDyadic rotated modulo compare = %v,%v; want handled nil", ok, err)
+	}
+	rotatedWhere, ok, err := TryTypedWhereMaskI64(rotatedMask.(Array))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedWhereMaskI64 rotated modulo compare = %v,%v; want handled nil", ok, err)
+	}
+	if _, ok := rotatedWhere.(i64SegmentArray); !ok {
+		t.Fatalf("rotated modulo where = %T, want i64SegmentArray", rotatedWhere)
+	}
+	if got, want := rotatedWhere.Values(), []any{int64(0), int64(6), int64(11)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("rotated modulo where = %v, want %v", got, want)
+	}
 	valueSum, ok, err := TryTypedNumericSumWhereModuloCompare(NewI64Range(1, 2, 10), NewI64Range(0, 1, 10), int64(3), OpEQ, int64(0))
 	if err != nil || !ok || valueSum != int64(40) {
 		t.Fatalf("TryTypedNumericSumWhereModuloCompare = %v,%v,%v; want 40,true,nil", valueSum, ok, err)

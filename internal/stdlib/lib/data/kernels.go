@@ -5821,6 +5821,9 @@ func TryTypedModuloCompareIndexesI64(array Array, modulus any, op Op, target any
 	if array == nil {
 		return nil, true, fmt.Errorf("modulo compare array is nil")
 	}
+	if indexes, ok := i64SegmentModuloEqualIndexes(array, modulusI64, op, targetI64); ok {
+		return indexes, true, nil
+	}
 	if plan, ok := i64ModuloComparePlanForArray(array, modulusI64, op, targetI64); ok {
 		return i64ModuloComparePlanIndexArray(plan), true, nil
 	}
@@ -5860,6 +5863,43 @@ func TryTypedModuloCompareIndexesI64(array Array, modulus any, op Op, target any
 		}
 	}
 	return newI64Trusted(indexes), true, nil
+}
+
+func i64SegmentModuloEqualIndexes(array Array, modulus int64, op Op, target int64) (Array, bool) {
+	if modulus <= 0 || op != OpEQ || target < 0 || target >= modulus {
+		return nil, false
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return i64SegmentModuloEqualIndexes(a.array, modulus, op, target)
+	case i64SegmentArray:
+		segments := make([]i64RangeArray, 0, len(a.segments))
+		logicalStart := int64(0)
+		for _, segment := range a.segments {
+			if segment.len <= 0 {
+				continue
+			}
+			if segment.step != 1 {
+				return nil, false
+			}
+			first := qPositiveMod(target-qPositiveMod(segment.start, modulus), modulus)
+			if first < int64(segment.len) {
+				count := int((int64(segment.len)-first-1)/modulus) + 1
+				segments = append(segments, i64RangeArray{
+					start: logicalStart + first,
+					step:  modulus,
+					len:   count,
+				})
+			}
+			logicalStart += int64(segment.len)
+		}
+		if logicalStart != int64(a.len) {
+			return nil, false
+		}
+		return newI64SegmentArray(segments...), true
+	default:
+		return nil, false
+	}
 }
 
 // TryTypedNumericSumWhereModuloCompare reduces values selected by a modulo
@@ -12336,6 +12376,9 @@ func (a i64ScalarDyadicCompareMask) trueCount() (int64, bool, error) {
 }
 
 func i64ScalarDyadicCompareMaskTrueCount(mask i64ScalarDyadicCompareMask) (int64, bool) {
+	if indexes, ok := i64ScalarDyadicCompareSegmentModuloIndexes(mask); ok {
+		return int64(indexes.Len()), true
+	}
 	plan, ok := i64ScalarDyadicCompareModuloPlan(mask)
 	if !ok {
 		return 0, false
@@ -16416,6 +16459,17 @@ func i64ScalarDyadicCompareModuloPlan(mask i64ScalarDyadicCompareMask) (i64Modul
 		scalar:       mask.scalar,
 		scalarLeft:   mask.scalarLeft,
 	}, true
+}
+
+func i64ScalarDyadicCompareSegmentModuloIndexes(mask i64ScalarDyadicCompareMask) (Array, bool) {
+	values := mask.values
+	if values.op != OpMod || values.scalarLeft || values.scalar <= 0 || values.len <= 0 || values.len != values.source.Len() {
+		return nil, false
+	}
+	if mask.scalarLeft && mask.op != OpEQ {
+		return nil, false
+	}
+	return i64SegmentModuloEqualIndexes(values.source, values.scalar, mask.op, mask.scalar)
 }
 
 func i64ModuloComparePlanForArray(array Array, modulus int64, op Op, target int64) (i64ModuloComparePlan, bool) {

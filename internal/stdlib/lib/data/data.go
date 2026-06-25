@@ -2659,6 +2659,9 @@ func i64SegmentCompareMaskIndexArray(mask i64SegmentCompareMask) (Array, bool, e
 }
 
 func i64ScalarDyadicCompareMaskIndexArray(mask i64ScalarDyadicCompareMask) (Array, bool, error) {
+	if indexes, ok := i64ScalarDyadicCompareSegmentModuloIndexes(mask); ok {
+		return indexes, true, nil
+	}
 	plan, ok := i64ScalarDyadicCompareModuloPlan(mask)
 	if !ok {
 		return nil, false, nil
