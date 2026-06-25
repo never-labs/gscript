@@ -265,3 +265,53 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 		t.Fatalf("module fact diffs missing details:\n%s", string(factDiffText))
 	}
 }
+
+func TestWarmDump_RuntimeSpecializationManifest(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "spectral_norm.leia"))
+	if err != nil {
+		t.Fatalf("read spectral benchmark: %v", err)
+	}
+	top := compileProto(t, string(src))
+	multiplyAtAv := findProtoByName(top, "multiplyAtAv")
+	if multiplyAtAv == nil {
+		t.Fatal("multiplyAtAv proto not found")
+	}
+
+	tm := NewTieringManager()
+	outDir := t.TempDir()
+	if err := tm.EnableWarmDump(outDir, "multiplyAtAv"); err != nil {
+		t.Fatalf("EnableWarmDump: %v", err)
+	}
+	if err := tm.WriteWarmDump(top); err != nil {
+		t.Fatalf("WriteWarmDump: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, "manifest.json"))
+	if err != nil {
+		t.Fatalf("read manifest: %v", err)
+	}
+	var manifest warmDumpManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	if len(manifest.Protos) != 1 {
+		t.Fatalf("manifest protos = %d, want 1", len(manifest.Protos))
+	}
+	got := manifest.Protos[0]
+	if got.Name != "multiplyAtAv" {
+		t.Fatalf("manifest proto = %q, want multiplyAtAv", got.Name)
+	}
+	found := false
+	for _, spec := range got.RuntimeSpecializations {
+		if spec.Name == "coefficient_matrix_ata_vector" {
+			found = true
+			if spec.Route != string(vm.RuntimeSpecializationRouteCallSiteNoResult) ||
+				spec.Arity != 3 || spec.Results != 0 || !spec.StructuralTiering {
+				t.Fatalf("unexpected runtime specialization metadata: %+v", spec)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("runtime specializations = %+v, want coefficient_matrix_ata_vector", got.RuntimeSpecializations)
+	}
+}

@@ -72,36 +72,45 @@ type warmDumpManifest struct {
 }
 
 type warmDumpProtoManifest struct {
-	Name                 string                     `json:"name"`
-	Status               string                     `json:"status"`
-	Attempt              int                        `json:"attempt,omitempty"`
-	Entered              bool                       `json:"entered"`
-	Compiled             bool                       `json:"compiled"`
-	Failed               bool                       `json:"failed"`
-	FailureReason        string                     `json:"failure_reason,omitempty"`
-	CallCount            int                        `json:"call_count"`
-	Tier2Promoted        bool                       `json:"tier2_promoted"`
-	NumParams            int                        `json:"num_params"`
-	MaxStack             int                        `json:"max_stack"`
-	InsnCount            int                        `json:"insn_count,omitempty"`
-	InsnHistogram        map[string]int             `json:"insn_histogram,omitempty"`
-	CodeBytes            int                        `json:"code_bytes,omitempty"`
-	CodeStart            string                     `json:"code_start,omitempty"`
-	CodeEnd              string                     `json:"code_end,omitempty"`
-	DirectEntryOff       int                        `json:"direct_entry_offset,omitempty"`
-	TypedEntryOff        int                        `json:"typed_entry_offset,omitempty"`
-	TypedClobberEntryOff int                        `json:"typed_clobber_entry_offset,omitempty"`
-	NumSpills            int                        `json:"num_spills,omitempty"`
-	TypedPeerFramePlan   Tier2TypedPeerFramePlan    `json:"typed_peer_frame_plan,omitempty"`
-	OptimizationRemarks  []OptimizationRemark       `json:"optimization_remarks,omitempty"`
-	Specialization       Tier2SpecializationSummary `json:"specialization,omitempty"`
-	LoopDiagnostics      []LoopDiagnostic           `json:"loop_diagnostics,omitempty"`
-	PipelineStages       []PipelineStageTiming      `json:"pipeline_stages,omitempty"`
-	ModuleContracts      []Tier2ModuleContract      `json:"module_contracts,omitempty"`
-	ModuleReasons        []Tier2ModuleReason        `json:"module_reasons,omitempty"`
-	ModuleFactDiffs      []Tier2ModuleFactDiff      `json:"module_fact_diffs,omitempty"`
-	Feedback             warmFeedbackSummary        `json:"feedback"`
-	Files                map[string]string          `json:"files,omitempty"`
+	Name                   string                          `json:"name"`
+	Status                 string                          `json:"status"`
+	Attempt                int                             `json:"attempt,omitempty"`
+	Entered                bool                            `json:"entered"`
+	Compiled               bool                            `json:"compiled"`
+	Failed                 bool                            `json:"failed"`
+	FailureReason          string                          `json:"failure_reason,omitempty"`
+	CallCount              int                             `json:"call_count"`
+	Tier2Promoted          bool                            `json:"tier2_promoted"`
+	NumParams              int                             `json:"num_params"`
+	MaxStack               int                             `json:"max_stack"`
+	InsnCount              int                             `json:"insn_count,omitempty"`
+	InsnHistogram          map[string]int                  `json:"insn_histogram,omitempty"`
+	CodeBytes              int                             `json:"code_bytes,omitempty"`
+	CodeStart              string                          `json:"code_start,omitempty"`
+	CodeEnd                string                          `json:"code_end,omitempty"`
+	DirectEntryOff         int                             `json:"direct_entry_offset,omitempty"`
+	TypedEntryOff          int                             `json:"typed_entry_offset,omitempty"`
+	TypedClobberEntryOff   int                             `json:"typed_clobber_entry_offset,omitempty"`
+	NumSpills              int                             `json:"num_spills,omitempty"`
+	TypedPeerFramePlan     Tier2TypedPeerFramePlan         `json:"typed_peer_frame_plan,omitempty"`
+	OptimizationRemarks    []OptimizationRemark            `json:"optimization_remarks,omitempty"`
+	Specialization         Tier2SpecializationSummary      `json:"specialization,omitempty"`
+	LoopDiagnostics        []LoopDiagnostic                `json:"loop_diagnostics,omitempty"`
+	PipelineStages         []PipelineStageTiming           `json:"pipeline_stages,omitempty"`
+	ModuleContracts        []Tier2ModuleContract           `json:"module_contracts,omitempty"`
+	ModuleReasons          []Tier2ModuleReason             `json:"module_reasons,omitempty"`
+	ModuleFactDiffs        []Tier2ModuleFactDiff           `json:"module_fact_diffs,omitempty"`
+	RuntimeSpecializations []warmDumpRuntimeSpecialization `json:"runtime_specializations,omitempty"`
+	Feedback               warmFeedbackSummary             `json:"feedback"`
+	Files                  map[string]string               `json:"files,omitempty"`
+}
+
+type warmDumpRuntimeSpecialization struct {
+	Name              string `json:"name"`
+	Route             string `json:"route"`
+	Arity             int    `json:"arity"`
+	Results           int    `json:"results"`
+	StructuralTiering bool   `json:"structural_tiering"`
 }
 
 type warmDumpPCMap struct {
@@ -277,6 +286,7 @@ func (s *WarmDumpSession) write(tm *TieringManager, top *vm.FuncProto) error {
 
 		status := warmDumpStatus(tm, proto, rec)
 		feedback := summarizeWarmFeedback(proto)
+		runtimeSpecializations := summarizeWarmRuntimeSpecializations(proto)
 
 		feedbackName := base + ".feedback.txt"
 		if err := os.WriteFile(filepath.Join(s.dir, feedbackName), []byte(formatWarmFeedback(proto, feedback)), 0o644); err != nil {
@@ -397,18 +407,19 @@ func (s *WarmDumpSession) write(tm *TieringManager, top *vm.FuncProto) error {
 		}
 
 		protoManifest := warmDumpProtoManifest{
-			Name:          displayWarmProtoName(proto),
-			Status:        status.status,
-			Entered:       proto.EnteredTier2 != 0,
-			Compiled:      status.compiled,
-			Failed:        status.failed,
-			FailureReason: status.failureReason,
-			CallCount:     proto.CallCount,
-			Tier2Promoted: proto.Tier2Promoted,
-			NumParams:     proto.NumParams,
-			MaxStack:      proto.MaxStack,
-			Feedback:      feedback,
-			Files:         files,
+			Name:                   displayWarmProtoName(proto),
+			Status:                 status.status,
+			Entered:                proto.EnteredTier2 != 0,
+			Compiled:               status.compiled,
+			Failed:                 status.failed,
+			FailureReason:          status.failureReason,
+			CallCount:              proto.CallCount,
+			Tier2Promoted:          proto.Tier2Promoted,
+			NumParams:              proto.NumParams,
+			MaxStack:               proto.MaxStack,
+			RuntimeSpecializations: runtimeSpecializations,
+			Feedback:               feedback,
+			Files:                  files,
 		}
 		if rec != nil {
 			protoManifest.Attempt = rec.Attempt
@@ -638,6 +649,30 @@ func warmDumpStatus(tm *TieringManager, proto *vm.FuncProto, rec *WarmDumpRecord
 		info.compiled = true
 	}
 	return info
+}
+
+func summarizeWarmRuntimeSpecializations(proto *vm.FuncProto) []warmDumpRuntimeSpecialization {
+	infos := vm.RecognizedCallSiteRuntimeSpecializations(proto)
+	if len(infos) == 0 {
+		return nil
+	}
+	out := make([]warmDumpRuntimeSpecialization, 0, len(infos))
+	for _, info := range infos {
+		out = append(out, warmDumpRuntimeSpecialization{
+			Name:              info.Name,
+			Route:             string(info.Route),
+			Arity:             info.Arity,
+			Results:           info.Results,
+			StructuralTiering: info.AllowsStructuralTiering(proto),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Route != out[j].Route {
+			return out[i].Route < out[j].Route
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
 }
 
 func collectWarmDumpProtos(top *vm.FuncProto) []*vm.FuncProto {
