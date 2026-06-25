@@ -221,6 +221,16 @@ func (l *Lowered) execRuntime(frame data.Frame, backend qSQLRuntimeBackend) (dat
 	plan := l.Plan
 	qExpandRuntimeAllColumnSelects(&plan, frame)
 	plan.Source = frame
+	if cached, ok := l.runtimeCachedExecutable(frame, backend); ok {
+		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, cached.descriptor.Shape, cached.descriptor.PipelineShape, cached.route, "attempt", "attempt")
+		out, err := cached.executable.Exec(plan, frame)
+		if err != nil {
+			recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, cached.descriptor.Shape, cached.descriptor.PipelineShape, cached.route, "error", RuntimeFallbackBackendExec)
+			return data.Frame{}, err
+		}
+		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, cached.descriptor.Shape, cached.descriptor.PipelineShape, cached.route, "hit", "typed_kernel")
+		return out, nil
+	}
 	descriptor := l.RuntimeDescriptor()
 	if !descriptor.Valid() {
 		return plan.Exec()
@@ -241,6 +251,7 @@ func (l *Lowered) execRuntime(frame data.Frame, backend qSQLRuntimeBackend) (dat
 		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, qSQLRuntimeRoutePlanFallback, "fallback", reason)
 		return plan.Exec()
 	}
+	l.storeRuntimeCachedExecutable(frame, backend, descriptor, executable)
 	out, err := executable.Exec(plan, frame)
 	if err != nil {
 		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "error", RuntimeFallbackBackendExec)
@@ -248,6 +259,30 @@ func (l *Lowered) execRuntime(frame data.Frame, backend qSQLRuntimeBackend) (dat
 	}
 	recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "hit", "typed_kernel")
 	return out, nil
+}
+
+func (l *Lowered) runtimeCachedExecutable(frame data.Frame, backend qSQLRuntimeBackend) (qSQLRuntimeCachedExecutable, bool) {
+	if l == nil || backend == nil || backend.Route() != qSQLRuntimeRouteTypedBackend {
+		return qSQLRuntimeCachedExecutable{}, false
+	}
+	key := frame.SchemaFingerprint()
+	l.runtimeCacheMu.Lock()
+	cached, ok := l.runtimeCache[key]
+	l.runtimeCacheMu.Unlock()
+	return cached, ok
+}
+
+func (l *Lowered) storeRuntimeCachedExecutable(frame data.Frame, backend qSQLRuntimeBackend, descriptor QSQLRuntimeDescriptor, executable qSQLRuntimeExecutable) {
+	if l == nil || backend == nil || backend.Route() != qSQLRuntimeRouteTypedBackend || executable == nil || !descriptor.Valid() || !descriptor.Supported {
+		return
+	}
+	key := frame.SchemaFingerprint()
+	l.runtimeCacheMu.Lock()
+	if l.runtimeCache == nil {
+		l.runtimeCache = make(map[string]qSQLRuntimeCachedExecutable, 1)
+	}
+	l.runtimeCache[key] = qSQLRuntimeCachedExecutable{descriptor: descriptor, executable: executable, route: backend.Route()}
+	l.runtimeCacheMu.Unlock()
 }
 
 // qExpandRuntimeAllColumnSelects expands the `*` select-all marker against

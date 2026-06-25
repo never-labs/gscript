@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
@@ -25,6 +26,15 @@ type Lowered struct {
 	// resolved source frame first and the outer plan runs on its result.
 	Sub      *Lowered
 	Original *Query
+
+	runtimeCacheMu sync.Mutex
+	runtimeCache   map[string]qSQLRuntimeCachedExecutable
+}
+
+type qSQLRuntimeCachedExecutable struct {
+	descriptor QSQLRuntimeDescriptor
+	executable qSQLRuntimeExecutable
+	route      string
 }
 
 type ExecDictPlan struct {
