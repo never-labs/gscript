@@ -25,6 +25,12 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 	absArg2 := base + int(ctx.OpExitArg2)
 	aux := int(ctx.OpExitAux)
 
+	if cf, _ := tm.tier2CompiledFor(proto); cf != nil {
+		if handled, err := cf.executeQTypedRuntimeOpExit(ctx, regs, base, qTypedRuntimeExecutionRouteOpExit); handled {
+			return err
+		}
+	}
+
 	switch op {
 	case OpCall:
 		nArgs := int(ctx.OpExitArg1)

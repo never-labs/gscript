@@ -713,6 +713,10 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 	arg2 := int(ctx.OpExitArg2)
 	aux := int(ctx.OpExitAux)
 
+	if handled, err := cf.executeQTypedRuntimeOpExit(ctx, regs, 0, qTypedRuntimeExecutionRouteOpExit); handled {
+		return err
+	}
+
 	switch op {
 	case OpConstString:
 		if cf.Proto != nil && aux >= 0 && aux < len(cf.Proto.Constants) {
