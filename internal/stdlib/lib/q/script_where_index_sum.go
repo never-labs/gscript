@@ -171,9 +171,6 @@ func qScriptWhereIndexSumTerminal(src string, bindings map[string]string) (value
 }
 
 func qScriptWhereIndexAliasGatherSumTerm(src string, bindings map[string]string) (string, string, bool) {
-	if !qScriptWhereIndexBindingsMentionXbar(bindings) {
-		return "", "", false
-	}
 	name := qScriptPipelineAliasBodyName(src)
 	if name == "" {
 		return "", "", false
@@ -187,15 +184,6 @@ func qScriptWhereIndexAliasGatherSumTerm(src string, bindings map[string]string)
 		return "", "", false
 	}
 	return strings.TrimSpace(valueExpr), strings.TrimSpace(indexExpr), valueExpr != "" && indexExpr != ""
-}
-
-func qScriptWhereIndexBindingsMentionXbar(bindings map[string]string) bool {
-	for _, rhs := range bindings {
-		if _, _, ok := splitTopLevelWord(rhs, "xbar"); ok {
-			return true
-		}
-	}
-	return false
 }
 
 func qScriptWhereIndexPredicateSummary(maskExpr string, bindings map[string]qScriptNumericExprPlan) (predicate qScriptNumericSumSummary, op string, scalar, lo, hi qScriptNumericSumSummary, ok bool) {
@@ -453,11 +441,15 @@ func (plan *qScriptWhereIndexSumPlan) buildResidues() {
 	}
 	periodLen, ok := qScriptWhereIndexPeriodLen(plan)
 	if !ok || periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
-		return
+		var constraint qScriptWhereRowConstraint
+		constraint, periodLen, ok = qScriptWhereIndexConstrainedResidueSpec(plan)
+		if !ok || constraint.start > constraint.end {
+			return
+		}
 	}
 	residues := make([]int, 0, periodLen)
 	for offset := 0; offset < periodLen && offset < plan.value.length; offset++ {
-		if qScriptWhereIndexPredicateAt(plan, offset) {
+		if qScriptWhereIndexResiduePredicateAt(plan, offset) {
 			residues = append(residues, offset)
 		}
 	}
@@ -466,6 +458,40 @@ func (plan *qScriptWhereIndexSumPlan) buildResidues() {
 	}
 	plan.residuePeriod = periodLen
 	plan.residues = residues
+}
+
+func qScriptWhereIndexResiduePredicateAt(plan *qScriptWhereIndexSumPlan, offset int) bool {
+	if plan == nil || plan.predicatePlan == nil {
+		return qScriptWhereIndexPredicateAt(plan, offset)
+	}
+	return qScriptWherePredicateResidualAt(plan.predicatePlan, offset)
+}
+
+func qScriptWhereIndexConstrainedResidueSpec(plan *qScriptWhereIndexSumPlan) (qScriptWhereRowConstraint, int, bool) {
+	if plan == nil || plan.predicatePlan == nil || plan.value.length <= 0 {
+		return qScriptWhereRowConstraint{}, 0, false
+	}
+	constraint := qScriptWhereRowConstraint{start: 0, end: plan.value.length - 1}
+	if !qScriptWherePredicateConstrainRows(plan.predicatePlan, &constraint) || constraint.start > constraint.end {
+		return qScriptWhereRowConstraint{}, 0, false
+	}
+	if !constraint.changed && constraint.exclusionCount == 0 {
+		return qScriptWhereRowConstraint{}, 0, false
+	}
+	periodLen := qScriptWherePredicateResidualPeriodLen(plan.predicatePlan)
+	if periodLen == 0 && (constraint.changed || constraint.exclusionCount > 0) {
+		periodLen = 1
+	}
+	if periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
+		return qScriptWhereRowConstraint{}, 0, false
+	}
+	if valuePeriod := qScriptWhereIndexSummaryPeriodLen(plan.value); valuePeriod > 0 {
+		periodLen = qScriptNumericLCM(periodLen, valuePeriod)
+	}
+	if periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
+		return qScriptWhereRowConstraint{}, 0, false
+	}
+	return constraint, periodLen, true
 }
 
 func qScriptWhereIndexResidueSum(plan *qScriptWhereIndexSumPlan, start, end, periodLen int, residues []int) (float64, int64, bool, bool) {
@@ -501,27 +527,8 @@ func qScriptWhereIndexResidueSum(plan *qScriptWhereIndexSumPlan, start, end, per
 }
 
 func qScriptWhereIndexConstrainedPeriodicSum(plan *qScriptWhereIndexSumPlan) (float64, int64, bool, bool) {
-	if plan == nil || plan.predicatePlan == nil || plan.value.length <= 0 {
-		return 0, 0, false, false
-	}
-	constraint := qScriptWhereRowConstraint{start: 0, end: plan.value.length - 1}
-	if !qScriptWherePredicateConstrainRows(plan.predicatePlan, &constraint) || constraint.start > constraint.end {
-		return 0, 0, false, false
-	}
-	if !constraint.changed && constraint.exclusionCount == 0 {
-		return 0, 0, false, false
-	}
-	periodLen := qScriptWherePredicateResidualPeriodLen(plan.predicatePlan)
-	if periodLen == 0 && (constraint.changed || constraint.exclusionCount > 0) {
-		periodLen = 1
-	}
-	if periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
-		return 0, 0, false, false
-	}
-	if valuePeriod := qScriptWhereIndexSummaryPeriodLen(plan.value); valuePeriod > 0 {
-		periodLen = qScriptNumericLCM(periodLen, valuePeriod)
-	}
-	if periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
+	constraint, periodLen, ok := qScriptWhereIndexConstrainedResidueSpec(plan)
+	if !ok {
 		return 0, 0, false, false
 	}
 	if len(plan.residues) > 0 && plan.residuePeriod == periodLen {
@@ -534,7 +541,7 @@ func qScriptWhereIndexConstrainedPeriodicSum(plan *qScriptWhereIndexSumPlan) (fl
 		}
 		for i := 0; i < constraint.exclusionCount; i++ {
 			excluded := constraint.exclusions[i]
-			if excluded < constraint.start || excluded > constraint.end || !qScriptWhereIndexPredicateAt(plan, excluded) {
+			if excluded < constraint.start || excluded > constraint.end || !qScriptWhereIndexResiduePredicateAt(plan, excluded) {
 				continue
 			}
 			count--
