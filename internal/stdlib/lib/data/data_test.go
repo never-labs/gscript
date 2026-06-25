@@ -4330,6 +4330,33 @@ func TestTryTypedFbySumTotalAndGroupCount(t *testing.T) {
 	}
 }
 
+func TestTryTypedFbySumTotalCachesDenseGroupIDs(t *testing.T) {
+	values := NewI64([]int64{10, 20, 30, 40, 50, 60})
+	groups := NewSymbols([]string{"a", "b", "a", "c", "b", "a"})
+	total, ok, err := TryTypedFbySumTotal(values, groups)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedFbySumTotal handled=%v err=%v; want true,nil", ok, err)
+	}
+	if total != int64(480) {
+		t.Fatalf("TryTypedFbySumTotal = %#v, want 480", total)
+	}
+	ids, count, ok := cachedDenseGroupIDs(groups)
+	if !ok {
+		t.Fatal("cachedDenseGroupIDs missed after fby sum total")
+	}
+	defer bulkIntRelease(ids)
+	if count != 3 {
+		t.Fatalf("cached group count = %d, want 3", count)
+	}
+	if got, want := ids, []int{0, 1, 0, 2, 1, 0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("cached group ids = %#v, want %#v", got, want)
+	}
+	total, ok, err = TryTypedFbySumTotal(values, groups)
+	if err != nil || !ok || total != int64(480) {
+		t.Fatalf("cached TryTypedFbySumTotal = %#v,%v,%v; want 480,true,nil", total, ok, err)
+	}
+}
+
 func TestTryTypedFbySumUsesComputedI64BucketGroups(t *testing.T) {
 	values := NewI64([]int64{10, 20, 30, 40, 50, 60})
 	buckets := i64BucketArray{source: NewI64([]int64{20, 25, 49, 50, 74, 75}), width: 25, len: 6}

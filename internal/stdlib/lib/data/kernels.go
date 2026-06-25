@@ -9744,24 +9744,53 @@ func fbyGroupIDsComparableInto[T comparable](values []T, rowGroups []int) ([]int
 // pooled ids must be released with bulkIntRelease by the caller; ok=false
 // defers to the closure-based fbyGroupLookup with no side effects.
 func fbySumRowGroupIDs(groups Array) (ids []int, count int, ok bool, err error) {
+	if ids, count, ok, err := fbyPooledGroupIDsFromIndex(groups); ok || err != nil {
+		return ids, count, ok, err
+	}
+	if ids, count, ok := cachedDenseGroupIDs(groups); ok {
+		return ids, count, true, nil
+	}
 	switch g := unwrapAttributedArray(groups).(type) {
 	case columnArray[Symbol]:
-		return fbyPooledGroupIDsText(g.data)
+		return fbyPooledGroupIDsTextCached(groups, g.data)
 	case columnArray[string]:
-		return fbyPooledGroupIDsText(g.data)
+		return fbyPooledGroupIDsTextCached(groups, g.data)
 	case columnArray[int64]:
-		return fbyPooledGroupIDs(g.data)
+		return fbyPooledGroupIDsCached(groups, g.data)
 	case columnArray[int32]:
-		return fbyPooledGroupIDs(g.data)
+		return fbyPooledGroupIDsCached(groups, g.data)
 	case columnArray[int16]:
-		return fbyPooledGroupIDs(g.data)
+		return fbyPooledGroupIDsCached(groups, g.data)
 	case columnArray[int8]:
-		return fbyPooledGroupIDs(g.data)
+		return fbyPooledGroupIDsCached(groups, g.data)
 	case columnArray[bool]:
-		return fbyPooledGroupIDs(g.data)
+		return fbyPooledGroupIDsCached(groups, g.data)
 	default:
 		return nil, 0, false, nil
 	}
+}
+
+func fbyPooledGroupIDsFromIndex(groups Array) ([]int, int, bool, error) {
+	if index, ok := arrayIndexForBorrowed(groups, ArrayAttributeUnique); ok {
+		return fbyPooledGroupIDsFromArrayIndex(index, groups.Len())
+	}
+	if index, ok := arrayIndexForBorrowed(groups, ArrayAttributeGrouped); ok {
+		return fbyPooledGroupIDsFromArrayIndex(index, groups.Len())
+	}
+	return nil, 0, false, nil
+}
+
+func fbyPooledGroupIDsFromArrayIndex(index ArrayIndex, rows int) ([]int, int, bool, error) {
+	rowToGroup, err := rowToGroupFromIndex(index)
+	if err != nil {
+		return nil, 0, true, err
+	}
+	if len(rowToGroup) != rows {
+		return nil, 0, true, fmt.Errorf("fby grouped index length mismatch: %d != %d", len(rowToGroup), rows)
+	}
+	ids := bulkIntGetLen(rows)
+	copy(ids, rowToGroup)
+	return ids, len(index.Rows), true, nil
 }
 
 func fbyPooledGroupIDs[T comparable](values []T) ([]int, int, bool, error) {
@@ -9773,6 +9802,14 @@ func fbyPooledGroupIDs[T comparable](values []T) ([]int, int, bool, error) {
 	return ids, count, true, nil
 }
 
+func fbyPooledGroupIDsCached[T comparable](groups Array, values []T) ([]int, int, bool, error) {
+	ids, count, ok, err := fbyPooledGroupIDs(values)
+	if ok && err == nil {
+		storeDenseGroupIDs(groups, ids, count)
+	}
+	return ids, count, ok, err
+}
+
 func fbyPooledGroupIDsText[T ~string](values []T) ([]int, int, bool, error) {
 	ids, count, err := fbyGroupIDsTextInto(values, bulkIntGetLen(len(values)))
 	if err != nil {
@@ -9780,6 +9817,14 @@ func fbyPooledGroupIDsText[T ~string](values []T) ([]int, int, bool, error) {
 		return nil, 0, true, err
 	}
 	return ids, count, true, nil
+}
+
+func fbyPooledGroupIDsTextCached[T ~string](groups Array, values []T) ([]int, int, bool, error) {
+	ids, count, ok, err := fbyPooledGroupIDsText(values)
+	if ok && err == nil {
+		storeDenseGroupIDs(groups, ids, count)
+	}
+	return ids, count, ok, err
 }
 
 // fbyTextGroupIDMapPool recycles the high-cardinality content map for the
