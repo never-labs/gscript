@@ -295,6 +295,12 @@ func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipeli
 	if backend == nil {
 		return runtime.NilValue(), false, nil
 	}
+	if valueExecutor, ok := backend.(QEvalPipelineValueExecutor); ok {
+		value, handled, err := valueExecutor.ExecuteQEvalPipelinePlanValue(ref)
+		if handled || err != nil {
+			return value, handled, err
+		}
+	}
 	if _, ok := backend.LookupQEvalPipelinePlan(ref); !ok {
 		return runtime.NilValue(), false, nil
 	}
@@ -309,9 +315,6 @@ func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipeli
 		if _, ok := runtimeBackend.lookupBackendPlan(ref); !ok {
 			return runtime.NilValue(), false, nil
 		}
-	}
-	if valueExecutor, ok := backend.(QEvalPipelineValueExecutor); ok {
-		return valueExecutor.ExecuteQEvalPipelinePlanValue(ref)
 	}
 	out, handled, err := executor.ExecuteQEvalPipelinePlan(ref)
 	if err != nil || !handled {
