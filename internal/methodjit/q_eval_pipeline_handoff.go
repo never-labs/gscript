@@ -549,9 +549,6 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlanValue(ref QEvalPipe
 	if qEvalPipelineBackendNameFromRef(ref) != qEvalPipelineTypedRuntimeBackend {
 		return runtime.NilValue(), false, nil
 	}
-	if _, ok := b.LookupQEvalPipelinePlan(ref); !ok {
-		return runtime.NilValue(), false, nil
-	}
 	if executable, ok := b.lookupExecutablePlan(ref); ok && b.executeExecutable == nil {
 		if state := b.lookupEvalState(ref.ID); state != nil {
 			state.mu.Lock()
@@ -566,6 +563,9 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlanValue(ref QEvalPipe
 			}
 			return value, true, nil
 		}
+	}
+	if _, ok := b.lookupBackendPlan(ref); !ok {
+		return runtime.NilValue(), false, nil
 	}
 	out, handled, err := b.ExecuteQEvalPipelinePlan(ref)
 	if err != nil || !handled {
