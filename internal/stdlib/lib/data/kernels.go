@@ -6464,6 +6464,12 @@ func typedIntegerSumWhereMask(array, mask Array) (any, bool, error) {
 			return sum, handled, err
 		}
 	}
+	if total, count, ok := fusedPredicateI64CompareAndSum(array, mask); ok {
+		if count == 0 {
+			return NullValue, true, nil
+		}
+		return total, true, nil
+	}
 	// Compound mask trees (bool-logical and/or chains, membership, within)
 	// lower to one dense pooled bool pass through the same compiled
 	// predicate `where` uses, instead of a per-row carrier-tree walk.

@@ -158,6 +158,191 @@ func fusedPredicateDenseBoolMask(mask Array) ([]bool, bool) {
 	return c.evalDenseBools(root)
 }
 
+type predI64CompareLeaf struct {
+	values []int64
+	op     Op
+	scalar int64
+}
+
+// fusedPredicateI64CompareAndSum lowers `sum values where c1 and c2 ...`
+// for pure integer compare predicates to a single tight loop over the value
+// column and flattened predicate columns. It handles the common q columnar
+// shape without materializing intermediate compare masks or the final dense
+// boolean mask; unsupported predicate trees fall back to the existing fused
+// bool-mask path.
+func fusedPredicateI64CompareAndSum(values, mask Array) (int64, int, bool) {
+	length := mask.Len()
+	if values == nil || mask == nil || length == 0 || values.Len() != length {
+		return 0, 0, false
+	}
+	valueData, valueOwned, ok := tryBulkI64Values(values)
+	if !ok || len(valueData) < length {
+		bulkI64Release(valueData, valueOwned)
+		return 0, 0, false
+	}
+	c := predCompiler{length: length, nodeBudget: predNodeBudget}
+	root, ok := c.compile(mask, false)
+	if !ok {
+		c.releaseOwnedBools()
+		bulkI64Release(valueData, valueOwned)
+		return 0, 0, false
+	}
+	c.foldSingleUseLeafChains(root)
+	sources := make([][]int64, len(c.sources))
+	sourcesOwned := make([]bool, len(c.sources))
+	release := func() {
+		for i, source := range sources {
+			bulkI64Release(source, sourcesOwned[i])
+		}
+		for _, base := range c.bases {
+			bulkI64Release(base.values, base.owned)
+		}
+		c.releaseOwnedBools()
+		bulkI64Release(valueData, valueOwned)
+	}
+	for i, sourceArray := range c.sources {
+		if sourceArray == nil {
+			continue
+		}
+		source, owned, ok := c.flattenSource(i, sourceArray, sources, length)
+		if !ok || len(source) < length {
+			bulkI64Release(source, owned)
+			release()
+			return 0, 0, false
+		}
+		sources[i] = source[:length]
+		sourcesOwned[i] = owned
+	}
+	nodes := make([]*predNode, 0, predNodeBudget)
+	if !collectPredAndLeaves(root, &nodes) || len(nodes) == 0 || len(nodes) > 8 {
+		release()
+		return 0, 0, false
+	}
+	leaves := make([]predI64CompareLeaf, 0, len(nodes))
+	for _, node := range nodes {
+		if node.kind != predNodeCmp || node.modBy != 0 || node.src < 0 || node.src >= len(sources) || sources[node.src] == nil {
+			release()
+			return 0, 0, false
+		}
+		leaves = append(leaves, predI64CompareLeaf{values: sources[node.src], op: node.op, scalar: node.scalar})
+	}
+	total, count, ok := sumI64WhereCompareAnd(valueData[:length], leaves)
+	release()
+	return total, count, ok
+}
+
+func sumI64WhereCompareAnd(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
+	if len(leaves) == 0 {
+		return 0, 0, false
+	}
+	op := leaves[0].op
+	for _, leaf := range leaves[1:] {
+		if leaf.op != op {
+			return 0, 0, false
+		}
+	}
+	switch op {
+	case OpGT:
+		return sumI64WhereCompareAndGT(values, leaves)
+	case OpGE:
+		return sumI64WhereCompareAndGE(values, leaves)
+	case OpLT:
+		return sumI64WhereCompareAndLT(values, leaves)
+	case OpLE:
+		return sumI64WhereCompareAndLE(values, leaves)
+	case OpEQ:
+		return sumI64WhereCompareAndEQ(values, leaves)
+	case OpNE:
+		return sumI64WhereCompareAndNE(values, leaves)
+	default:
+		return 0, 0, false
+	}
+}
+
+func sumI64WhereCompareAndGT(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
+	var total int64
+	count := 0
+	switch len(leaves) {
+	case 1:
+		a, ca := leaves[0].values, leaves[0].scalar
+		for i, v := range values {
+			if a[i] > ca {
+				total += v
+				count++
+			}
+		}
+	case 2:
+		a, b := leaves[0].values, leaves[1].values
+		ca, cb := leaves[0].scalar, leaves[1].scalar
+		for i, v := range values {
+			if a[i] > ca && b[i] > cb {
+				total += v
+				count++
+			}
+		}
+	case 3:
+		a, b, c := leaves[0].values, leaves[1].values, leaves[2].values
+		ca, cb, cc := leaves[0].scalar, leaves[1].scalar, leaves[2].scalar
+		for i, v := range values {
+			if a[i] > ca && b[i] > cb && c[i] > cc {
+				total += v
+				count++
+			}
+		}
+	case 4:
+		a, b, c, d := leaves[0].values, leaves[1].values, leaves[2].values, leaves[3].values
+		ca, cb, cc, cd := leaves[0].scalar, leaves[1].scalar, leaves[2].scalar, leaves[3].scalar
+		for i, v := range values {
+			if a[i] > ca && b[i] > cb && c[i] > cc && d[i] > cd {
+				total += v
+				count++
+			}
+		}
+	default:
+		return sumI64WhereCompareAndSameOp(values, leaves, func(v, c int64) bool { return v > c })
+	}
+	return total, count, true
+}
+
+func sumI64WhereCompareAndGE(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
+	return sumI64WhereCompareAndSameOp(values, leaves, func(v, c int64) bool { return v >= c })
+}
+
+func sumI64WhereCompareAndLT(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
+	return sumI64WhereCompareAndSameOp(values, leaves, func(v, c int64) bool { return v < c })
+}
+
+func sumI64WhereCompareAndLE(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
+	return sumI64WhereCompareAndSameOp(values, leaves, func(v, c int64) bool { return v <= c })
+}
+
+func sumI64WhereCompareAndEQ(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
+	return sumI64WhereCompareAndSameOp(values, leaves, func(v, c int64) bool { return v == c })
+}
+
+func sumI64WhereCompareAndNE(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
+	return sumI64WhereCompareAndSameOp(values, leaves, func(v, c int64) bool { return v != c })
+}
+
+func sumI64WhereCompareAndSameOp(values []int64, leaves []predI64CompareLeaf, keep func(int64, int64) bool) (int64, int, bool) {
+	var total int64
+	count := 0
+	for i, v := range values {
+		matched := true
+		for _, leaf := range leaves {
+			if !keep(leaf.values[i], leaf.scalar) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			total += v
+			count++
+		}
+	}
+	return total, count, true
+}
+
 // evalDenseBools flattens the compiled tree's leaf sources and evaluates the
 // predicate into one pooled dense bool buffer. All compiler-owned state is
 // released before returning; on ok the caller owns the returned buffer and
