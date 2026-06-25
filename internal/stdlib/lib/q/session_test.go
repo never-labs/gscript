@@ -103,6 +103,7 @@ func TestQScriptWhereIndexSumPlanRecognizesCompositePredicates(t *testing.T) {
 	tests := []string{
 		"x:((til 128) mod 16)*0.5;idx:where x within 2.5 5.0;(+/x[idx])+count idx",
 		"x:til 128;y:(x mod 16)+5;idx:where (y>8) and (y<16) and (not (y in 10 12));(+/y[idx])+count idx",
+		"x:til 8192;y:(x mod 97)+5;idx:where (y>20) and (y<90) and ((y mod 4)=1) and (not (y in 25 33 41));(+/y[idx])+count idx",
 	}
 	for _, src := range tests {
 		plan := buildQScriptPlan(src)

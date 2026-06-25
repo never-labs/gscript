@@ -5,13 +5,15 @@ import (
 	"strings"
 )
 
-const qScriptWhereIndexClosedFormMaxPeriod = 64
+const qScriptWhereIndexClosedFormMaxPeriod = 512
 
 type qScriptWhereIndexSumPlan struct {
 	source        string
 	sources       []string
 	value         qScriptNumericSumSummary
 	predicatePlan *qScriptWherePredicatePlan
+	residues      []int
+	residuePeriod int
 	predicate     qScriptNumericSumSummary
 	op            string
 	scalar        qScriptNumericSumSummary
@@ -108,13 +110,15 @@ func buildQScriptWhereIndexSumPlan(statements []qScriptStatement) *qScriptWhereI
 		}
 		countNull = &nullSummary
 	}
-	return &qScriptWhereIndexSumPlan{
+	plan := &qScriptWhereIndexSumPlan{
 		source:        terminal,
 		sources:       qScriptNumericSumStatementSources(statements),
 		value:         valueSummary,
 		predicatePlan: predicatePlan,
 		countNull:     countNull,
 	}
+	plan.buildResidues()
+	return plan
 }
 
 func qScriptWhereIndexSumTerminal(src string, bindings map[string]string) (valueName, indexName, countIndexName, countNullName string, ok bool) {
@@ -328,6 +332,9 @@ func qScriptWhereIndexSum(plan *qScriptWhereIndexSumPlan) (float64, int64, bool,
 	if !ok || periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
 		return qScriptWhereIndexConstrainedPeriodicSum(plan)
 	}
+	if len(plan.residues) > 0 && plan.residuePeriod == periodLen {
+		return qScriptWhereIndexResidueSum(plan, 0, length-1, periodLen, plan.residues)
+	}
 	var sum float64
 	var count int64
 	isFloat := plan.value.isFloat
@@ -341,6 +348,59 @@ func qScriptWhereIndexSum(plan *qScriptWhereIndexSumPlan) (float64, int64, bool,
 		}
 		count += int64(rows)
 		if part, partFloat, ok := qScriptWhereIndexValueResidueSum(plan.value, offset, periodLen, rows); ok {
+			sum += part
+			isFloat = isFloat || partFloat
+		}
+	}
+	return sum, count, isFloat, true
+}
+
+func (plan *qScriptWhereIndexSumPlan) buildResidues() {
+	if plan == nil {
+		return
+	}
+	periodLen, ok := qScriptWhereIndexPeriodLen(plan)
+	if !ok || periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
+		return
+	}
+	residues := make([]int, 0, periodLen)
+	for offset := 0; offset < periodLen && offset < plan.value.length; offset++ {
+		if qScriptWhereIndexPredicateAt(plan, offset) {
+			residues = append(residues, offset)
+		}
+	}
+	if len(residues) == 0 {
+		return
+	}
+	plan.residuePeriod = periodLen
+	plan.residues = residues
+}
+
+func qScriptWhereIndexResidueSum(plan *qScriptWhereIndexSumPlan, start, end, periodLen int, residues []int) (float64, int64, bool, bool) {
+	if plan == nil || periodLen <= 0 || start > end {
+		return 0, 0, false, false
+	}
+	var sum float64
+	var count int64
+	isFloat := plan.value.isFloat
+	for _, offset := range residues {
+		if offset > end {
+			continue
+		}
+		first := offset
+		if first < start {
+			delta := start - first
+			first += ((delta + periodLen - 1) / periodLen) * periodLen
+		}
+		if first > end {
+			continue
+		}
+		rows := (end-first)/periodLen + 1
+		if rows <= 0 {
+			continue
+		}
+		count += int64(rows)
+		if part, partFloat, ok := qScriptWhereIndexValueResidueSum(plan.value, first, periodLen, rows); ok {
 			sum += part
 			isFloat = isFloat || partFloat
 		}
@@ -371,6 +431,26 @@ func qScriptWhereIndexConstrainedPeriodicSum(plan *qScriptWhereIndexSumPlan) (fl
 	}
 	if periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
 		return 0, 0, false, false
+	}
+	if len(plan.residues) > 0 && plan.residuePeriod == periodLen {
+		sum, count, isFloat, ok := qScriptWhereIndexResidueSum(plan, constraint.start, constraint.end, periodLen, plan.residues)
+		if !ok {
+			return 0, 0, false, false
+		}
+		if constraint.exclusionCount == 0 {
+			return sum, count, isFloat, true
+		}
+		for i := 0; i < constraint.exclusionCount; i++ {
+			excluded := constraint.exclusions[i]
+			if excluded < constraint.start || excluded > constraint.end || !qScriptWhereIndexPredicateAt(plan, excluded) {
+				continue
+			}
+			count--
+			if !plan.value.IsNullAt(excluded) {
+				sum -= plan.value.FloatAt(excluded)
+			}
+		}
+		return sum, count, isFloat, true
 	}
 	var sum float64
 	var count int64
