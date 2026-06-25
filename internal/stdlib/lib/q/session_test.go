@@ -150,6 +150,10 @@ func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T)
 			src:  "x:til 8192;p:(x mod 64)*0.25;idx:where (p>4.5) and ((x mod 3)=0) and (x<7500);g:x[idx];(+/g)+count idx",
 			want: int64(6588270),
 		},
+		{
+			src:  "x:8192#0N 3 6 9;v:til 8192;idx:where (not null x) and (x>4) and ((x mod 3)=0);(+/v[idx])+count idx",
+			want: int64(16783360),
+		},
 	}
 	for _, tt := range tests {
 		got, err := NewEvalState(nil).Eval(tt.src)
@@ -172,14 +176,14 @@ func TestQScriptCountWherePlanClosesPeriodicPredicates(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
-	src := "x:((til 8192) mod 8)*0.25;c1:count where x=1.25;c2:count where x<>0.5;c1+c2"
+	src := "x:((til 8192) mod 8)*0.25;n:8192#0N 3 6 9;c1:count where x=1.25;c2:count where x<>0.5;c3:count where null n;c1+c2+c3"
 	plan := buildQScriptPlan(src)
 	if plan.countWhere == nil {
 		t.Fatalf("count-where plan missing for %q", src)
 	}
 	got, err := NewEvalState(nil).Eval(src)
-	if err != nil || got != int64(8192) {
-		t.Fatalf("Eval(%q) = %#v,%v; want 8192,nil", src, got, err)
+	if err != nil || got != int64(10240) {
+		t.Fatalf("Eval(%q) = %#v,%v; want 10240,nil", src, got, err)
 	}
 	seen := false
 	for _, stat := range RuntimeKernelExecutionStats() {

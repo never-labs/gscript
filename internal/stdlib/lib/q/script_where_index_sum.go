@@ -33,6 +33,7 @@ const (
 	qScriptWherePredicateCompare
 	qScriptWherePredicateWithin
 	qScriptWherePredicateIn
+	qScriptWherePredicateNull
 )
 
 type qScriptWherePredicatePlan struct {
@@ -275,6 +276,13 @@ func qScriptWhereIndexPredicatePlan(maskExpr string, bindings map[string]qScript
 			return nil, false
 		}
 		return &qScriptWherePredicatePlan{kind: qScriptWherePredicateNot, left: child}, true
+	}
+	if strings.HasPrefix(maskExpr, "null ") && wordBoundary(maskExpr, 0, len("null")) {
+		value, ok := qScriptWhereIndexExprSummary(strings.TrimSpace(maskExpr[len("null "):]), bindings)
+		if !ok {
+			return nil, false
+		}
+		return &qScriptWherePredicatePlan{kind: qScriptWherePredicateNull, value: value}, true
 	}
 	if left, right, ok := splitTopLevelWord(maskExpr, "in"); ok {
 		value, valueOK := qScriptWhereIndexExprSummary(left, bindings)
@@ -678,7 +686,7 @@ func qScriptWherePredicateLength(plan *qScriptWherePredicatePlan) int {
 		}
 	case qScriptWherePredicateNot:
 		return qScriptWherePredicateLength(plan.left)
-	case qScriptWherePredicateCompare, qScriptWherePredicateWithin:
+	case qScriptWherePredicateCompare, qScriptWherePredicateWithin, qScriptWherePredicateNull:
 		return plan.value.length
 	case qScriptWherePredicateIn:
 		if plan.symValue.length > 0 {
@@ -706,6 +714,11 @@ func qScriptWherePredicatePeriodLen(plan *qScriptWherePredicatePlan) int {
 		return qScriptWherePredicatePeriodLen(plan.left)
 	case qScriptWherePredicateCompare, qScriptWherePredicateWithin:
 		return qScriptWhereIndexSummaryPeriodLen(plan.value)
+	case qScriptWherePredicateNull:
+		if periodLen := qScriptWhereIndexSummaryPeriodLen(plan.value); periodLen > 0 {
+			return periodLen
+		}
+		return 1
 	case qScriptWherePredicateIn:
 		if len(plan.symValue.period) > 0 {
 			return len(plan.symValue.period)
@@ -742,6 +755,8 @@ func qScriptWherePredicateConstrainRows(plan *qScriptWherePredicatePlan, constra
 			return qScriptWhereConstraintApplyCompare(constraint, plan.value, "<=", plan.hi)
 		}
 		return qScriptWhereIndexSummaryPeriodLen(plan.value) > 0
+	case qScriptWherePredicateNull:
+		return true
 	case qScriptWherePredicateIn:
 		if len(plan.symValue.period) > 0 {
 			return true
@@ -777,6 +792,11 @@ func qScriptWherePredicateResidualPeriodLen(plan *qScriptWherePredicatePlan) int
 			return 0
 		}
 		return qScriptWhereIndexSummaryPeriodLen(plan.value)
+	case qScriptWherePredicateNull:
+		if periodLen := qScriptWhereIndexSummaryPeriodLen(plan.value); periodLen > 0 {
+			return periodLen
+		}
+		return 1
 	case qScriptWherePredicateIn:
 		if len(plan.symValue.period) > 0 {
 			return len(plan.symValue.period)
@@ -806,6 +826,8 @@ func qScriptWherePredicateResidualAt(plan *qScriptWherePredicatePlan, row int) b
 		if qScriptWhereSummaryIsLinear(plan.value) {
 			return true
 		}
+		return qScriptWherePredicateAt(plan, row)
+	case qScriptWherePredicateNull:
 		return qScriptWherePredicateAt(plan, row)
 	case qScriptWherePredicateIn:
 		if len(plan.symValue.period) > 0 {
@@ -977,6 +999,8 @@ func qScriptWherePredicateAt(plan *qScriptWherePredicatePlan, row int) bool {
 		}
 		value := plan.value.FloatAt(row)
 		return value >= plan.lo.FloatAt(0) && value <= plan.hi.FloatAt(0)
+	case qScriptWherePredicateNull:
+		return plan.value.IsNullAt(row)
 	case qScriptWherePredicateIn:
 		if len(plan.symValue.period) > 0 {
 			probe := plan.symValue.At(row)
