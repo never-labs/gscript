@@ -104,6 +104,7 @@ func TestQScriptWhereIndexSumPlanRecognizesCompositePredicates(t *testing.T) {
 		"x:((til 128) mod 16)*0.5;idx:where x within 2.5 5.0;(+/x[idx])+count idx",
 		"x:til 128;y:(x mod 16)+5;idx:where (y>8) and (y<16) and (not (y in 10 12));(+/y[idx])+count idx",
 		"x:til 8192;y:(x mod 97)+5;idx:where (y>20) and (y<90) and ((y mod 4)=1) and (not (y in 25 33 41));(+/y[idx])+count idx",
+		"x:til 8192;sym:8192#`AAPL`MSFT`NVDA`TSLA;v:x*3;idx:where (sym in `AAPL`NVDA) and (x>128) and ((x mod 3)=0);(+/v[idx])+count idx",
 	}
 	for _, src := range tests {
 		plan := buildQScriptPlan(src)
@@ -139,6 +140,10 @@ func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T)
 		{
 			src:  "x:til 8192;v:(x*2)+1;idx:where x>64;(+/v[idx])+count idx",
 			want: int64(67112766),
+		},
+		{
+			src:  "x:til 8192;sym:8192#`AAPL`MSFT`NVDA`TSLA;v:x*3;idx:where (sym in `AAPL`NVDA) and (x>128) and ((x mod 3)=0);(+/v[idx])+count idx",
+			want: int64(16778496),
 		},
 	}
 	for _, tt := range tests {

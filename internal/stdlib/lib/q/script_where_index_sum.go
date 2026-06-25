@@ -3,6 +3,8 @@ package q
 import (
 	"math"
 	"strings"
+
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
 const qScriptWhereIndexClosedFormMaxPeriod = 512
@@ -34,15 +36,22 @@ const (
 )
 
 type qScriptWherePredicatePlan struct {
-	kind   qScriptWherePredicateKind
-	left   *qScriptWherePredicatePlan
-	right  *qScriptWherePredicatePlan
-	value  qScriptNumericSumSummary
-	op     string
-	scalar qScriptNumericSumSummary
-	lo     qScriptNumericSumSummary
-	hi     qScriptNumericSumSummary
-	values []qScriptNumericSumSummary
+	kind      qScriptWherePredicateKind
+	left      *qScriptWherePredicatePlan
+	right     *qScriptWherePredicatePlan
+	value     qScriptNumericSumSummary
+	symValue  qScriptSymbolSummary
+	op        string
+	scalar    qScriptNumericSumSummary
+	lo        qScriptNumericSumSummary
+	hi        qScriptNumericSumSummary
+	values    []qScriptNumericSumSummary
+	symValues []data.Symbol
+}
+
+type qScriptSymbolSummary struct {
+	length int
+	period []data.Symbol
 }
 
 type qScriptWhereRowConstraint struct {
@@ -58,6 +67,7 @@ func buildQScriptWhereIndexSumPlan(statements []qScriptStatement) *qScriptWhereI
 		return nil
 	}
 	bindings := make(map[string]qScriptNumericExprPlan, len(statements))
+	symbolBindings := make(map[string]qScriptSymbolSummary, len(statements))
 	stringBindings := make(map[string]string, len(statements))
 	for i := 0; i < len(statements)-1; i++ {
 		stmt := statements[i]
@@ -71,6 +81,10 @@ func buildQScriptWhereIndexSumPlan(statements []qScriptStatement) *qScriptWhereI
 		}
 		if plan, ok := buildQScriptNumericExprPlan(expr, bindings); ok {
 			bindings[stmt.assign] = plan
+			continue
+		}
+		if summary, ok := qScriptSymbolExprSummary(stmt.rhs, symbolBindings); ok {
+			symbolBindings[stmt.assign] = summary
 		}
 	}
 	terminal := strings.TrimSpace(statements[len(statements)-1].src)
@@ -94,7 +108,7 @@ func buildQScriptWhereIndexSumPlan(statements []qScriptStatement) *qScriptWhereI
 	if !ok || err != nil || valueSummary.length <= 0 {
 		return nil
 	}
-	predicatePlan, ok := qScriptWhereIndexPredicatePlan(maskExpr, bindings)
+	predicatePlan, ok := qScriptWhereIndexPredicatePlan(maskExpr, bindings, symbolBindings)
 	if !ok || qScriptWherePredicateLength(predicatePlan) != valueSummary.length {
 		return nil
 	}
@@ -142,6 +156,9 @@ func qScriptWhereIndexSumTerminal(src string, bindings map[string]string) (value
 			continue
 		}
 		v, idx, sumOK := qScriptPipelineGatherSumTermResolved(term, bindings, nil)
+		if !sumOK {
+			v, idx, sumOK = qScriptWhereIndexAliasGatherSumTerm(term, bindings)
+		}
 		if !sumOK || valueName != "" {
 			return "", "", "", "", false
 		}
@@ -151,6 +168,34 @@ func qScriptWhereIndexSumTerminal(src string, bindings map[string]string) (value
 		valueName, indexName = v, idx
 	}
 	return valueName, indexName, countIndexName, countNullName, valueName != "" && indexName != "" && (countIndexName != "" || countNullName != "")
+}
+
+func qScriptWhereIndexAliasGatherSumTerm(src string, bindings map[string]string) (string, string, bool) {
+	if !qScriptWhereIndexBindingsMentionXbar(bindings) {
+		return "", "", false
+	}
+	name := qScriptPipelineAliasBodyName(src)
+	if name == "" {
+		return "", "", false
+	}
+	bound, ok := qScriptPipelineResolveSimpleBinding(name, bindings, nil)
+	if !ok {
+		return "", "", false
+	}
+	valueExpr, indexExpr, ok := findPostfixIndex(bound)
+	if !ok {
+		return "", "", false
+	}
+	return strings.TrimSpace(valueExpr), strings.TrimSpace(indexExpr), valueExpr != "" && indexExpr != ""
+}
+
+func qScriptWhereIndexBindingsMentionXbar(bindings map[string]string) bool {
+	for _, rhs := range bindings {
+		if _, _, ok := splitTopLevelWord(rhs, "xbar"); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func qScriptWhereIndexPredicateSummary(maskExpr string, bindings map[string]qScriptNumericExprPlan) (predicate qScriptNumericSumSummary, op string, scalar, lo, hi qScriptNumericSumSummary, ok bool) {
@@ -223,21 +268,21 @@ func qScriptWhereIndexWithinSummary(maskExpr string, bindings map[string]qScript
 	return predicate, lo, hi, true
 }
 
-func qScriptWhereIndexPredicatePlan(maskExpr string, bindings map[string]qScriptNumericExprPlan) (*qScriptWherePredicatePlan, bool) {
+func qScriptWhereIndexPredicatePlan(maskExpr string, bindings map[string]qScriptNumericExprPlan, symbolBindings map[string]qScriptSymbolSummary) (*qScriptWherePredicatePlan, bool) {
 	maskExpr = stripEnclosingParens(strings.TrimSpace(maskExpr))
 	if maskExpr == "" {
 		return nil, false
 	}
 	if left, right, ok := splitTopLevelWord(maskExpr, "and"); ok {
-		leftPlan, leftOK := qScriptWhereIndexPredicatePlan(left, bindings)
-		rightPlan, rightOK := qScriptWhereIndexPredicatePlan(right, bindings)
+		leftPlan, leftOK := qScriptWhereIndexPredicatePlan(left, bindings, symbolBindings)
+		rightPlan, rightOK := qScriptWhereIndexPredicatePlan(right, bindings, symbolBindings)
 		if !leftOK || !rightOK {
 			return nil, false
 		}
 		return &qScriptWherePredicatePlan{kind: qScriptWherePredicateAnd, left: leftPlan, right: rightPlan}, true
 	}
 	if strings.HasPrefix(maskExpr, "not ") && wordBoundary(maskExpr, 0, len("not")) {
-		child, ok := qScriptWhereIndexPredicatePlan(strings.TrimSpace(maskExpr[len("not "):]), bindings)
+		child, ok := qScriptWhereIndexPredicatePlan(strings.TrimSpace(maskExpr[len("not "):]), bindings, symbolBindings)
 		if !ok {
 			return nil, false
 		}
@@ -245,22 +290,27 @@ func qScriptWhereIndexPredicatePlan(maskExpr string, bindings map[string]qScript
 	}
 	if left, right, ok := splitTopLevelWord(maskExpr, "in"); ok {
 		value, valueOK := qScriptWhereIndexExprSummary(left, bindings)
-		if !valueOK {
-			return nil, false
-		}
-		parts := strings.Fields(stripEnclosingParens(strings.TrimSpace(right)))
-		if len(parts) == 0 {
-			return nil, false
-		}
-		values := make([]qScriptNumericSumSummary, 0, len(parts))
-		for _, part := range parts {
-			summary, ok := qScriptWhereIndexExprSummary(part, bindings)
-			if !ok || !summary.scalar {
+		if valueOK {
+			parts := strings.Fields(stripEnclosingParens(strings.TrimSpace(right)))
+			if len(parts) == 0 {
 				return nil, false
 			}
-			values = append(values, summary)
+			values := make([]qScriptNumericSumSummary, 0, len(parts))
+			for _, part := range parts {
+				summary, ok := qScriptWhereIndexExprSummary(part, bindings)
+				if !ok || !summary.scalar {
+					return nil, false
+				}
+				values = append(values, summary)
+			}
+			return &qScriptWherePredicatePlan{kind: qScriptWherePredicateIn, value: value, values: values}, true
 		}
-		return &qScriptWherePredicatePlan{kind: qScriptWherePredicateIn, value: value, values: values}, true
+		symValue, symOK := qScriptSymbolExprSummary(left, symbolBindings)
+		symValues, valuesOK := qScriptSymbolSetSummary(right)
+		if !symOK || !valuesOK {
+			return nil, false
+		}
+		return &qScriptWherePredicatePlan{kind: qScriptWherePredicateIn, symValue: symValue, symValues: symValues}, true
 	}
 	if predicate, op, scalar, lo, hi, ok := qScriptWhereIndexPredicateSummary(maskExpr, bindings); ok {
 		switch op {
@@ -284,6 +334,48 @@ func qScriptWhereIndexExprSummary(src string, bindings map[string]qScriptNumeric
 	}
 	summary, ok, err := qScriptNumericSummarize(plan)
 	return summary, ok && err == nil
+}
+
+func qScriptSymbolExprSummary(src string, bindings map[string]qScriptSymbolSummary) (qScriptSymbolSummary, bool) {
+	src = strings.TrimSpace(src)
+	if summary, ok := bindings[src]; ok && qScriptPipelineSimpleName(src) {
+		return summary, true
+	}
+	if left, right, ok := splitTopLevelOperator(src, "#"); ok {
+		countExpr := compileQEvalExpr(strings.TrimSpace(left), 0)
+		if countExpr == nil {
+			return qScriptSymbolSummary{}, false
+		}
+		count, ok := qScriptNumericLiteralI64(countExpr)
+		if !ok || count < 0 || count > int64(math.MaxInt) {
+			return qScriptSymbolSummary{}, false
+		}
+		symbols, ok := qScriptSymbolSetSummary(right)
+		if !ok || len(symbols) == 0 {
+			return qScriptSymbolSummary{}, false
+		}
+		return qScriptSymbolSummary{length: int(count), period: symbols}, true
+	}
+	symbols, ok := qScriptSymbolSetSummary(src)
+	if !ok || len(symbols) == 0 {
+		return qScriptSymbolSummary{}, false
+	}
+	return qScriptSymbolSummary{length: len(symbols), period: symbols}, true
+}
+
+func qScriptSymbolSetSummary(src string) ([]data.Symbol, bool) {
+	symbols, err := parseSymbolList(stripEnclosingParens(strings.TrimSpace(src)))
+	if err != nil || len(symbols) == 0 || len(symbols) > qScriptWhereIndexClosedFormMaxPeriod {
+		return nil, false
+	}
+	return symbols, true
+}
+
+func (s qScriptSymbolSummary) At(row int) data.Symbol {
+	if len(s.period) == 0 {
+		return ""
+	}
+	return s.period[row%len(s.period)]
 }
 
 func qScriptWhereIndexFlipCompare(op string) (string, bool) {
@@ -579,7 +671,12 @@ func qScriptWherePredicateLength(plan *qScriptWherePredicatePlan) int {
 		}
 	case qScriptWherePredicateNot:
 		return qScriptWherePredicateLength(plan.left)
-	case qScriptWherePredicateCompare, qScriptWherePredicateWithin, qScriptWherePredicateIn:
+	case qScriptWherePredicateCompare, qScriptWherePredicateWithin:
+		return plan.value.length
+	case qScriptWherePredicateIn:
+		if plan.symValue.length > 0 {
+			return plan.symValue.length
+		}
 		return plan.value.length
 	default:
 		return 0
@@ -600,7 +697,12 @@ func qScriptWherePredicatePeriodLen(plan *qScriptWherePredicatePlan) int {
 		return qScriptNumericLCM(left, right)
 	case qScriptWherePredicateNot:
 		return qScriptWherePredicatePeriodLen(plan.left)
-	case qScriptWherePredicateCompare, qScriptWherePredicateWithin, qScriptWherePredicateIn:
+	case qScriptWherePredicateCompare, qScriptWherePredicateWithin:
+		return qScriptWhereIndexSummaryPeriodLen(plan.value)
+	case qScriptWherePredicateIn:
+		if len(plan.symValue.period) > 0 {
+			return len(plan.symValue.period)
+		}
 		return qScriptWhereIndexSummaryPeriodLen(plan.value)
 	default:
 		return 0
@@ -634,6 +736,9 @@ func qScriptWherePredicateConstrainRows(plan *qScriptWherePredicatePlan, constra
 		}
 		return qScriptWhereIndexSummaryPeriodLen(plan.value) > 0
 	case qScriptWherePredicateIn:
+		if len(plan.symValue.period) > 0 {
+			return true
+		}
 		if qScriptWhereSummaryIsLinear(plan.value) {
 			return false
 		}
@@ -660,7 +765,15 @@ func qScriptWherePredicateResidualPeriodLen(plan *qScriptWherePredicatePlan) int
 		return qScriptNumericLCM(left, right)
 	case qScriptWherePredicateNot:
 		return qScriptWherePredicateResidualPeriodLen(plan.left)
-	case qScriptWherePredicateCompare, qScriptWherePredicateWithin, qScriptWherePredicateIn:
+	case qScriptWherePredicateCompare, qScriptWherePredicateWithin:
+		if qScriptWhereSummaryIsLinear(plan.value) {
+			return 0
+		}
+		return qScriptWhereIndexSummaryPeriodLen(plan.value)
+	case qScriptWherePredicateIn:
+		if len(plan.symValue.period) > 0 {
+			return len(plan.symValue.period)
+		}
 		if qScriptWhereSummaryIsLinear(plan.value) {
 			return 0
 		}
@@ -682,7 +795,15 @@ func qScriptWherePredicateResidualAt(plan *qScriptWherePredicatePlan, row int) b
 			return true
 		}
 		return !qScriptWherePredicateResidualAt(plan.left, row)
-	case qScriptWherePredicateCompare, qScriptWherePredicateWithin, qScriptWherePredicateIn:
+	case qScriptWherePredicateCompare, qScriptWherePredicateWithin:
+		if qScriptWhereSummaryIsLinear(plan.value) {
+			return true
+		}
+		return qScriptWherePredicateAt(plan, row)
+	case qScriptWherePredicateIn:
+		if len(plan.symValue.period) > 0 {
+			return qScriptWherePredicateAt(plan, row)
+		}
 		if qScriptWhereSummaryIsLinear(plan.value) {
 			return true
 		}
@@ -850,6 +971,15 @@ func qScriptWherePredicateAt(plan *qScriptWherePredicatePlan, row int) bool {
 		value := plan.value.FloatAt(row)
 		return value >= plan.lo.FloatAt(0) && value <= plan.hi.FloatAt(0)
 	case qScriptWherePredicateIn:
+		if len(plan.symValue.period) > 0 {
+			probe := plan.symValue.At(row)
+			for _, value := range plan.symValues {
+				if probe == value {
+					return true
+				}
+			}
+			return false
+		}
 		if plan.value.IsNullAt(row) {
 			for _, value := range plan.values {
 				if value.IsNullAt(0) {

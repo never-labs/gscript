@@ -4975,6 +4975,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	assertEvalValue(t, "count (sum 1 2 3 4 fby `a`a`b`b)", int64(4))
 	assertEvalValue(t, `count where "AAPL" "MSFT" "AMD" "ASK" like "A*"`, int64(3))
 	assertEvalValue(t, "count where 8#`AAPL`MSFT`NVDA`TSLA in `AAPL`MSFT", int64(4))
+	assertEvalArray(t, "4#`AAPL`MSFT`NVDA`TSLA in `AAPL`TSLA", data.KindBool, []any{true, false, false, true})
 	assertEvalArray(t, "where 8#`AAPL`MSFT`NVDA`TSLA in `AAPL`MSFT", data.KindI64, []any{int64(0), int64(1), int64(4), int64(5)})
 	assertEvalValue(t, `count reverse "AAPL" "MSFT" "AMD"`, int64(3))
 	assertEvalArray(t, "x:til 8;x[where x>=4]", data.KindI64, []any{int64(4), int64(5), int64(6), int64(7)})
