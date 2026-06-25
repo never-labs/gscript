@@ -417,11 +417,11 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlan(plan EvalPipelineExecutabl
 // without copying the plan payload. Hot session/JIT call paths should prefer
 // this form when they already own a stable executable plan.
 func (s *EvalState) ExecuteEvalPipelineExecutablePlanRef(plan *EvalPipelineExecutablePlan) (any, bool, error) {
-	if s == nil || plan == nil || !plan.Valid() {
+	if s == nil || plan == nil {
 		return nil, false, nil
 	}
-	runner, ok := plan.executableRunner()
-	if !ok {
+	runner := plan.runner
+	if runner == nil || runner.kind() == "" || !runner.valid() {
 		return nil, false, nil
 	}
 	return runner.run(s)
@@ -436,10 +436,9 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlanRefHot(plan *EvalPipelineEx
 	}
 	previous := s.skipPipelineRemember
 	s.skipPipelineRemember = true
-	defer func() {
-		s.skipPipelineRemember = previous
-	}()
-	return s.ExecuteEvalPipelineExecutablePlanRef(plan)
+	out, handled, err := s.ExecuteEvalPipelineExecutablePlanRef(plan)
+	s.skipPipelineRemember = previous
+	return out, handled, err
 }
 
 func (s *EvalState) compileEvalPipelineSource(source string) (EvalPipelineBackendPlan, EvalPipelineExecutablePlan, bool) {

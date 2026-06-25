@@ -183,11 +183,17 @@ func qEvalPipelinePlanRefByID(refs []QEvalPipelinePlanRef, id int) (QEvalPipelin
 }
 
 func qEvalPipelineExecutablePlanRefByID(refs []QEvalPipelinePlanRef, id int) (QEvalPipelinePlanRef, bool) {
-	ref, ok := qEvalPipelinePlanRefByID(refs, id)
-	if !ok {
+	if id < 0 || id >= len(refs) {
 		return QEvalPipelinePlanRef{}, false
 	}
-	if _, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); !ok {
+	ref := refs[id]
+	if ref.ID < 0 || qEvalPipelineBackendNameFromRef(ref) != qEvalPipelineTypedRuntimeBackend {
+		return QEvalPipelinePlanRef{}, false
+	}
+	if ref.BackendPlan == nil || !ref.BackendPlan.Valid() || ref.BackendPlan.Backend != qEvalPipelineTypedRuntimeBackend {
+		return QEvalPipelinePlanRef{}, false
+	}
+	if qEvalPipelinePlanRefKernel(ref) == "" || qEvalPipelinePlanRefShape(ref) == "" {
 		return QEvalPipelinePlanRef{}, false
 	}
 	return ref, true
@@ -216,13 +222,16 @@ func (cf *CompiledFunction) executeQEvalPipelinePlanBackendValue(id int) (runtim
 	if helper := cf.qEvalPipelinePlanHelper(id); helper != nil {
 		return helper.execute()
 	}
-	ref, ok := qEvalPipelineExecutablePlanRefByID(cf.QEvalPipelinePlans, id)
+	ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, id)
 	if !ok {
 		return runtime.NilValue(), false, nil
 	}
 	backend := cf.QEvalPipelineBackend
 	if !backend.hasPlans() {
 		backend = newQRuntimeEvalPipelineBackend(cf.QEvalPipelinePlans)
+	}
+	if ref.BackendPlan != nil && ref.BackendPlan.Valid() && ref.BackendPlan.Backend == qEvalPipelineTypedRuntimeBackend {
+		return backend.ExecuteQEvalPipelinePlanValue(ref)
 	}
 	return executeQEvalPipelinePlanValue(backend, ref)
 }
