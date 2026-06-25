@@ -955,6 +955,11 @@ func (s *EvalState) evalScriptPlan(plan qScriptPlan) (any, error) {
 }
 
 func (s *EvalState) evalScriptPlanBody(plan qScriptPlan) (any, error) {
+	if plan.numericSum != nil {
+		if out, handled, err := s.evalQScriptNumericSumPlan(plan.numericSum); err != nil || handled {
+			return out, err
+		}
+	}
 	if plan.executable != nil {
 		if out, handled, err := s.evalQScriptExecutablePlan(plan.executable); err != nil || handled {
 			return out, err
@@ -1006,6 +1011,7 @@ type qScriptPlan struct {
 	deferScanCandidates bool
 	scriptPipeline      *qScriptPipelineDescriptor
 	executable          *qScriptExecutablePlan
+	numericSum          *qScriptNumericSumPlan
 	fastPipelineSources []string
 }
 
@@ -1289,6 +1295,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 		statements:          statements,
 		deferScanCandidates: deferScanCandidates,
 		scriptPipeline:      pipeline,
+		numericSum:          buildQScriptNumericSumPlan(statements),
 		fastPipelineSources: qScriptPlanFastPipelineSources(statements),
 	}
 	plan.executable = buildQScriptExecutablePlan(plan)
@@ -1356,6 +1363,7 @@ func cloneQScriptPlan(plan qScriptPlan) qScriptPlan {
 		deferScanCandidates: plan.deferScanCandidates,
 		scriptPipeline:      cloneQScriptPipelineDescriptor(plan.scriptPipeline),
 		executable:          cloneQScriptExecutablePlan(plan.executable),
+		numericSum:          plan.numericSum,
 		fastPipelineSources: append([]string(nil), plan.fastPipelineSources...),
 	}
 	if len(plan.statements) > 0 {

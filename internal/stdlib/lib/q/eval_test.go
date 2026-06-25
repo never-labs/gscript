@@ -5203,6 +5203,41 @@ func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestEvalScriptNumericCastSumUsesFusedPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 16;s:`short$x mod 11;w:`int$x mod 13;y:s+w;+/y", int64(146))
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "hit" {
+			seen = true
+		}
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Outcome == "fallback" {
+			t.Fatalf("numeric cast sum plan fell back: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+	}
+	if !seen {
+		t.Fatalf("missing script numeric sum plan hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalScriptNumericCastSumPreservesRangeErrors(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalErrorContains(t, "x:til 40000;s:`short$x;+/s", "must be i16")
+	seenError := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "error" {
+			seenError = true
+		}
+	}
+	if !seenError {
+		t.Fatalf("missing script numeric sum plan error stat: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalFloatModuloRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
