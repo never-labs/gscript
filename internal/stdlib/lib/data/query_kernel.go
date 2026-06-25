@@ -22,7 +22,16 @@ type QueryKernel struct {
 	reason        string
 	shape         string
 	pipelineShape string
+	route         queryKernelExecRoute
 }
+
+type queryKernelExecRoute uint8
+
+const (
+	queryKernelExecRouteGeneric queryKernelExecRoute = iota
+	queryKernelExecRouteTypedFilterProject
+	queryKernelExecRouteTypedGroupedProjectionProject
+)
 
 // QueryKernelPipelineDescriptor is the schema-stable lowering contract between
 // qSQL planning and typed runtime/JIT backends. Family fields intentionally use
@@ -617,7 +626,52 @@ func CompileQueryKernel(frame Frame, plan QueryPlan) (*QueryKernel, bool, error)
 		reason:        reason,
 		shape:         described.Shape,
 		pipelineShape: described.PipelineShape,
+		route:         classifyQueryKernelExecRoute(compiled),
 	}, true, nil
+}
+
+func classifyQueryKernelExecRoute(plan QueryPlan) queryKernelExecRoute {
+	if queryKernelCanUseTypedFilterProjectRoute(plan) {
+		return queryKernelExecRouteTypedFilterProject
+	}
+	if queryKernelCanUseTypedGroupedProjectionRoute(plan) {
+		return queryKernelExecRouteTypedGroupedProjectionProject
+	}
+	return queryKernelExecRouteGeneric
+}
+
+func queryKernelCanUseTypedFilterProjectRoute(plan QueryPlan) bool {
+	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
+		len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
+		return false
+	}
+	return queryKernelCanUseTypedProjectCarrierRoute(plan)
+}
+
+func queryKernelCanUseTypedGroupedProjectionRoute(plan QueryPlan) bool {
+	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
+		len(plan.Aggregates) > 0 || len(plan.Select) == 0 {
+		return false
+	}
+	if len(plan.By) == 0 && len(plan.ByExprs) == 0 {
+		return false
+	}
+	for _, item := range plan.ByExprs {
+		if queryKernelExprUnsupportedReason(item.Expr) != "" {
+			return false
+		}
+	}
+	return queryKernelCanUseTypedProjectCarrierRoute(plan)
+}
+
+func queryKernelCanUseTypedProjectCarrierRoute(plan QueryPlan) bool {
+	if !typedFilterProjectPlanSupported(plan) {
+		return false
+	}
+	if plan.Where != nil && queryKernelWherePipelineShape(plan.Where) == "" {
+		return false
+	}
+	return queryKernelProjectionUsesTypedCarrier(plan)
 }
 
 func cloneQueryKernelPlan(plan QueryPlan) QueryPlan {
@@ -1990,6 +2044,9 @@ func (k *QueryKernel) exec(frame Frame, transferOwned bool) (Frame, error) {
 	}
 	plan := k.plan
 	plan.Source = frame
+	if out, ok, err := k.execCompiledRoute(frame, plan); ok || err != nil {
+		return out, err
+	}
 	if out, ok, err := execTypedFilterProject(frame, plan); ok || err != nil {
 		return out, err
 	}
@@ -2082,6 +2139,27 @@ func (k *QueryKernel) exec(frame Frame, transferOwned bool) (Frame, error) {
 		return out.Gather(allIndexes(plan.LimitN))
 	}
 	return out, nil
+}
+
+func (k *QueryKernel) execCompiledRoute(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	switch k.route {
+	case queryKernelExecRouteTypedFilterProject, queryKernelExecRouteTypedGroupedProjectionProject:
+		return execCompiledTypedProjectCarrier(frame, plan)
+	default:
+		return Frame{}, false, nil
+	}
+}
+
+func execCompiledTypedProjectCarrier(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	indexes, handled, err := typedFilterIndexArray(frame, plan.Where)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	if !handled {
+		return Frame{}, false, nil
+	}
+	out, err := execProjectByI64IndexArray(frame, indexes, plan.Select)
+	return out, true, err
 }
 
 // ExecQueryKernelOrPlan executes a compiled query kernel when present and
