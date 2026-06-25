@@ -733,7 +733,68 @@ func Eval(src string) (any, error) {
 }
 
 func EvalWithEnv(src string, env map[string]any) (any, error) {
-	return (&EvalState{env: env, envBorrowed: true, namespace: ".", oneShot: true}).Eval(src)
+	state := EvalState{env: env, envBorrowed: true, namespace: ".", oneShot: true}
+	return state.Eval(src)
+}
+
+// PreparedEval pins the source-derived q.eval plan chain for repeated
+// execution with caller-supplied environments. It caches parse, script, and
+// typed-runtime executable plans, but never memoizes results.
+//
+// PreparedEval is safe for concurrent callers; execution is serialized because
+// the underlying plan chain contains lazy runtime metadata caches.
+type PreparedEval struct {
+	source string
+	entry  *evalSessionPlan
+	mu     sync.Mutex
+}
+
+// PrepareEval compiles a cacheable q source into a reusable execution handle.
+// Stateful, random, filesystem, IPC, and empty sources are rejected for the
+// same reason EvalSourceCacheable rejects them: callers must not accidentally
+// stabilize observably dynamic q code.
+func PrepareEval(src string) (*PreparedEval, error) {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return nil, fmt.Errorf("q: cannot prepare empty source")
+	}
+	if !EvalSourceCacheable(src) {
+		return nil, fmt.Errorf("q: source is not safe for prepared eval")
+	}
+	session := &EvalSession{state: &EvalState{namespace: ".", oneShot: true}}
+	entry := session.plan(src)
+	if entry == nil {
+		return nil, fmt.Errorf("q: prepared eval plan is empty")
+	}
+	return &PreparedEval{source: src, entry: entry}, nil
+}
+
+// Source returns the normalized source pinned by the prepared handle.
+func (p *PreparedEval) Source() string {
+	if p == nil {
+		return ""
+	}
+	return p.source
+}
+
+// EvalWithEnv evaluates the prepared q source against env. Assignments and
+// temporary q bindings remain local to the evaluation and do not mutate env.
+func (p *PreparedEval) EvalWithEnv(env map[string]any) (any, error) {
+	if p == nil || p.entry == nil {
+		return nil, fmt.Errorf("q: prepared eval handle is empty")
+	}
+	state := EvalState{env: env, envBorrowed: true, namespace: ".", oneShot: true}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.entry.executable.Valid() {
+		if out, handled, err := state.ExecuteEvalPipelineExecutablePlanRef(&p.entry.executable); err != nil || handled {
+			if handled && err == nil {
+				recordQEvalDispatch(p.entry.source, EvalDispatchPipelineBackend)
+			}
+			return out, err
+		}
+	}
+	return state.evalScriptPlan(p.entry.script)
 }
 
 // EvalSourceCacheable reports whether src is safe for callers to memoize across

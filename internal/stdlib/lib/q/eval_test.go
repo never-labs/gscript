@@ -2962,6 +2962,78 @@ func TestEvalGlobalScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	}
 }
 
+func TestPreparedEvalPreservesEnvironmentSemantics(t *testing.T) {
+	ClearEvalPlanCaches()
+	t.Cleanup(ClearEvalPlanCaches)
+
+	prepared, err := PrepareEval("x:a+1;y:x*2;y")
+	if err != nil {
+		t.Fatalf("PrepareEval returned error: %v", err)
+	}
+	if prepared.Source() != "x:a+1;y:x*2;y" {
+		t.Fatalf("prepared source = %q", prepared.Source())
+	}
+	if got, err := prepared.EvalWithEnv(map[string]any{"a": int64(10)}); err != nil || got != int64(22) {
+		t.Fatalf("first prepared EvalWithEnv returned %#v, %v; want 22,nil", got, err)
+	}
+	if got, err := prepared.EvalWithEnv(map[string]any{"a": int64(20)}); err != nil || got != int64(42) {
+		t.Fatalf("warm prepared EvalWithEnv returned %#v, %v; want 42,nil", got, err)
+	}
+}
+
+func TestPreparedEvalPipelineExecutablePreservesEnvironmentSemantics(t *testing.T) {
+	ClearEvalPlanCaches()
+	t.Cleanup(ClearEvalPlanCaches)
+
+	src := "i:where v>threshold;+/v[i]"
+	prepared, err := PrepareEval(src)
+	if err != nil {
+		t.Fatalf("PrepareEval returned error: %v", err)
+	}
+	if prepared.entry == nil || !prepared.entry.executable.Valid() {
+		t.Fatalf("prepared entry executable = %#v, want valid executable", prepared.entry)
+	}
+	env1 := map[string]any{"v": data.NewI64([]int64{1, 2, 3, 4}), "threshold": int64(2)}
+	if got, err := prepared.EvalWithEnv(env1); err != nil || got != int64(7) {
+		t.Fatalf("first prepared pipeline returned %#v, %v; want 7,nil", got, err)
+	}
+	env2 := map[string]any{"v": data.NewI64([]int64{10, 20, 30}), "threshold": int64(15)}
+	if got, err := prepared.EvalWithEnv(env2); err != nil || got != int64(50) {
+		t.Fatalf("warm prepared pipeline returned %#v, %v; want 50,nil", got, err)
+	}
+}
+
+func TestPreparedEvalRejectsUncacheableSource(t *testing.T) {
+	for _, src := range []string{"", "rand 3", "\\p", "system \"p\"", "get `:/tmp/q/table"} {
+		if prepared, err := PrepareEval(src); err == nil || prepared != nil {
+			t.Fatalf("PrepareEval(%q) = %#v,%v; want nil,error", src, prepared, err)
+		}
+	}
+	if got := (*PreparedEval)(nil).Source(); got != "" {
+		t.Fatalf("nil PreparedEval Source = %q, want empty", got)
+	}
+	if _, err := (*PreparedEval)(nil).EvalWithEnv(nil); err == nil {
+		t.Fatal("nil PreparedEval EvalWithEnv succeeded, want error")
+	}
+}
+
+func TestPreparedEvalDoesNotMutateHostEnv(t *testing.T) {
+	prepared, err := PrepareEval("x:2;y:3;x+y")
+	if err != nil {
+		t.Fatalf("PrepareEval returned error: %v", err)
+	}
+	env := map[string]any{"x": int64(1)}
+	if got, err := prepared.EvalWithEnv(env); err != nil || got != int64(5) {
+		t.Fatalf("prepared EvalWithEnv returned %#v, %v; want 5,nil", got, err)
+	}
+	if got := env["x"]; got != int64(1) {
+		t.Fatalf("prepared EvalWithEnv mutated host env x = %#v, want 1", got)
+	}
+	if _, ok := env["y"]; ok {
+		t.Fatal("prepared EvalWithEnv leaked y into host env")
+	}
+}
+
 func TestEvalGlobalPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearEvalPlanCaches()
 	t.Cleanup(ClearEvalPlanCaches)

@@ -50,6 +50,33 @@ func BenchmarkEvalWithEnvScriptPlanCacheWarm(b *testing.B) {
 	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
 }
 
+func BenchmarkPreparedEvalScriptPlanWarm(b *testing.B) {
+	ClearEvalPlanCaches()
+	defer ClearEvalPlanCaches()
+
+	const src = "x:a+1;y:x*2;z:y+3;z"
+	env := map[string]any{"a": int64(10)}
+	prepared, err := PrepareEval(src)
+	if err != nil {
+		b.Fatalf("PrepareEval script: %v", err)
+	}
+	if _, err := prepared.EvalWithEnv(env); err != nil {
+		b.Fatalf("warm PreparedEval script setup: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := prepared.EvalWithEnv(env)
+		if err != nil {
+			b.Fatalf("PreparedEval script warm: %v", err)
+		}
+		qEvalPlanBenchSink = out
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
+}
+
 func BenchmarkEvalWithEnvPipelinePlanCacheCold(b *testing.B) {
 	const src = "+/v where v>threshold"
 	env := map[string]any{
@@ -97,6 +124,36 @@ func BenchmarkEvalWithEnvPipelinePlanCacheWarm(b *testing.B) {
 	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
 }
 
+func BenchmarkPreparedEvalPipelinePlanWarm(b *testing.B) {
+	ClearEvalPlanCaches()
+	defer ClearEvalPlanCaches()
+
+	const src = "+/v where v>threshold"
+	env := map[string]any{
+		"v":         data.NewI64Range(0, 1, 8192),
+		"threshold": int64(4096),
+	}
+	prepared, err := PrepareEval(src)
+	if err != nil {
+		b.Fatalf("PrepareEval pipeline: %v", err)
+	}
+	if _, err := prepared.EvalWithEnv(env); err != nil {
+		b.Fatalf("warm PreparedEval pipeline setup: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := prepared.EvalWithEnv(env)
+		if err != nil {
+			b.Fatalf("PreparedEval pipeline warm: %v", err)
+		}
+		qEvalPlanBenchSink = out
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
+}
+
 func BenchmarkEvalWithEnvRuntimePrimitivePipelineWarm(b *testing.B) {
 	ClearEvalPlanCaches()
 	defer ClearEvalPlanCaches()
@@ -117,6 +174,37 @@ func BenchmarkEvalWithEnvRuntimePrimitivePipelineWarm(b *testing.B) {
 		out, err := EvalWithEnv(src, env)
 		if err != nil {
 			b.Fatalf("EvalWithEnv runtime primitive warm: %v", err)
+		}
+		qEvalPlanBenchSink = out
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
+}
+
+func BenchmarkPreparedEvalRuntimePrimitivePipelineWarm(b *testing.B) {
+	ClearEvalPlanCaches()
+	defer ClearEvalPlanCaches()
+
+	const src = "(w wsum v)+(v cor y)+(count 32 mdev v)"
+	env := map[string]any{
+		"v": data.NewI64Range(1, 1, 8192),
+		"w": data.NewI64Range(1, 1, 8192),
+		"y": data.NewI64Range(2, 2, 8192),
+	}
+	prepared, err := PrepareEval(src)
+	if err != nil {
+		b.Fatalf("PrepareEval runtime primitive: %v", err)
+	}
+	if _, err := prepared.EvalWithEnv(env); err != nil {
+		b.Fatalf("warm PreparedEval runtime primitive setup: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := prepared.EvalWithEnv(env)
+		if err != nil {
+			b.Fatalf("PreparedEval runtime primitive warm: %v", err)
 		}
 		qEvalPlanBenchSink = out
 	}
