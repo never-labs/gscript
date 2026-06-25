@@ -2322,6 +2322,45 @@ func TestTypedCompareIndexesAndNullMasks(t *testing.T) {
 	}
 }
 
+func TestTryTypedIntegerFloorDividePreservesNullBitmap(t *testing.T) {
+	source := NewColumn("x", []any{NullValue, int64(5), int64(7), int64(9)}).Data
+	tiled, ok := NewTiledCycleView(source, 0, 8)
+	if !ok {
+		t.Fatal("NewTiledCycleView nullable source did not match")
+	}
+	out, handled, err := TryTypedIntegerFloorDivide(tiled, int64(3), tiled.Len())
+	if err != nil || !handled {
+		t.Fatalf("TryTypedIntegerFloorDivide nullable tiled handled=%v err=%v", handled, err)
+	}
+	values := out.Values()
+	want := []any{NullValue, int64(1), int64(2), int64(3), NullValue, int64(1), int64(2), int64(3)}
+	if !reflect.DeepEqual(values, want) {
+		t.Fatalf("nullable tiled div values = %#v, want %#v", values, want)
+	}
+	count, handled, err := TryTypedNullCount(out)
+	if err != nil || !handled || count != 2 {
+		t.Fatalf("nullable tiled div null count = %d,%v,%v; want 2,true,nil", count, handled, err)
+	}
+}
+
+func TestTryTypedIntegerFloorDivideNullsDivideByZeroRows(t *testing.T) {
+	left := NewColumn("x", []any{int64(9), int64(8), NullValue, int64(7)}).Data
+	right := NewColumn("y", []any{int64(3), int64(0), int64(2), NullValue}).Data
+	out, handled, err := TryTypedIntegerFloorDivide(left, right, left.Len())
+	if err != nil || !handled {
+		t.Fatalf("TryTypedIntegerFloorDivide nullable vector handled=%v err=%v", handled, err)
+	}
+	values := out.Values()
+	want := []any{int64(3), NullValue, NullValue, NullValue}
+	if !reflect.DeepEqual(values, want) {
+		t.Fatalf("nullable vector div values = %#v, want %#v", values, want)
+	}
+	count, handled, err := TryTypedNullCount(out)
+	if err != nil || !handled || count != 3 {
+		t.Fatalf("nullable vector div null count = %d,%v,%v; want 3,true,nil", count, handled, err)
+	}
+}
+
 func TestTypedNumericSumByI64IndexesConsumesLazyIntegerViews(t *testing.T) {
 	base := NewI64Range(0, 1, 16)
 	scaled, handled, err := TryTypedIntegerDyadic(OpMul, base, int64(3))

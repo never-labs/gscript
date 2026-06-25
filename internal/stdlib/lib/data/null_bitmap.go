@@ -561,12 +561,12 @@ func (o nullBitmapI64Operand) release() {
 }
 
 // numericIntegerDyadicNullBitmapBulk lowers integer dyadics over null-bitmap
-// carriers to dense loops with bitmap null propagation. Mod by zero produces
-// a null row, matching the boxed fallback. It only engages when an operand is
-// bitmap-backed so dense paths stay untouched.
+// carriers to dense loops with bitmap null propagation. Div/mod by zero
+// produces a null row, matching the boxed fallback. It only engages when an
+// operand is bitmap-backed so dense paths stay untouched.
 func numericIntegerDyadicNullBitmapBulk(op Op, left, right any, length int) (Array, bool) {
 	switch op {
-	case OpAdd, OpSub, OpMul, OpMod:
+	case OpAdd, OpSub, OpMul, OpIDiv, OpMod:
 	default:
 		return nil, false
 	}
@@ -634,6 +634,20 @@ func numericIntegerDyadicNullBitmapBulk(op Op, left, right any, length int) (Arr
 			for i, v := range lo.values {
 				out[i] = v * ro.values[i]
 			}
+		}
+	case OpIDiv:
+		const minInt64 = -1 << 63
+		for i := 0; i < length; i++ {
+			if nullBitGet(nulls, i) {
+				continue
+			}
+			lv, _ := lo.at(i)
+			rv, _ := ro.at(i)
+			if rv == 0 || (lv == minInt64 && rv == -1) {
+				nullBitSet(nulls, i)
+				continue
+			}
+			out[i] = floorDivInt64(lv, rv)
 		}
 	case OpMod:
 		for i := 0; i < length; i++ {

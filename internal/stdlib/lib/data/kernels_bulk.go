@@ -2089,6 +2089,9 @@ func numericIntegerDyadicBulk(op Op, left, right any, length int) (Array, bool) 
 // MinInt64/-1 overflow row bail out so callers keep null-producing fallbacks.
 func TryTypedIntegerFloorDivide(left, right any, length int) (Array, bool, error) {
 	const minInt64 = -1 << 63
+	if out, handled := numericIntegerDyadicNullBitmapBulk(OpIDiv, left, right, length); handled {
+		return out, true, nil
+	}
 	leftArray, leftIsArray := left.(Array)
 	rightArray, rightIsArray := right.(Array)
 	switch {
