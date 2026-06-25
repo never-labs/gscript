@@ -683,6 +683,31 @@ func TestTypedRunningAndMovingIntegerKernels(t *testing.T) {
 	if err != nil || !handled || math.Abs(sparseMovingAvgValue-(485.0/3.0)) > 1e-9 {
 		t.Fatalf("sparse zero mavg sum = %#v,%v,%v; want %v,true,nil", sparseMovingAvg, handled, err, 485.0/3.0)
 	}
+
+	nullable := NewColumn("x", []any{NullValue, int64(2), NullValue, int64(5), NullValue}).Data
+	filled, handled, err := TryTypedScalarFill(int64(0), vectorFills(nullable))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedScalarFill fills nullable handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := filled.(i64FillArray); !ok {
+		t.Fatalf("TryTypedScalarFill fills nullable returned %T, want i64FillArray", filled)
+	}
+	filledMovingSum, handled, err := TryTypedMovingNumericSumSum(filled.(Array), 2, false)
+	if err != nil || !handled || filledMovingSum != int64(23) {
+		t.Fatalf("filled nullable msum sum = %#v,%v,%v; want 23,true,nil", filledMovingSum, handled, err)
+	}
+	filledMovingAvg, handled, err := TryTypedMovingNumericSumSum(filled.(Array), 2, true)
+	if err != nil || !handled || filledMovingAvg != 11.5 {
+		t.Fatalf("filled nullable mavg sum = %#v,%v,%v; want 11.5,true,nil", filledMovingAvg, handled, err)
+	}
+	fusedMovingSum, handled, err := TryTypedMovingFillsScalarFillSum(nullable, 0, 2, false)
+	if err != nil || !handled || fusedMovingSum != int64(23) {
+		t.Fatalf("fused fills-fill msum sum = %#v,%v,%v; want 23,true,nil", fusedMovingSum, handled, err)
+	}
+	fusedMovingAvg, handled, err := TryTypedMovingFillsScalarFillSum(nullable, 0, 2, true)
+	if err != nil || !handled || fusedMovingAvg != 11.5 {
+		t.Fatalf("fused fills-fill mavg sum = %#v,%v,%v; want 11.5,true,nil", fusedMovingAvg, handled, err)
+	}
 }
 
 func TestTypedFbySumSparseZeroAmend(t *testing.T) {

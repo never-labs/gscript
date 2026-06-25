@@ -2787,6 +2787,21 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan *qPipelinePlan) (any, bool
 			return nil, true, errMovingWindowWidth(plan.compareOp)
 		}
 	}
+	if (plan.compareOp == "msum" || plan.compareOp == "mavg") && width > 0 {
+		if fillPlan := buildQFillsFillPlan(plan.rightExpr); fillPlan != nil {
+			source, err := s.evalQPipelinePlannedExpr(fillPlan.source, nil)
+			if err != nil {
+				return nil, true, err
+			}
+			if array, ok := source.(data.Array); ok {
+				out, handled, err := data.TryTypedMovingFillsScalarFillSum(array, fillPlan.fill, int(width), plan.compareOp == "mavg")
+				out, handled, err = qTypedRuntimeResult("ArrayMovingFillsFillSum", "vector-reduce/sum-"+plan.compareOp+"-fills-fill/"+string(array.Kind()), out, handled, err)
+				if err != nil || handled {
+					return out, handled, err
+				}
+			}
+		}
+	}
 	value, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
 	if err != nil {
 		return nil, true, err

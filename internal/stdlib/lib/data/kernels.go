@@ -6869,29 +6869,23 @@ func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {
 	if IsNull(fill) {
 		return array, true, nil
 	}
+	if arrayKnownNoNulls(array) {
+		return array, true, nil
+	}
 	if values, ok := array.(nullableArray); ok {
 		if out, handled := typedScalarFillNullable(fill, values); handled {
 			return out, true, nil
 		}
 	}
-	// Bitmap-backed carriers materialize the fill densely in one pass: the
-	// result has no nulls, so downstream reads stay unboxed (mirrors the
-	// boxed typedScalarFillNullable eager path).
+	if n, ok := coerceInt64Exact(fill); ok && isIntegerArray(array) {
+		return i64FillArray{source: array, fill: n}, true, nil
+	}
+	// Bitmap-backed float carriers materialize the fill densely in one pass:
+	// the result has no nulls, so downstream reads stay unboxed (mirrors the
+	// boxed typedScalarFillNullable eager path). Integer carriers stay lazy
+	// above so fused reducers can consume null/fill state without an O(n)
+	// temporary column.
 	if nullBitmapBackedArray(array) {
-		if fillI, ok := coerceInt64Exact(fill); ok && isIntegerArray(array) {
-			if values, nulls, owned, ok := tryBulkI64NullableValues(array); ok {
-				out := make([]int64, len(values))
-				for i, v := range values {
-					if nulls != nil && nullBitGet(nulls, i) {
-						out[i] = fillI
-						continue
-					}
-					out[i] = v
-				}
-				bulkI64Release(values, owned)
-				return newI64Trusted(out), true, nil
-			}
-		}
 		if fillF, ok := numeric(fill); ok && isNumericArray(array) {
 			if values, nulls, owned, ok := tryBulkF64NullableValues(array); ok {
 				out := make([]float64, len(values))
@@ -6907,13 +6901,33 @@ func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {
 			}
 		}
 	}
-	if n, ok := coerceInt64Exact(fill); ok && isIntegerArray(array) {
-		return i64FillArray{source: array, fill: n}, true, nil
-	}
 	if n, ok := numeric(fill); ok && isNumericArray(array) {
 		return f64FillArray{source: array, fill: n}, true, nil
 	}
 	return nil, false, nil
+}
+
+func arrayKnownNoNulls(array Array) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		return arrayKnownNoNulls(a.array)
+	case columnArray[bool], columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
+		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
+		columnArray[float32], columnArray[float64], columnArray[string], columnArray[Symbol],
+		columnArray[Month], columnArray[Date], columnArray[DateTime], columnArray[Timespan],
+		columnArray[Minute], columnArray[Second], columnArray[Time], columnArray[Timestamp]:
+		return true
+	case i64RangeArray, f64RangeArray, i64SegmentArray, i64Int32IndexArray, i64PeriodicIndexArray,
+		i64ProductArray, i64DyadicProductArray, i64BucketArray, i64XrankArray, i64FillArray,
+		f64BucketArray, f64FillArray, i64RunningSumArray, i64ScalarDyadicArray,
+		i64ScalarDyadicRunningSumArray, f64NumericDyadicArray, i64DyadicMinMaxArray,
+		qRatiosArray:
+		return true
+	case tiledArray:
+		return arrayKnownNoNulls(a.source)
+	default:
+		return false
+	}
 }
 
 // typedScalarFillNullable materializes a scalar fill over boxed nullable
@@ -8086,6 +8100,11 @@ func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, boo
 		}
 		return movingSumSumI64SparseZeroAmend(sparse, width), true, nil
 	}
+	if fill, ok := array.(i64FillArray); ok {
+		if out, handled := movingNumericSumSumI64Fill(fill, width, average); handled {
+			return out, true, nil
+		}
+	}
 	if array.Kind() != KindF64 && array.Kind() != KindF32 {
 		// Null-free integer carriers flatten once and run the identical
 		// sliding-window accumulation over a dense slice, replacing the
@@ -8195,6 +8214,57 @@ func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, boo
 	return total, true, nil
 }
 
+// TryTypedMovingFillsScalarFillSum computes sum(width msum/mavg (fill ^ fills
+// array)) without materializing either the forward-filled column or the scalar
+// filled column. It is a generic columnar pipeline kernel for q shapes such as
+// `+/20 msum 0^fills c`.
+func TryTypedMovingFillsScalarFillSum(array Array, fill int64, width int, average bool) (any, bool, error) {
+	if array == nil {
+		return nil, false, nil
+	}
+	if width <= 0 {
+		return nil, true, fmt.Errorf("moving numeric width must be positive")
+	}
+	values, nulls, owned, ok := tryBulkI64NullableValues(array)
+	if !ok || len(values) != array.Len() {
+		bulkI64Release(values, owned)
+		return nil, false, nil
+	}
+	ring := bulkI64Get(width)
+	for i := range ring {
+		ring[i] = 0
+	}
+	last := fill
+	var window int64
+	var totalI int64
+	var totalF float64
+	for row, value := range values {
+		if nulls == nil || !nullBitGet(nulls, row) {
+			last = value
+		}
+		window += last
+		if row >= width {
+			window -= ring[row%width]
+		}
+		ring[row%width] = last
+		if average {
+			count := row + 1
+			if count > width {
+				count = width
+			}
+			totalF += float64(window) / float64(count)
+		} else {
+			totalI += window
+		}
+	}
+	bulkI64Release(ring, true)
+	bulkI64Release(values, owned)
+	if average {
+		return totalF, true, nil
+	}
+	return totalI, true, nil
+}
+
 func movingSumSumI64Range(values i64RangeArray, width int) int64 {
 	n := values.len
 	if n == 0 {
@@ -8219,6 +8289,49 @@ func movingSumSumI64Range(values i64RangeArray, width int) int64 {
 		total += value * int64(n-row)
 	}
 	return total
+}
+
+func movingNumericSumSumI64Fill(array i64FillArray, width int, average bool) (any, bool) {
+	if width <= 0 || array.source == nil {
+		return nil, false
+	}
+	values, nulls, owned, ok := tryBulkI64NullableValues(array.source)
+	if !ok || len(values) != array.Len() {
+		bulkI64Release(values, owned)
+		return nil, false
+	}
+	ring := bulkI64Get(width)
+	for i := range ring {
+		ring[i] = 0
+	}
+	var window int64
+	var totalI int64
+	var totalF float64
+	for row, value := range values {
+		if nulls != nil && nullBitGet(nulls, row) {
+			value = array.fill
+		}
+		window += value
+		if row >= width {
+			window -= ring[row%width]
+		}
+		ring[row%width] = value
+		if average {
+			count := row + 1
+			if count > width {
+				count = width
+			}
+			totalF += float64(window) / float64(count)
+		} else {
+			totalI += window
+		}
+	}
+	bulkI64Release(ring, true)
+	bulkI64Release(values, owned)
+	if average {
+		return totalF, true
+	}
+	return totalI, true
 }
 
 func movingAvgSumI64Range(values i64RangeArray, width int) float64 {
