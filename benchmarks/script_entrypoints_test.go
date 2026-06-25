@@ -162,7 +162,8 @@ func TestReleaseProfileRequiresReleaseOnlyToolSmokes(t *testing.T) {
 		"--release-profile",
 		"scripts/run.sh editor --require-tree-sitter",
 		"scripts/run.sh release-dist --require-goreleaser",
-		"scripts/run.sh release-check",
+		"scripts/run.sh release-notes-gate",
+		"scripts/run.sh release-artifacts-gate",
 	} {
 		requireContains(t, production, want)
 	}
@@ -182,7 +183,8 @@ func TestProductionReleaseProfileListIncludesRequiredToolFlags(t *testing.T) {
 		"Release profile: critical release tool skips are treated as failures.",
 		"scripts/run.sh editor --require-tree-sitter",
 		"scripts/run.sh release-dist --require-goreleaser",
-		"scripts/run.sh release-check",
+		"scripts/run.sh release-notes-gate",
+		"scripts/run.sh release-artifacts-gate",
 	} {
 		requireContains(t, out, want)
 	}

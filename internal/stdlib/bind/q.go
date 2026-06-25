@@ -635,6 +635,11 @@ var (
 	qQueryKernelSupportCacheOrder []string
 	qQueryKernelSupportStats      qQueryKernelSupportCacheStats
 	qQueryKernelSupportStatsByKey = make(map[string]*qQueryKernelSupportCacheKeyStat)
+	qQueryDataKernelCache         = make(map[string]*data.QueryKernel)
+	qQueryDataKernelOrder         []string
+	qQueryDataKernelUnsupported   = make(map[string]string)
+	qQueryDataFrameCache          = make(map[string]data.Frame)
+	qQueryDataFrameCacheOrder     []string
 
 	qFallbackStatsMu  sync.Mutex
 	qFallbackCounters qFallbackStats
@@ -2009,6 +2014,11 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(aggs) > 0 {
+		if rows, ok, err := qTryRunQueryDataKernel(s, spec, by, selects, aggs); ok || err != nil {
+			return rows, err
+		}
+	}
 	var rows *Table
 	var nativeRows *SoA
 	nativeReasonCode := ""
@@ -2082,6 +2092,360 @@ func qRunQuery(s *SoA, spec *Table) (*Table, error) {
 		qAttachRowsNativeFramePayload(rows)
 	}
 	return rows, nil
+}
+
+func qTryRunQueryDataKernel(s *SoA, spec *Table, by []string, selects []qSelect, aggs map[string]string) (*Table, bool, error) {
+	frame, err := qDataFrameFromSoABorrowedCached(s)
+	if err != nil {
+		return nil, false, nil
+	}
+	plan, ok, err := qQueryDataPlan(frame, spec, by, selects, aggs)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	execFrame := plan.Source
+	key := data.QueryKernelCacheKey("q.query", execFrame, plan)
+	kernel, ok, reason, err := qQueryDataKernelForFrame(key, execFrame, plan)
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		qRecordFallbackReasonAttribution(qFallbackQueryKernel, qNormalizeQueryKernelFallbackReasonCode(reason), reason, "q.query", execFrame.SchemaFingerprint(), data.QueryKernelPlanShape(plan))
+		return nil, false, nil
+	}
+	out, err := data.ExecQueryKernelOrPlan(kernel, plan, execFrame)
+	if err != nil {
+		return nil, false, err
+	}
+	out, err = qQueryNormalizeAggregateResultFrame(out, aggs)
+	if err != nil {
+		return nil, false, err
+	}
+	value, err := qDataFrameValue(out)
+	if err != nil {
+		return nil, false, err
+	}
+	if !value.IsTable() {
+		return nil, false, nil
+	}
+	qRecordQueryKernelHit()
+	return value.Table(), true, nil
+}
+
+func qQueryNormalizeAggregateResultFrame(frame data.Frame, aggs map[string]string) (data.Frame, error) {
+	if len(aggs) == 0 {
+		return frame, nil
+	}
+	names := data.FrameColumnNames(frame)
+	cols := make([]data.Column, 0, len(names))
+	changed := false
+	for _, name := range names {
+		col, ok := frame.Column(name)
+		if !ok {
+			return data.Frame{}, fmt.Errorf("q.query result column %q not found", name)
+		}
+		if aggs[string(name)] == "sum" && qQueryAggregateSumNeedsFloatResult(col.Kind()) {
+			xs := make([]float64, frame.Len())
+			for i := 0; i < frame.Len(); i++ {
+				v, ok := col.At(i)
+				if !ok {
+					return data.Frame{}, fmt.Errorf("q.query result column %q row %d unavailable", name, i)
+				}
+				n, ok := qQueryNumberAny(v)
+				if !ok {
+					return data.Frame{}, fmt.Errorf("q.query result column %q row %d is not numeric", name, i)
+				}
+				xs[i] = n
+			}
+			col = data.NewF64Borrowed(xs)
+			changed = true
+		}
+		cols = append(cols, data.Column{Name: name, Data: col})
+	}
+	if !changed {
+		return frame, nil
+	}
+	return data.NewFrameAdoptingColumns(cols...)
+}
+
+func qQueryAggregateSumNeedsFloatResult(kind data.Kind) bool {
+	switch kind {
+	case data.KindI8, data.KindI16, data.KindI32, data.KindI64, data.KindU8, data.KindU16, data.KindU32, data.KindU64:
+		return true
+	default:
+		return false
+	}
+}
+
+func qQueryNumberAny(v any) (float64, bool) {
+	switch x := v.(type) {
+	case int:
+		return float64(x), true
+	case int8:
+		return float64(x), true
+	case int16:
+		return float64(x), true
+	case int32:
+		return float64(x), true
+	case int64:
+		return float64(x), true
+	case uint8:
+		return float64(x), true
+	case uint16:
+		return float64(x), true
+	case uint32:
+		return float64(x), true
+	case uint64:
+		return float64(x), true
+	case float32:
+		return float64(x), true
+	case float64:
+		return x, true
+	default:
+		return 0, false
+	}
+}
+
+func qQueryDataKernelForFrame(key string, frame data.Frame, plan data.QueryPlan) (*data.QueryKernel, bool, string, error) {
+	qQueryKernelSupportCacheMu.Lock()
+	if kernel, ok := qQueryDataKernelCache[key]; ok {
+		qQueryKernelSupportCacheMu.Unlock()
+		return kernel, true, "", nil
+	}
+	if reason, ok := qQueryDataKernelUnsupported[key]; ok {
+		qQueryKernelSupportCacheMu.Unlock()
+		return nil, false, reason, nil
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+	kernel, ok, err := data.CompileQueryKernel(frame, plan)
+	if err != nil {
+		return nil, false, "", err
+	}
+	if !ok {
+		_, reason := data.QueryKernelSupportReason(plan)
+		qQueryKernelSupportCacheMu.Lock()
+		qQueryDataKernelUnsupported[key] = reason
+		qQueryKernelSupportCacheMu.Unlock()
+		return nil, false, reason, nil
+	}
+	qQueryKernelSupportCacheMu.Lock()
+	if cached, ok := qQueryDataKernelCache[key]; ok {
+		qQueryKernelSupportCacheMu.Unlock()
+		return cached, true, "", nil
+	}
+	qQueryDataKernelCache[key] = kernel
+	qQueryDataKernelOrder = append(qQueryDataKernelOrder, key)
+	for len(qQueryDataKernelOrder) > qQueryKernelSupportCacheLimit {
+		evict := qQueryDataKernelOrder[0]
+		qQueryDataKernelOrder = qQueryDataKernelOrder[1:]
+		delete(qQueryDataKernelCache, evict)
+		delete(qQueryDataKernelUnsupported, evict)
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+	return kernel, true, "", nil
+}
+
+func qQueryDataPlan(frame data.Frame, spec *Table, by []string, selects []qSelect, aggs map[string]string) (data.QueryPlan, bool, error) {
+	plan := data.QueryPlan{Source: frame, LimitN: -1}
+	frame, where, ok, err := qQueryDataWhere(frame, spec.RawGetString("where"))
+	if err != nil || !ok {
+		return data.QueryPlan{}, ok, err
+	}
+	plan.Source = frame
+	plan.Where = where
+	for _, name := range by {
+		plan.By = append(plan.By, data.Symbol(name))
+	}
+	for _, sel := range selects {
+		agg, aggregate := aggs[sel.Name]
+		if !aggregate {
+			continue
+		}
+		item := data.Aggregate{Name: data.Symbol(sel.Name), Func: agg}
+		if agg != "count" {
+			expr, ok := qQueryDataExpr(sel.Expr)
+			if !ok {
+				return data.QueryPlan{}, false, nil
+			}
+			item.Expr = expr
+		}
+		plan.Aggregates = append(plan.Aggregates, item)
+	}
+	if len(plan.Aggregates) == 0 {
+		return data.QueryPlan{}, false, nil
+	}
+	order, err := qOrderSpecs(spec.RawGetString("order_by"))
+	if err != nil {
+		return data.QueryPlan{}, false, err
+	}
+	for _, ord := range order {
+		plan.OrderBy = append(plan.OrderBy, data.OrderSpec{Column: data.Symbol(ord.Column), Desc: ord.Desc})
+	}
+	limit, err := qLimit(spec.RawGetString("limit"))
+	if err != nil {
+		return data.QueryPlan{}, false, err
+	}
+	plan.LimitN = limit
+	return plan, true, nil
+}
+
+func qQueryDataWhere(frame data.Frame, where Value) (data.Frame, data.Expr, bool, error) {
+	if where.IsNil() {
+		return frame, nil, true, nil
+	}
+	if where.IsDenseArray() {
+		mask := where.DenseArray()
+		if mask.DType() != DenseArrayBool || mask.Len() != frame.Len() {
+			return data.Frame{}, nil, false, nil
+		}
+		withMask, name, err := qQueryDataFrameWithMask(frame, mask)
+		if err != nil {
+			return data.Frame{}, nil, false, err
+		}
+		return withMask, data.Binary{Op: data.OpEQ, Left: data.ColumnRef{Name: name}, Right: data.Literal{Value: true}}, true, nil
+	}
+	if !where.IsTable() {
+		return data.Frame{}, nil, false, nil
+	}
+	tbl := where.Table()
+	column := tbl.RawGetString("column")
+	if column.IsNil() {
+		column = tbl.RawGetInt(1)
+	}
+	op := tbl.RawGetString("op")
+	if op.IsNil() {
+		op = tbl.RawGetInt(2)
+	}
+	value := tbl.RawGetString("value")
+	if value.IsNil() {
+		value = tbl.RawGetInt(3)
+	}
+	if !column.IsString() || !op.IsString() {
+		return data.Frame{}, nil, false, nil
+	}
+	dataOp, ok := qQueryDataOp(op.Str())
+	if !ok {
+		return data.Frame{}, nil, false, nil
+	}
+	lit, ok := qQueryDataLiteral(value)
+	if !ok {
+		return data.Frame{}, nil, false, nil
+	}
+	return frame, data.Binary{Op: dataOp, Left: data.ColumnRef{Name: data.Symbol(column.Str())}, Right: data.Literal{Value: lit}}, true, nil
+}
+
+func qQueryDataFrameWithMask(frame data.Frame, mask *DenseArray) (data.Frame, data.Symbol, error) {
+	name := data.Symbol("__q_where_mask")
+	for i := 0; ; i++ {
+		if _, exists := frame.Column(name); !exists {
+			break
+		}
+		name = data.Symbol(fmt.Sprintf("__q_where_mask_%d", i+1))
+	}
+	xs, ok := mask.Bool()
+	if !ok {
+		return data.Frame{}, "", fmt.Errorf("q.query where mask must be bool")
+	}
+	names := data.FrameColumnNames(frame)
+	cols := make([]data.Column, 0, len(names)+1)
+	for _, colName := range names {
+		col, ok := frame.Column(colName)
+		if !ok {
+			return data.Frame{}, "", fmt.Errorf("q.query frame column %q not found", colName)
+		}
+		cols = append(cols, data.Column{Name: colName, Data: col})
+	}
+	cols = append(cols, data.Column{Name: name, Data: data.NewBoolBorrowed(xs)})
+	out, err := data.NewFrameAdoptingColumns(cols...)
+	if err != nil {
+		return data.Frame{}, "", err
+	}
+	return out, name, nil
+}
+
+func qQueryDataExpr(expr Value) (data.Expr, bool) {
+	if expr.IsString() {
+		return data.ColumnRef{Name: data.Symbol(expr.Str())}, true
+	}
+	if lit, ok := qQueryDataLiteral(expr); ok {
+		return data.Literal{Value: lit}, true
+	}
+	if !expr.IsTable() {
+		return nil, false
+	}
+	tbl := expr.Table()
+	op := tbl.RawGetString("op")
+	if op.IsNil() {
+		op = tbl.RawGetInt(1)
+	}
+	if !op.IsString() {
+		return nil, false
+	}
+	dataOp, ok := qQueryDataOp(op.Str())
+	if !ok {
+		return nil, false
+	}
+	left := tbl.RawGetString("left")
+	if left.IsNil() {
+		left = tbl.RawGetInt(2)
+	}
+	right := tbl.RawGetString("right")
+	if right.IsNil() {
+		right = tbl.RawGetInt(3)
+	}
+	l, ok := qQueryDataExpr(left)
+	if !ok {
+		return nil, false
+	}
+	r, ok := qQueryDataExpr(right)
+	if !ok {
+		return nil, false
+	}
+	return data.Binary{Op: dataOp, Left: l, Right: r}, true
+}
+
+func qQueryDataOp(op string) (data.Op, bool) {
+	switch op {
+	case "+":
+		return data.OpAdd, true
+	case "-":
+		return data.OpSub, true
+	case "*":
+		return data.OpMul, true
+	case "/":
+		return data.OpDiv, true
+	case "=", "==":
+		return data.OpEQ, true
+	case "!=", "<>":
+		return data.OpNE, true
+	case "<":
+		return data.OpLT, true
+	case "<=":
+		return data.OpLE, true
+	case ">":
+		return data.OpGT, true
+	case ">=":
+		return data.OpGE, true
+	default:
+		return "", false
+	}
+}
+
+func qQueryDataLiteral(v Value) (any, bool) {
+	switch {
+	case v.IsInt():
+		return v.Int(), true
+	case v.IsFloat():
+		return v.Float(), true
+	case v.IsBool():
+		return v.Bool(), true
+	case v.IsString():
+		return v.Str(), true
+	case v.IsNil():
+		return nil, true
+	default:
+		return nil, false
+	}
 }
 
 func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
@@ -6974,6 +7338,11 @@ func qClearCaches() {
 	qQueryKernelSupportCacheOrder = nil
 	qQueryKernelSupportStats = qQueryKernelSupportCacheStats{}
 	qQueryKernelSupportStatsByKey = make(map[string]*qQueryKernelSupportCacheKeyStat)
+	qQueryDataKernelCache = make(map[string]*data.QueryKernel)
+	qQueryDataKernelOrder = nil
+	qQueryDataKernelUnsupported = make(map[string]string)
+	qQueryDataFrameCache = make(map[string]data.Frame)
+	qQueryDataFrameCacheOrder = nil
 	qQueryKernelSupportCacheMu.Unlock()
 
 	qFallbackStatsMu.Lock()
@@ -8162,6 +8531,91 @@ func qDataFrameFromSoA(s *SoA) (data.Frame, error) {
 		cols = append(cols, data.Column{Name: data.Symbol(name), Data: array})
 	}
 	return data.NewFrame(cols...)
+}
+
+func qDataFrameFromSoABorrowedCached(s *SoA) (data.Frame, error) {
+	if s == nil {
+		return data.Frame{}, fmt.Errorf("soa is nil")
+	}
+	key := fmt.Sprintf("%p:%d", s, s.ShapeVersion())
+	qQueryKernelSupportCacheMu.Lock()
+	if frame, ok := qQueryDataFrameCache[key]; ok {
+		qQueryKernelSupportCacheMu.Unlock()
+		return frame, nil
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+	frame, err := qDataFrameFromSoABorrowed(s)
+	if err != nil {
+		return data.Frame{}, err
+	}
+	qQueryKernelSupportCacheMu.Lock()
+	if cached, ok := qQueryDataFrameCache[key]; ok {
+		qQueryKernelSupportCacheMu.Unlock()
+		return cached, nil
+	}
+	qQueryDataFrameCache[key] = frame
+	qQueryDataFrameCacheOrder = append(qQueryDataFrameCacheOrder, key)
+	for len(qQueryDataFrameCacheOrder) > qQueryKernelSupportCacheLimit {
+		evict := qQueryDataFrameCacheOrder[0]
+		qQueryDataFrameCacheOrder = qQueryDataFrameCacheOrder[1:]
+		delete(qQueryDataFrameCache, evict)
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+	return frame, nil
+}
+
+func qDataFrameFromSoABorrowed(s *SoA) (data.Frame, error) {
+	if s == nil {
+		return data.Frame{}, fmt.Errorf("soa is nil")
+	}
+	names := s.ColumnNames()
+	cols := make([]data.Column, 0, len(names))
+	for _, name := range names {
+		col, ok := s.Column(name)
+		if !ok {
+			return data.Frame{}, fmt.Errorf("soa column %q not found", name)
+		}
+		array, err := qDataArrayFromDenseBorrowed(col)
+		if err != nil {
+			return data.Frame{}, fmt.Errorf("column %q: %w", name, err)
+		}
+		cols = append(cols, data.Column{Name: data.Symbol(name), Data: array})
+	}
+	return data.NewFrame(cols...)
+}
+
+func qDataArrayFromDenseBorrowed(col *DenseArray) (data.Array, error) {
+	if col == nil {
+		return nil, fmt.Errorf("dense array is nil")
+	}
+	switch col.DType() {
+	case DenseArrayI64:
+		xs, ok := col.I64()
+		if !ok {
+			return nil, fmt.Errorf("i64 dense array storage unavailable")
+		}
+		return data.NewI64Borrowed(xs), nil
+	case DenseArrayF64:
+		xs, ok := col.F64()
+		if !ok {
+			return nil, fmt.Errorf("f64 dense array storage unavailable")
+		}
+		return data.NewF64Borrowed(xs), nil
+	case DenseArrayBool:
+		xs, ok := col.Bool()
+		if !ok {
+			return nil, fmt.Errorf("bool dense array storage unavailable")
+		}
+		return data.NewBoolBorrowed(xs), nil
+	case DenseArrayString:
+		xs, ok := col.StringValues()
+		if !ok {
+			return nil, fmt.Errorf("string dense array storage unavailable")
+		}
+		return data.NewStringBorrowed(xs), nil
+	default:
+		return nil, fmt.Errorf("unsupported dense array dtype %s", col.DType())
+	}
 }
 
 func qDataFrameFromColumns(columns, columnNames *Table, kinds map[string]data.Kind) (data.Frame, error) {

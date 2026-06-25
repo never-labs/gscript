@@ -693,6 +693,12 @@ func newBoolTrusted(values []bool) Array {
 	return columnArray[bool]{kind: KindBool, data: values}
 }
 
+// NewBoolBorrowed wraps values without copying. Callers must keep the backing
+// slice immutable for the lifetime of the returned Array.
+func NewBoolBorrowed(values []bool) Array {
+	return newBoolTrusted(values)
+}
+
 func NewI8(values []int8) Array {
 	return columnArray[int8]{kind: KindI8, data: append([]int8(nil), values...)}
 }
@@ -711,6 +717,12 @@ func NewI64(values []int64) Array {
 
 func newI64Trusted(values []int64) Array {
 	return columnArray[int64]{kind: KindI64, data: values}
+}
+
+// NewI64Borrowed wraps values without copying. Callers must keep the backing
+// slice immutable for the lifetime of the returned Array.
+func NewI64Borrowed(values []int64) Array {
+	return newI64Trusted(values)
 }
 
 func NewI64Range(start, step int64, length int) Array {
@@ -748,8 +760,20 @@ func newF64Trusted(values []float64) Array {
 	return columnArray[float64]{kind: KindF64, data: values}
 }
 
+// NewF64Borrowed wraps values without copying. Callers must keep the backing
+// slice immutable for the lifetime of the returned Array.
+func NewF64Borrowed(values []float64) Array {
+	return newF64Trusted(values)
+}
+
 func NewString(values []string) Array {
 	return columnArray[string]{kind: KindString, data: append([]string(nil), values...)}
+}
+
+// NewStringBorrowed wraps values without copying. Callers must keep the
+// backing slice immutable for the lifetime of the returned Array.
+func NewStringBorrowed(values []string) Array {
+	return columnArray[string]{kind: KindString, data: values}
 }
 
 func NewSymbols(values []string) Array {
