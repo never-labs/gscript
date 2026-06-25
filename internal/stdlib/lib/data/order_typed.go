@@ -8,6 +8,7 @@ import (
 
 const (
 	maxTypedSortModuloResidues = 1 << 16
+	maxTypedSortCountingWidth  = bulkPoolMaxLen
 	sortMaxInt64Value          = int64(^uint64(0) >> 1)
 	sortMinInt64Value          = -sortMaxInt64Value - 1
 )
@@ -402,6 +403,9 @@ func stableKeyPermutationI32(keys []uint64) []int32 {
 		return out
 	}
 	span := maxKey - minKey
+	if positions, ok := stableCountingKeyPermutationI32(keys, minKey, span); ok {
+		return positions
+	}
 	passes := 0
 	for s := span; s != 0; s >>= 8 {
 		passes++
@@ -444,6 +448,33 @@ func stableKeyPermutationI32(keys []uint64) []int32 {
 		bulkI32Release(tmpPositionsBuf)
 	}
 	return positions
+}
+
+func stableCountingKeyPermutationI32(keys []uint64, minKey, span uint64) ([]int32, bool) {
+	n := len(keys)
+	if span >= uint64(maxTypedSortCountingWidth) || span+1 > uint64(n)*2 {
+		return nil, false
+	}
+	width := int(span + 1)
+	counts := bulkI32Get(width)
+	clear(counts)
+	for _, key := range keys {
+		counts[int(key-minKey)]++
+	}
+	offset := int32(0)
+	for i, count := range counts {
+		counts[i] = offset
+		offset += count
+	}
+	positions := make([]int32, n)
+	for i, key := range keys {
+		bucket := int(key - minKey)
+		out := counts[bucket]
+		positions[out] = int32(i)
+		counts[bucket] = out + 1
+	}
+	bulkI32Release(counts)
+	return positions, true
 }
 
 func sameI32Backing(a, b []int32) bool {

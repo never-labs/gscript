@@ -2140,6 +2140,8 @@ func Slice(array Array, start, count int) (Array, error) {
 		return Gather(array, contiguousIndexes(start, count))
 	case i64SegmentArray:
 		return sliceI64SegmentArray(a, start, count), nil
+	case i64Int32IndexArray:
+		return i64Int32IndexArray{rows: a.rows[start : start+count]}, nil
 	case f64RangeArray:
 		return f64RangeArray{start: a.start + float64(start)*a.step, step: a.step, len: count}, nil
 	case columnArray[bool]:
