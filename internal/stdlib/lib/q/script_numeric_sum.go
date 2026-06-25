@@ -12,6 +12,7 @@ type qScriptNumericSumPlan struct {
 	source    string
 	sources   []string
 	root      qScriptNumericExprPlan
+	count     *qScriptNumericExprPlan
 	closed    qScriptNumericSumSummary
 	closedOK  bool
 	closedErr string
@@ -45,7 +46,7 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 		return nil
 	}
 	terminal := strings.TrimSpace(statements[len(statements)-1].src)
-	target, ok := qScriptNumericSumTargetName(terminal)
+	terminalPlan, ok := qScriptNumericSumTerminal(terminal)
 	if !ok {
 		return nil
 	}
@@ -65,17 +66,30 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 		}
 		bindings[stmt.assign] = plan
 	}
-	root, ok := bindings[target]
+	root, ok := bindings[terminalPlan.sumName]
 	if !ok {
 		return nil
 	}
 	if _, ok := qScriptNumericExprLength(root, bindings); !ok {
 		return nil
 	}
+	var count *qScriptNumericExprPlan
+	if terminalPlan.countName != "" {
+		countPlan, ok := bindings[terminalPlan.countName]
+		if !ok {
+			return nil
+		}
+		sumLen, sumOK := qScriptNumericExprLength(root, bindings)
+		countLen, countOK := qScriptNumericExprLength(countPlan, bindings)
+		if !sumOK || !countOK || sumLen != countLen || sumLen < 0 {
+			return nil
+		}
+		count = &countPlan
+	}
 	if !root.hasCast {
 		return nil
 	}
-	plan := &qScriptNumericSumPlan{source: terminal, sources: qScriptNumericSumStatementSources(statements), root: root}
+	plan := &qScriptNumericSumPlan{source: terminal, sources: qScriptNumericSumStatementSources(statements), root: root, count: count}
 	if summary, ok, err := qScriptNumericSummarize(root); ok {
 		plan.closed = summary
 		plan.closedOK = true
@@ -84,6 +98,33 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 		}
 	}
 	return plan
+}
+
+type qScriptNumericSumTerminalPlan struct {
+	sumName   string
+	countName string
+}
+
+func qScriptNumericSumTerminal(src string) (qScriptNumericSumTerminalPlan, bool) {
+	if name, ok := qScriptNumericSumTargetName(src); ok {
+		return qScriptNumericSumTerminalPlan{sumName: name}, true
+	}
+	expr := compileQEvalExpr(src, 0)
+	binary, ok := expr.(Binary)
+	if !ok || binary.Op != "+" {
+		return qScriptNumericSumTerminalPlan{}, false
+	}
+	if sumName, ok := qScriptNumericSumExprName(binary.Left); ok {
+		if countName, ok := qScriptNumericCountExprName(binary.Right); ok {
+			return qScriptNumericSumTerminalPlan{sumName: sumName, countName: countName}, true
+		}
+	}
+	if countName, ok := qScriptNumericCountExprName(binary.Left); ok {
+		if sumName, ok := qScriptNumericSumExprName(binary.Right); ok {
+			return qScriptNumericSumTerminalPlan{sumName: sumName, countName: countName}, true
+		}
+	}
+	return qScriptNumericSumTerminalPlan{}, false
 }
 
 func qScriptNumericSumTargetName(src string) (string, bool) {
@@ -98,6 +139,46 @@ func qScriptNumericSumTargetName(src string) (string, bool) {
 		name := strings.TrimSpace(src[len("sum "):])
 		if isQAssignmentName(name) {
 			return name, true
+		}
+	}
+	return "", false
+}
+
+func qScriptNumericSumExprName(expr Expr) (string, bool) {
+	switch x := expr.(type) {
+	case SafeCall:
+		if x.Func != "sum" {
+			return "", false
+		}
+		if ident, ok := x.Arg.(Ident); ok {
+			return ident.Name, true
+		}
+	case Call:
+		if x.Func != "sum" {
+			return "", false
+		}
+		if ident, ok := x.Arg.(Ident); ok {
+			return ident.Name, true
+		}
+	}
+	return "", false
+}
+
+func qScriptNumericCountExprName(expr Expr) (string, bool) {
+	switch x := expr.(type) {
+	case SafeCall:
+		if x.Func != "count" {
+			return "", false
+		}
+		if ident, ok := x.Arg.(Ident); ok {
+			return ident.Name, true
+		}
+	case Call:
+		if x.Func != "count" {
+			return "", false
+		}
+		if ident, ok := x.Arg.(Ident); ok {
+			return ident.Name, true
 		}
 	}
 	return "", false
@@ -221,9 +302,15 @@ func qScriptNumericCastKind(x CastExpr) (data.Kind, bool) {
 			if sym, ok := c.Value.(data.Symbol); ok {
 				return qCastKindFromSymbol(sym)
 			}
+			if text, ok := c.Value.(string); ok {
+				return qCastKindFromTypeText(text)
+			}
 		}
 		if sym, ok := x.Domain.(Symbol); ok {
 			return qCastKindFromTypeText(sym.Name)
+		}
+		if text, ok := x.Domain.(String); ok {
+			return qCastKindFromTypeText(text.Value)
 		}
 	}
 	return "", false
@@ -291,7 +378,7 @@ func (s *EvalState) evalQScriptNumericSumPlan(plan *qScriptNumericSumPlan) (any,
 		}
 		recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", true, nil)
 		plan.recordDispatch()
-		return plan.closed.Sum(), true, nil
+		return plan.closed.Sum() + plan.countValue(), true, nil
 	}
 	bindings := make(map[string]qScriptNumericExprPlan, 8)
 	// The immutable root contains inlined name references to plan-time
@@ -321,7 +408,7 @@ func (s *EvalState) evalQScriptNumericSumPlan(plan *qScriptNumericSumPlan) (any,
 	}
 	recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", true, nil)
 	plan.recordDispatch()
-	return sum, true, nil
+	return sum + plan.countValue(), true, nil
 }
 
 func qScriptNumericSumStatementSources(statements []qScriptStatement) []string {
@@ -342,6 +429,16 @@ func (plan *qScriptNumericSumPlan) recordDispatch() {
 	for _, source := range plan.sources {
 		recordQEvalDispatch(source, EvalDispatchScriptNumericSum)
 	}
+}
+
+func (plan *qScriptNumericSumPlan) countValue() int64 {
+	if plan == nil || plan.count == nil {
+		return 0
+	}
+	if length, ok := qScriptNumericExprLength(*plan.count, nil); ok && length >= 0 {
+		return int64(length)
+	}
+	return 0
 }
 
 func qScriptNumericCollectBindings(plan qScriptNumericExprPlan, out map[string]qScriptNumericExprPlan) {
