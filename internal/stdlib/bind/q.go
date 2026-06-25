@@ -9766,17 +9766,16 @@ func qDataFrameFacadeValueWithNative(frame data.Frame, soaNative bool) (Value, e
 }
 
 func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
-	schema := frame.Schema()
-	names := schema.Names()
+	names := data.FrameColumnNames(frame)
+	frameKinds := data.FrameColumnKinds(frame)
 	kindNames := make([]string, len(names))
 	kindValues := make([]string, len(names))
 	for i, name := range names {
 		if _, ok := frame.Column(name); !ok {
 			return NilValue(), fmt.Errorf("column %q not found", name)
 		}
-		kind, _ := schema.Kind(name)
 		kindNames[i] = string(name)
-		kindValues[i] = string(kind)
+		kindValues[i] = string(frameKinds[i])
 	}
 	// Six eager marker keys land in the string part; pre-sizing avoids the
 	// 1->2->4->8 arena regrowth on every per-query result facade.
@@ -9847,13 +9846,12 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 		case "columns", "data":
 			if columns.IsNil() {
 				cols := NewTable()
-				for _, name := range names {
+				for i, name := range names {
 					col, ok := frame.Column(name)
 					if !ok {
 						return NilValue(), false
 					}
-					kind, _ := schema.Kind(name)
-					cols.RawSetString(string(name), dataColumnValue(kind, dataArrayFacadeValue(col, qAnyToColumnValue)))
+					cols.RawSetString(string(name), dataColumnValue(frameKinds[i], dataArrayFacadeValue(col, qAnyToColumnValue)))
 				}
 				if HasActiveValueScope() {
 					return TableValue(cols), true
