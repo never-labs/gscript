@@ -122,7 +122,10 @@ func partitionAlignedRows(left Frame, leftName Symbol, leftPart Array, right Fra
 	kind := leftPart.Kind()
 	resolved := make([][]int, len(leftIndex.Keys))
 	for g, key := range leftIndex.Keys {
-		rows := rightIndex.RowsByKey[arrayValueKey(kind, key)]
+		rows, ok := typedIndexRowsByKey(rightIndex, key)
+		if !ok {
+			rows = rightIndex.RowsByKey[arrayValueKey(kind, key)]
+		}
 		if len(rows) > 0 && !int64RowsSorted(rightTimes, rows) {
 			rows = append([]int(nil), rows...)
 			sort.SliceStable(rows, func(i, j int) bool {
@@ -132,6 +135,59 @@ func partitionAlignedRows(left Frame, leftName Symbol, leftPart Array, right Fra
 		resolved[g] = rows
 	}
 	return leftIDs, leftIndex.Rows, resolved, true
+}
+
+func typedIndexRowsByKey(index ArrayIndex, key any) ([]int, bool) {
+	switch rowsByKey := index.typedRowsByKey.(type) {
+	case map[bool][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[int8][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[int16][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[int32][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[int64][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[uint8][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[uint16][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[uint32][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[uint64][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[string][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Symbol][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Month][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Date][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[DateTime][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Timespan][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Minute][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Second][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Time][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	case map[Timestamp][]int:
+		return rowsByTypedKey(rowsByKey, key)
+	default:
+		return nil, false
+	}
+}
+
+func rowsByTypedKey[T comparable](rowsByKey map[T][]int, key any) ([]int, bool) {
+	typed, ok := key.(T)
+	if !ok {
+		return nil, false
+	}
+	return rowsByKey[typed], true
 }
 
 // windowMatchIndexesTypedFast computes per-left-row right row windows for a
