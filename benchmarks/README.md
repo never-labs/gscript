@@ -54,6 +54,11 @@ go run ./cmd/leia bench q-columnar --runs=3 --warmup=1 \
 LEIA_GO_BENCHTIME=100x go run ./cmd/leia bench q-suite --runs=3 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128
 
+# q baseline evidence for optimization work: current vs HEAD vs LuaJIT,
+# q/qSQL vs hand-written Go, allocs/op, typed kernel hit rate, and fallback
+# counters. Use this before and after non-trivial q/runtime/JIT performance work.
+scripts/run.sh q-baseline
+
 # q performance completeness report: qSQL plus ordinary q.eval/list/vector
 # workloads against hand-written Go, with warm/cold, cache/fallback, and allocs.
 go run ./cmd/leia bench q-report --benchtime=100x \

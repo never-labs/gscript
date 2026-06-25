@@ -22,6 +22,7 @@ Tasks:
   module-path          Check repository module path
   public-blockers      Check public release blocker decisions
   q                    Run q conformance gate
+  q-baseline           Run q LuaJIT and hand-written Go baseline report
   q-perf               Run q performance report gate
   release-artifacts    Build local release artifacts
   release-artifacts-gate
@@ -480,6 +481,9 @@ case "$task" in
     ;;
   q|q-conformance)
     run_shell_task scripts/q_conformance_gate.sh "$@"
+    ;;
+  q-baseline|q-performance-baseline)
+    exec bash "$repo_root/benchmarks/q_baseline_suite.sh" "$@"
     ;;
   q-perf|q-performance|q-performance-gate)
     run_q_perf_task "$@"
