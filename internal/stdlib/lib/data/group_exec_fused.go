@@ -197,6 +197,9 @@ func fusedReleaseSlots(slots []fusedSumSlot) {
 // at most two group-key columns in one fused pass. ok=false defers to the
 // generic grouped pipeline with no side effects.
 func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs []groupInput, aggs []aggregateInput) (Frame, bool, error) {
+	if out, ok, err := execGroupedFusedI64Sums(frame, indexes, allRows, byInputs, aggs); ok || err != nil {
+		return out, ok, err
+	}
 	rows := frame.Len()
 	if rows == 0 || len(byInputs) == 0 || len(byInputs) > 2 || len(aggs) == 0 {
 		return Frame{}, false, nil
@@ -491,6 +494,173 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 		}
 	}
 	fusedReleaseSlots(slots)
+	out, err := newFrameTrusted(cols...)
+	return out, true, err
+}
+
+func execGroupedFusedI64Sums(frame Frame, indexes []int, allRows bool, byInputs []groupInput, aggs []aggregateInput) (Frame, bool, error) {
+	rows := frame.Len()
+	if rows == 0 || len(byInputs) == 0 || len(byInputs) > 2 || len(aggs) == 0 {
+		return Frame{}, false, nil
+	}
+	var sources [][]int64
+	plans := make([]fusedAggPlan, len(aggs))
+	for i, agg := range aggs {
+		plans[i] = fusedAggPlan{fn: agg.Func, name: agg.Name, slot: -1, wslot: -1}
+		switch agg.Func {
+		case "count":
+			if agg.Weight != nil {
+				return Frame{}, false, nil
+			}
+		case "sum":
+			if agg.Weight != nil || agg.column == nil || agg.leftColumn != nil || agg.rightColumn != nil {
+				return Frame{}, false, nil
+			}
+			src, ok := groupAggI64Slice(agg.column)
+			if !ok || len(src) != rows {
+				return Frame{}, false, nil
+			}
+			found := -1
+			for j, existing := range sources {
+				if len(existing) > 0 && len(src) > 0 && &existing[0] == &src[0] {
+					found = j
+					break
+				}
+			}
+			if found < 0 {
+				if len(sources) >= fusedGroupMaxSumSlots {
+					return Frame{}, false, nil
+				}
+				found = len(sources)
+				sources = append(sources, src)
+			}
+			plans[i].slot = found
+		default:
+			return Frame{}, false, nil
+		}
+	}
+
+	byArrays, ok := groupByArrays(frame, byInputs)
+	if !ok {
+		return Frame{}, false, nil
+	}
+	var ids0, ids1 []int
+	c1 := 1
+	domain := 1
+	for i, array := range byArrays {
+		ids, count, ok := groupColumnRowIDs(frame, byInputs[i], array)
+		if !ok || count <= 0 {
+			return Frame{}, false, nil
+		}
+		if i == 0 {
+			ids0 = ids
+			domain = count
+		} else {
+			ids1 = ids
+			c1 = count
+			if int64(domain)*int64(count) > 1<<22 {
+				return Frame{}, false, nil
+			}
+			domain *= count
+		}
+	}
+	n := rows
+	if !allRows {
+		n = len(indexes)
+		for _, row := range indexes {
+			if row < 0 || row >= rows {
+				return Frame{}, false, nil
+			}
+		}
+	}
+	if domain > 1<<22 || (domain > rows*4 && domain > 1<<12) {
+		return Frame{}, false, nil
+	}
+	capN := domain
+	if n < capN {
+		capN = n
+	}
+	slate := bulkI32Get(domain)
+	clear(slate)
+	count := bulkI64Get(capN)
+	clear(count)
+	var sum0, sum1, sum2 []int64
+	if len(sources) > 0 {
+		sum0 = bulkI64Get(capN)
+		clear(sum0)
+	}
+	if len(sources) > 1 {
+		sum1 = bulkI64Get(capN)
+		clear(sum1)
+	}
+	if len(sources) > 2 {
+		sum2 = bulkI64Get(capN)
+		clear(sum2)
+	}
+
+	repRows := make([]int, 0, 16)
+	accumulate := func(row int) {
+		key := ids0[row]
+		if ids1 != nil {
+			key = key*c1 + ids1[row]
+		}
+		g := slate[key]
+		if g == 0 {
+			repRows = append(repRows, row)
+			g = int32(len(repRows))
+			slate[key] = g
+		}
+		gi := int(g - 1)
+		count[gi]++
+		if sum0 != nil {
+			sum0[gi] += sources[0][row]
+		}
+		if sum1 != nil {
+			sum1[gi] += sources[1][row]
+		}
+		if sum2 != nil {
+			sum2[gi] += sources[2][row]
+		}
+	}
+	if allRows {
+		for row := 0; row < rows; row++ {
+			accumulate(row)
+		}
+	} else {
+		for _, row := range indexes {
+			accumulate(row)
+		}
+	}
+	bulkI32Release(slate)
+
+	groups := len(repRows)
+	cols := make([]Column, 0, len(byInputs)+len(aggs))
+	for i, item := range byInputs {
+		cols = append(cols, Column{Name: item.Name, Data: unwrapAttributedArray(byArrays[i]).Gather(repRows)})
+	}
+	for _, plan := range plans {
+		switch plan.fn {
+		case "count":
+			values := make([]int64, groups)
+			copy(values, count[:groups])
+			cols = append(cols, Column{Name: plan.name, Data: columnArray[int64]{kind: KindI64, data: values}})
+		case "sum":
+			values := make([]int64, groups)
+			switch plan.slot {
+			case 0:
+				copy(values, sum0[:groups])
+			case 1:
+				copy(values, sum1[:groups])
+			case 2:
+				copy(values, sum2[:groups])
+			}
+			cols = append(cols, Column{Name: plan.name, Data: columnArray[int64]{kind: KindI64, data: values}})
+		}
+	}
+	bulkI64Release(count, true)
+	bulkI64Release(sum0, true)
+	bulkI64Release(sum1, true)
+	bulkI64Release(sum2, true)
 	out, err := newFrameTrusted(cols...)
 	return out, true, err
 }
