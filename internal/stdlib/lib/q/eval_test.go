@@ -3198,10 +3198,16 @@ func TestEvalStatePipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	if got, err := state.Eval("x:til 8;y:x*2;idx:where x<6;+/y[idx]"); err != nil || got != int64(30) {
 		t.Fatalf("second Eval returned %#v, %v; want 30,nil", got, err)
 	}
-	if len(state.pipelineCache) == 0 {
+	var plan *qPipelinePlan
+	if state.pipelineCache1Src == "+/y[idx]" {
+		plan = state.pipelineCache1Plan
+	} else if state.pipelineCache != nil {
+		plan = state.pipelineCache["+/y[idx]"]
+	}
+	if plan == nil {
 		t.Fatal("EvalState pipeline plan cache was not populated")
 	}
-	if plan := state.pipelineCache["+/y[idx]"]; plan.kind != qPipelineSumGatherIndexes {
+	if plan.kind != qPipelineSumGatherIndexes {
 		t.Fatalf("cached +/y[idx] plan kind = %v, want qPipelineSumGatherIndexes", plan.kind)
 	}
 	seenPlanHit := false

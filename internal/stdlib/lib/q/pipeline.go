@@ -184,6 +184,9 @@ func (s *EvalState) qPipelinePlanRef(src string) *qPipelinePlan {
 	// session-warm evals re-visit the same subexpression sources every call,
 	// and the candidate prefilter alone walks the source several times.
 	// Negative results are cached too, so steady-state planning is one map hit.
+	if s.pipelineCache1Plan != nil && s.pipelineCache1Src == src {
+		return s.pipelineCache1Plan
+	}
 	if s.pipelineCache != nil {
 		if plan, ok := s.pipelineCache[src]; ok {
 			return plan
@@ -218,10 +221,22 @@ func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
 }
 
 func (s *EvalState) storeQPipelinePlan(src string, plan *qPipelinePlan) {
+	if s.pipelineCache1Plan == nil {
+		s.pipelineCache1Src = src
+		s.pipelineCache1Plan = plan
+		return
+	}
+	if s.pipelineCache1Src == src {
+		s.pipelineCache1Plan = plan
+		return
+	}
 	if s.pipelineCache == nil {
 		s.pipelineCache = make(map[string]*qPipelinePlan, 32)
+		s.pipelineCache[s.pipelineCache1Src] = s.pipelineCache1Plan
 	} else if len(s.pipelineCache) >= 512 {
 		s.pipelineCache = make(map[string]*qPipelinePlan, 32)
+		s.pipelineCache1Src = src
+		s.pipelineCache1Plan = plan
 	}
 	s.pipelineCache[src] = plan
 }

@@ -665,6 +665,8 @@ type EvalState struct {
 	scriptCache          map[string]qScriptPlan
 	valueExprCache       map[string]Expr
 	pipelineCache        map[string]*qPipelinePlan
+	pipelineCache1Src    string
+	pipelineCache1Plan   *qPipelinePlan
 	constValueCache      map[string]any
 	applyIndexCache      map[string]qScalarApplyIndexPlan
 	dotApplyCache        map[string]qDotApplyPlan
