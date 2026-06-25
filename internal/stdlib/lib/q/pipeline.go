@@ -190,7 +190,9 @@ func (s *EvalState) qPipelinePlanRef(src string) *qPipelinePlan {
 		}
 	}
 	if !qPipelinePlanCandidate(src) {
-		s.storeQPipelinePlan(src, qPipelinePlanInvalidShared)
+		if !s.oneShot {
+			s.storeQPipelinePlan(src, qPipelinePlanInvalidShared)
+		}
 		return qPipelinePlanInvalidShared
 	}
 	if qPipelinePlanGlobalCacheable(src) {

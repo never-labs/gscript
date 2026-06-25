@@ -1044,6 +1044,11 @@ func (s *EvalState) qScriptPlan(src string) qScriptPlan {
 			return plan
 		}
 	}
+	if s.oneShot {
+		if plan, ok := qGlobalScriptPlanCacheHit(src); ok {
+			return plan
+		}
+	}
 	if qScriptPlanGlobalCacheable(src) {
 		if plan, ok := qGlobalScriptPlanCacheProbe(src); ok {
 			s.rememberQScriptPlan(src, plan)
@@ -1081,6 +1086,20 @@ func qGlobalScriptPlanCacheProbe(src string) (qScriptPlan, bool) {
 		qGlobalScriptPlanStats.ScriptHits++
 	} else {
 		qGlobalScriptPlanStats.ScriptMisses++
+	}
+	qGlobalScriptPlanCacheMu.Unlock()
+	if !ok {
+		return qScriptPlan{}, false
+	}
+	qRecordScriptPlanFastPipelineCacheHits(plan)
+	return plan, true
+}
+
+func qGlobalScriptPlanCacheHit(src string) (qScriptPlan, bool) {
+	qGlobalScriptPlanCacheMu.Lock()
+	plan, ok := qGlobalScriptPlanCache[src]
+	if ok {
+		qGlobalScriptPlanStats.ScriptHits++
 	}
 	qGlobalScriptPlanCacheMu.Unlock()
 	if !ok {
