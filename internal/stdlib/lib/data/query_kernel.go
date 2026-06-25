@@ -2104,7 +2104,7 @@ func ExecQueryKernelOrPlanConsume(kernel *QueryKernel, plan QueryPlan, frame Fra
 }
 
 func validateQueryKernelSchema(frame Frame, want Schema) error {
-	got := frame.Schema()
+	got := frame.schema
 	if len(got.names) != len(want.names) {
 		return fmt.Errorf("query kernel schema mismatch: got %d columns, want %d", len(got.names), len(want.names))
 	}
@@ -2113,8 +2113,8 @@ func validateQueryKernelSchema(frame Frame, want Schema) error {
 		if gotName != wantName {
 			return fmt.Errorf("query kernel schema mismatch at column %d: got %q, want %q", i, gotName, wantName)
 		}
-		gotKind, gotOK := got.Kind(gotName)
-		wantKind, wantOK := want.Kind(wantName)
+		gotKind, gotOK := got.kinds[gotName]
+		wantKind, wantOK := want.kinds[wantName]
 		if !gotOK || !wantOK || gotKind != wantKind {
 			return fmt.Errorf("query kernel schema mismatch for column %q: got %s, want %s", wantName, gotKind, wantKind)
 		}
