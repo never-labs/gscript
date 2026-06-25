@@ -89,15 +89,8 @@ func qTryTypedRuntimeVectorCompareDyadic(op string, dataOp data.Op, left, right 
 		}
 		return nil, false, nil
 	}
-	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-		kernel:         "ArrayDyadicCompare",
-		shape:          shape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
-		call: func() (any, bool, error) {
-			out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra)
-			return out, handled, err
-		},
-	})
+	out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra)
+	return qTypedRuntimeResultReason("ArrayDyadicCompare", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 }
 
 func qTryTypedRuntimeVectorArithmeticDyadic(op byte, dataOp data.Op, left, right any, la, ra data.Array, recordUnsupportedProbe bool) (any, bool, error) {
@@ -119,37 +112,19 @@ func qTryTypedRuntimeVectorArithmeticDyadic(op byte, dataOp data.Op, left, right
 		}
 		return nil, false, nil
 	}
-	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-		kernel:         "ArrayDyadicArithmetic",
-		shape:          shape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
-		call: func() (any, bool, error) {
-			return qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight)
-		},
-	})
+	out, handled, err := qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight)
+	return qTypedRuntimeResultReason("ArrayDyadicArithmetic", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 }
 
 func qTryTypedRuntimeBoolLogical(logical, shape string, left, right any) (any, bool, error) {
-	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-		kernel:         "ArrayBoolLogical",
-		shape:          shape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
-		call: func() (any, bool, error) {
-			return data.TryTypedBoolLogical(logical, left, right)
-		},
-	})
+	out, handled, err := data.TryTypedBoolLogical(logical, left, right)
+	return qTypedRuntimeResultReason("ArrayBoolLogical", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 }
 
 func qTryTypedRuntimeDyadicMinMax(logical string, wantMax bool, left, right any, la, ra data.Array) (any, bool, error) {
 	shape := "minmax/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
-	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
-		kernel:         "ArrayDyadicMinMax",
-		shape:          shape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
-		call: func() (any, bool, error) {
-			return data.TryTypedDyadicMinMax(left, right, wantMax)
-		},
-	})
+	out, handled, err := data.TryTypedDyadicMinMax(left, right, wantMax)
+	return qTypedRuntimeResultReason("ArrayDyadicMinMax", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 }
 
 func qTryTypedRuntimeScalarFill(scalar any, array data.Array) (data.Array, bool, error) {

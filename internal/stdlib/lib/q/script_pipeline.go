@@ -1941,6 +1941,8 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	out, handled, err := s.evalQScriptTerminalPipeline(descriptor, terminal)
@@ -1967,6 +1969,7 @@ func (s *EvalState) evalQScriptSumPlusDyadicFloatPipeline(descriptor *qScriptPip
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
@@ -2020,6 +2023,7 @@ func (s *EvalState) evalQScriptIntegerDivModReducePipeline(descriptor *qScriptPi
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
@@ -2084,6 +2088,7 @@ func (s *EvalState) evalQScriptMatrixRowSumCountPipeline(descriptor *qScriptPipe
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	matrixValue, handled, err := s.evalQScriptBindingPlan(&descriptor.rowValuePlan)
@@ -2133,6 +2138,7 @@ func (s *EvalState) evalQScriptMatrixRowsSumCountPipeline(descriptor *qScriptPip
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	matrixValue, handled, err := s.evalQScriptBindingPlan(&descriptor.rowValuePlan)
@@ -2276,6 +2282,7 @@ func (s *EvalState) evalQScriptMatrixCellPlusCountPipeline(descriptor *qScriptPi
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	row, handled, err := s.evalQScriptScalarIndexPlan(&descriptor.rowIndexPlan)
@@ -2328,6 +2335,7 @@ func (s *EvalState) evalQScriptMatrixNestedCellPipeline(descriptor *qScriptPipel
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	sumValue, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
@@ -2440,6 +2448,7 @@ func (s *EvalState) evalQScriptCallableDotSumPlusRightPipeline(descriptor *qScri
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	left, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
@@ -2811,6 +2820,7 @@ func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipeli
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
@@ -2854,6 +2864,7 @@ func (s *EvalState) evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor 
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	value, handled, err := s.evalQScriptBindingPlan(&descriptor.sequenceValuePlan)
@@ -2884,6 +2895,7 @@ func (s *EvalState) evalQScriptSequenceTransformChainSumCountPipeline(descriptor
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	value, handled, err := s.evalQScriptBindingPlan(&descriptor.sequenceValuePlan)
@@ -2912,6 +2924,7 @@ func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelin
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	if qScriptPipelineHasAssignment(descriptor, descriptor.valueExpr) {
@@ -3009,6 +3022,7 @@ func (s *EvalState) evalQScriptIndexExprSumCountPipeline(descriptor *qScriptPipe
 				return nil, true, err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
@@ -3488,6 +3502,7 @@ func (s *EvalState) evalQScriptPipelineDeferredAssignment(descriptor *qScriptPip
 				return err
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 		return nil
 	}

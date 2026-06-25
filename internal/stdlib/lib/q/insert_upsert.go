@@ -75,6 +75,7 @@ func (s *EvalState) applyNamedInsertUpsert(name, verb string, value any) (any, e
 				return nil, fmt.Errorf("%s `%s: %w", verb, name, err)
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[resolved] = out
 		if verb == "upsert" {
 			return data.Symbol(name), nil
@@ -101,6 +102,7 @@ func (s *EvalState) applyNamedInsertUpsert(name, verb string, value any) (any, e
 				return nil, fmt.Errorf("%s `%s: %w", verb, name, err)
 			}
 		}
+		s.ensureOwnedEnv()
 		s.env[resolved] = out
 		if verb == "upsert" {
 			return data.Symbol(name), nil

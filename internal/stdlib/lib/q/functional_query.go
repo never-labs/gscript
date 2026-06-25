@@ -700,6 +700,7 @@ func (s *EvalState) evalFunctionalAmend(table qFunctionalTable, args []string) (
 		result = frame
 	}
 	if table.name != "" {
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(table.name)] = result
 		// Canonical amend-by-name returns the table name symbol.
 		return data.Symbol(table.name), nil

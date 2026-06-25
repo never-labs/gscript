@@ -2985,6 +2985,25 @@ func TestEvalGlobalPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) 
 	}
 }
 
+func TestEvalWithEnvDoesNotMutateHostEnv(t *testing.T) {
+	env := map[string]any{"x": int64(1)}
+	if got, err := EvalWithEnv("x:2;x", env); err != nil || got != int64(2) {
+		t.Fatalf("EvalWithEnv assignment returned %#v, %v; want 2,nil", got, err)
+	}
+	if got := env["x"]; got != int64(1) {
+		t.Fatalf("EvalWithEnv mutated host env x = %#v, want 1", got)
+	}
+	if _, ok := env["y"]; ok {
+		t.Fatalf("EvalWithEnv leaked new binding y into host env")
+	}
+	if got, err := EvalWithEnv("y:3;y", env); err != nil || got != int64(3) {
+		t.Fatalf("EvalWithEnv new assignment returned %#v, %v; want 3,nil", got, err)
+	}
+	if _, ok := env["y"]; ok {
+		t.Fatalf("EvalWithEnv leaked new binding y into host env after new assignment")
+	}
+}
+
 func TestEvalGlobalScriptPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearEvalPlanCaches()
 	t.Cleanup(ClearEvalPlanCaches)

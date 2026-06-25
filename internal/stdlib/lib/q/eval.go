@@ -658,6 +658,7 @@ type projectionArg struct {
 // relying on package-global state.
 type EvalState struct {
 	env                  map[string]any
+	envBorrowed          bool
 	port                 int64
 	namespace            string
 	oneShot              bool
@@ -729,7 +730,7 @@ func Eval(src string) (any, error) {
 }
 
 func EvalWithEnv(src string, env map[string]any) (any, error) {
-	return (&EvalState{env: cloneEnv(env), namespace: ".", oneShot: true}).Eval(src)
+	return (&EvalState{env: env, envBorrowed: true, namespace: ".", oneShot: true}).Eval(src)
 }
 
 // EvalSourceCacheable reports whether src is safe for callers to memoize across
@@ -1228,6 +1229,11 @@ func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any,
 	}
 	switch plan.kind {
 	case qScriptExecutableSingleStatement:
+		if s.oneShot {
+			stmt := &plan.statement
+			out, err := s.evalCachedOrString(stmt.src, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
+			return out, true, err
+		}
 		stmt := plan.statement
 		out, err := s.evalCachedOrString(stmt.src, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
 		return out, true, err
@@ -1683,6 +1689,7 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 		if s.assignPool.active {
 			v = s.assignPoolMaterialize(name, v)
 		}
+		s.ensureOwnedEnv()
 		s.env[name] = v
 	}
 	return v, nil
@@ -1742,6 +1749,7 @@ func (s *EvalState) evalIndexedAssignStatement(stmt *qScriptStatement) (any, err
 	if s.assignPool.active {
 		amended = s.assignPoolMaterialize(name, amended)
 	}
+	s.ensureOwnedEnv()
 	s.env[name] = amended
 	return value, nil
 }
@@ -1878,6 +1886,7 @@ func (s *EvalState) tryEvalNumericReductionBundle(statements []qScriptStatement,
 	var last any
 	for i := range bindings {
 		value := numericReductionStatsValue(stats, bindings[i].reduction.op)
+		s.ensureOwnedEnv()
 		s.env[s.resolveAssignmentName(bindings[i].reduction.assign)] = value
 		last = value
 	}
@@ -2787,6 +2796,17 @@ func cloneEnv(env map[string]any) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+func (s *EvalState) ensureOwnedEnv() {
+	if !s.envBorrowed {
+		if s.env == nil {
+			s.env = make(map[string]any)
+		}
+		return
+	}
+	s.env = cloneEnv(s.env)
+	s.envBorrowed = false
 }
 
 func (s *EvalState) currentNamespace() string {
@@ -9486,23 +9506,29 @@ func (s *EvalState) bindIPCArgs(args []any) func() {
 		old[name] = oldValue{value: v, ok: ok}
 	}
 	for i, arg := range args {
+		s.ensureOwnedEnv()
 		s.env[fmt.Sprintf("x%d", i)] = arg
 	}
 	if len(args) > 0 {
+		s.ensureOwnedEnv()
 		s.env["x"] = args[0]
 	}
 	if len(args) > 1 {
+		s.ensureOwnedEnv()
 		s.env["y"] = args[1]
 	}
 	if len(args) > 2 {
+		s.ensureOwnedEnv()
 		s.env["z"] = args[2]
 	}
 	return func() {
 		for name, previous := range old {
 			if previous.ok {
+				s.ensureOwnedEnv()
 				s.env[name] = previous.value
 				continue
 			}
+			s.ensureOwnedEnv()
 			delete(s.env, name)
 		}
 	}
@@ -9685,6 +9711,7 @@ func (s *EvalState) applyLambda(fn qLambda, args []any) (any, error) {
 	state := NewEvalState(vars)
 	state.namespace = fn.namespace
 	for i, arg := range args {
+		state.ensureOwnedEnv()
 		state.env[state.resolveAssignmentName(params[i])] = arg
 	}
 	return state.Eval(body)

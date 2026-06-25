@@ -496,10 +496,13 @@ func (s *EvalState) evalQScriptBindingPlanWithResolver(plan *qScriptBindingPlan,
 	if plan == nil {
 		return nil, false, nil
 	}
-	if plan.cached {
+	if !s.oneShot && plan.cached {
 		return plan.cache, true, nil
 	}
-	cacheable := qScriptBindingPlanCacheable(plan)
+	cacheable := false
+	if !s.oneShot {
+		cacheable = qScriptBindingPlanCacheable(plan)
+	}
 	var (
 		value   any
 		handled bool
