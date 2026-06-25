@@ -12476,11 +12476,7 @@ func orderIndexesLimit(frame Frame, indexes []int, specs []OrderSpec, limit int)
 		return out[:limit], nil
 	}
 	if len(bound) != 1 {
-		out, err := orderIndexes(frame, indexes, specs)
-		if err != nil {
-			return nil, err
-		}
-		return out[:limit], nil
+		return topKOrderIndexesMulti(indexes, bound, limit), nil
 	}
 	return topKOrderIndexes(indexes, bound[0], limit), nil
 }
@@ -12517,6 +12513,11 @@ type orderTopKHeap struct {
 	spec  boundOrderSpec
 }
 
+type orderTopKMultiHeap struct {
+	items []orderTopKItem
+	specs []boundOrderSpec
+}
+
 func (h orderTopKHeap) Len() int { return len(h.items) }
 
 func (h orderTopKHeap) Less(i, j int) bool {
@@ -12530,6 +12531,26 @@ func (h *orderTopKHeap) Push(x any) {
 }
 
 func (h *orderTopKHeap) Pop() any {
+	old := h.items
+	n := len(old)
+	item := old[n-1]
+	h.items = old[:n-1]
+	return item
+}
+
+func (h orderTopKMultiHeap) Len() int { return len(h.items) }
+
+func (h orderTopKMultiHeap) Less(i, j int) bool {
+	return orderTopKBeforeMulti(h.specs, h.items[j], h.items[i])
+}
+
+func (h orderTopKMultiHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
+
+func (h *orderTopKMultiHeap) Push(x any) {
+	h.items = append(h.items, x.(orderTopKItem))
+}
+
+func (h *orderTopKMultiHeap) Pop() any {
 	old := h.items
 	n := len(old)
 	item := old[n-1]
@@ -12561,9 +12582,47 @@ func topKOrderIndexes(indexes []int, spec boundOrderSpec, limit int) []int {
 	return out
 }
 
+func topKOrderIndexesMulti(indexes []int, specs []boundOrderSpec, limit int) []int {
+	h := &orderTopKMultiHeap{items: make([]orderTopKItem, 0, limit), specs: specs}
+	for seq, row := range indexes {
+		item := orderTopKItem{row: row, seq: seq}
+		if h.Len() < limit {
+			heap.Push(h, item)
+			continue
+		}
+		if orderTopKBeforeMulti(specs, item, h.items[0]) {
+			h.items[0] = item
+			heap.Fix(h, 0)
+		}
+	}
+	outItems := append([]orderTopKItem(nil), h.items...)
+	sort.SliceStable(outItems, func(i, j int) bool {
+		return orderTopKBeforeMulti(specs, outItems[i], outItems[j])
+	})
+	out := make([]int, len(outItems))
+	for i, item := range outItems {
+		out[i] = item.row
+	}
+	return out
+}
+
 func orderTopKBefore(spec boundOrderSpec, left, right orderTopKItem) bool {
 	cmp := compareArrayRows(spec.column, left.row, right.row)
 	if cmp != 0 {
+		if spec.spec.Desc {
+			return cmp > 0
+		}
+		return cmp < 0
+	}
+	return left.seq < right.seq
+}
+
+func orderTopKBeforeMulti(specs []boundOrderSpec, left, right orderTopKItem) bool {
+	for _, spec := range specs {
+		cmp := compareArrayRows(spec.column, left.row, right.row)
+		if cmp == 0 {
+			continue
+		}
 		if spec.spec.Desc {
 			return cmp > 0
 		}

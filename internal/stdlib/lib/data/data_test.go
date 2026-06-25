@@ -3986,6 +3986,54 @@ func TestQueryOrderByMultipleColumns(t *testing.T) {
 	assertColumnValues(t, got, "seq", []any{int64(3), int64(1), int64(2), int64(4)})
 }
 
+func TestQueryOrderByMultipleColumnsLimitUsesStableTopK(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("b"), Symbol("a"), Symbol("a"), Symbol("b"), Symbol("a"), Symbol("b"), Symbol("a")}),
+		NewColumn("qty", []any{4, 2, 5, 5, 5, 5, 5}),
+		NewColumn("seq", []any{1, 2, 3, 4, 5, 6, 7}),
+	)
+	specs := []OrderSpec{
+		{Column: "sym"},
+		{Column: "qty", Desc: true},
+	}
+
+	want, err := From(frame).
+		OrderByColumns(specs...).
+		Exec()
+	if err != nil {
+		t.Fatalf("full order Exec returned error: %v", err)
+	}
+	got, err := From(frame).
+		OrderByColumns(specs...).
+		Limit(4).
+		Exec()
+	if err != nil {
+		t.Fatalf("limited order Exec returned error: %v", err)
+	}
+
+	for _, name := range []Symbol{"sym", "qty", "seq"} {
+		wantColumn, ok := want.Column(name)
+		if !ok {
+			t.Fatalf("full order result missing column %q", name)
+		}
+		gotColumn, ok := got.Column(name)
+		if !ok {
+			t.Fatalf("limited order result missing column %q", name)
+		}
+		if gotColumn.Len() != 4 {
+			t.Fatalf("limited column %q len = %d, want 4", name, gotColumn.Len())
+		}
+		for row := 0; row < gotColumn.Len(); row++ {
+			gotValue, _ := gotColumn.At(row)
+			wantValue, _ := wantColumn.At(row)
+			if gotValue != wantValue {
+				t.Fatalf("column %q row %d = %#v, want %#v", name, row, gotValue, wantValue)
+			}
+		}
+	}
+	assertColumnValues(t, got, "seq", []any{int64(3), int64(5), int64(7), int64(2)})
+}
+
 func TestDataFoundationGroupJoinAsofAndXbarBasics(t *testing.T) {
 	trades := mustFrame(t,
 		NewColumn("sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT"), Symbol("AAPL")}),
