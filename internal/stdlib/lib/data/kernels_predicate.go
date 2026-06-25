@@ -180,6 +180,10 @@ func fusedPredicateI64CompareAndSum(values, mask Array) (int64, int, bool) {
 		bulkI64Release(valueData, valueOwned)
 		return 0, 0, false
 	}
+	if total, count, ok := fusedPredicateI64CompareAndSumDirect(valueData[:length], mask, length); ok {
+		bulkI64Release(valueData, valueOwned)
+		return total, count, true
+	}
 	c := predCompiler{length: length, nodeBudget: predNodeBudget}
 	root, ok := c.compile(mask, false)
 	if !ok {
@@ -229,6 +233,62 @@ func fusedPredicateI64CompareAndSum(values, mask Array) (int64, int, bool) {
 	total, count, ok := sumI64WhereCompareAnd(valueData[:length], leaves)
 	release()
 	return total, count, ok
+}
+
+func fusedPredicateI64CompareAndSumDirect(values []int64, mask Array, length int) (int64, int, bool) {
+	var leaves [8]predI64CompareLeaf
+	var owned [8]bool
+	count := 0
+	if !collectI64CompareAndLeaves(mask, length, &leaves, &owned, &count) || count == 0 {
+		releaseI64CompareLeaves(leaves[:count], owned[:count])
+		return 0, 0, false
+	}
+	total, selected, ok := sumI64WhereCompareAnd(values, leaves[:count])
+	releaseI64CompareLeaves(leaves[:count], owned[:count])
+	return total, selected, ok
+}
+
+func collectI64CompareAndLeaves(mask Array, length int, leaves *[8]predI64CompareLeaf, owned *[8]bool, count *int) bool {
+	switch a := mask.(type) {
+	case attributedArray:
+		return collectI64CompareAndLeaves(a.array, length, leaves, owned, count)
+	case boolLogicalMask:
+		if a.op != "and" || a.leftIsScalar || a.rightIsScalar || a.len != length || a.left == nil || a.right == nil {
+			return false
+		}
+		if a.left.Len() != length || a.right.Len() != length {
+			return false
+		}
+		return collectI64CompareAndLeaves(a.left, length, leaves, owned, count) &&
+			collectI64CompareAndLeaves(a.right, length, leaves, owned, count)
+	case i64ArrayCompareMask:
+		if a.len != length || a.source == nil || a.source.Len() != length || *count >= len(leaves) {
+			return false
+		}
+		op := effectiveRangeCompareOp(a.op, a.scalarLeft)
+		switch op {
+		case OpEQ, OpNE, OpLT, OpLE, OpGT, OpGE:
+		default:
+			return false
+		}
+		source, sourceOwned, ok := tryBulkI64Values(a.source)
+		if !ok || len(source) < length {
+			bulkI64Release(source, sourceOwned)
+			return false
+		}
+		leaves[*count] = predI64CompareLeaf{values: source[:length], op: op, scalar: a.scalar}
+		owned[*count] = sourceOwned
+		*count = *count + 1
+		return true
+	default:
+		return false
+	}
+}
+
+func releaseI64CompareLeaves(leaves []predI64CompareLeaf, owned []bool) {
+	for i := range leaves {
+		bulkI64Release(leaves[i].values, owned[i])
+	}
 }
 
 func sumI64WhereCompareAnd(values []int64, leaves []predI64CompareLeaf) (int64, int, bool) {
