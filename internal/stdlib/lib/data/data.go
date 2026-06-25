@@ -11518,11 +11518,14 @@ func execGroupedFromFilteredPredicateIndex(frame Frame, byInputs []groupInput, a
 }
 
 type typedGroupedAggregateAccumulator struct {
-	input  aggregateInput
-	sum    []float64
-	count  []int64
-	value  []any
-	hasVal []bool
+	input    aggregateInput
+	valueFn  func(row int) (float64, bool)
+	weightFn func(row int) (float64, bool)
+	sum      []float64
+	weight   []float64
+	count    []int64
+	value    []any
+	hasVal   []bool
 }
 
 func execTypedGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []aggregateInput, index ArrayIndex, groupOrder []int, indexes []int, predicate rowPredicate) (Frame, bool, error) {
@@ -11539,6 +11542,14 @@ func execTypedGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []a
 			input: agg,
 			sum:   make([]float64, len(index.Rows)),
 			count: make([]int64, len(index.Rows)),
+		}
+		if agg.Func == "wavg" {
+			accumulators[i].weight = make([]float64, len(index.Rows))
+			accumulators[i].valueFn = resolveAggNumericFn(agg)
+			accumulators[i].weightFn = resolveNumericColumnFn(agg.weightColumn)
+			if accumulators[i].valueFn == nil || accumulators[i].weightFn == nil {
+				return Frame{}, false, nil
+			}
 		}
 		if agg.Func == "min" || agg.Func == "max" {
 			accumulators[i].value = make([]any, len(index.Rows))
@@ -11573,6 +11584,14 @@ func execTypedGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []a
 				}
 				if ok {
 					acc.sum[group] += value
+					acc.count[group]++
+				}
+			case "wavg":
+				value, vok := acc.valueFn(row)
+				weight, wok := acc.weightFn(row)
+				if vok && wok {
+					acc.sum[group] += value * weight
+					acc.weight[group] += weight
 					acc.count[group]++
 				}
 			case "min", "max":
@@ -11662,12 +11681,26 @@ func isTypedGroupedAggregateKeyKind(kind Kind) bool {
 
 func typedGroupedAggregateInputsSupported(aggs []aggregateInput) bool {
 	for _, agg := range aggs {
-		if agg.Weight != nil {
-			return false
-		}
 		switch agg.Func {
 		case "count":
+			if agg.Weight != nil {
+				return false
+			}
 		case "sum":
+			if agg.Weight != nil {
+				return false
+			}
+			if agg.column != nil && isNumericArray(agg.column) {
+				continue
+			}
+			if agg.leftColumn != nil && agg.rightColumn != nil && isNumericArray(agg.leftColumn) && isNumericArray(agg.rightColumn) {
+				continue
+			}
+			return false
+		case "wavg":
+			if agg.Weight == nil || agg.weightColumn == nil || !isNumericArray(agg.weightColumn) {
+				return false
+			}
 			if agg.column != nil && isNumericArray(agg.column) {
 				continue
 			}
@@ -11676,6 +11709,9 @@ func typedGroupedAggregateInputsSupported(aggs []aggregateInput) bool {
 			}
 			return false
 		case "min", "max":
+			if agg.Weight != nil {
+				return false
+			}
 			if agg.column == nil || !isTypedMinMaxArray(agg.column) {
 				return false
 			}
@@ -11795,6 +11831,16 @@ func typedGroupedAggregateOutputColumn(frame Frame, acc typedGroupedAggregateAcc
 			values[row] = acc.sum[group]
 		}
 		return sumOutputColumnFromF64(frame, agg, values), nil
+	case "wavg":
+		sums := make([]float64, len(order))
+		weights := make([]float64, len(order))
+		counts := make([]int64, len(order))
+		for row, group := range order {
+			sums[row] = acc.sum[group]
+			weights[row] = acc.weight[group]
+			counts[row] = acc.count[group]
+		}
+		return groupedWavgOutputColumn(agg.Name, sums, weights, counts), nil
 	case "min", "max":
 		values := make([]any, len(order))
 		for row, group := range order {
@@ -12371,6 +12417,30 @@ func sumOutputColumnFromF64(frame Frame, agg Aggregate, sums []float64) Column {
 		}
 	}
 	return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: sums}}
+}
+
+func groupedWavgOutputColumn(name Symbol, sums, weights []float64, counts []int64) Column {
+	values := make([]float64, len(sums))
+	hasNull := false
+	for i := range sums {
+		if counts[i] == 0 || weights[i] == 0 {
+			hasNull = true
+			continue
+		}
+		values[i] = sums[i] / weights[i]
+	}
+	if !hasNull {
+		return Column{Name: name, Data: columnArray[float64]{kind: KindF64, data: values}}
+	}
+	out := make([]any, len(sums))
+	for i, value := range values {
+		if counts[i] == 0 || weights[i] == 0 {
+			out[i] = NullValue
+			continue
+		}
+		out[i] = value
+	}
+	return NewColumn(name, out)
 }
 
 func groupByItems(plan QueryPlan) []SelectItem {

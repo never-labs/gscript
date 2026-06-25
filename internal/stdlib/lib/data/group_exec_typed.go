@@ -20,8 +20,10 @@ import (
 type typedRowIDsAccumulator struct {
 	input    aggregateInput
 	valueFn  func(row int) (float64, bool)
+	weightFn func(row int) (float64, bool)
 	sum      []float64
 	sumsq    []float64
+	weight   []float64
 	count    []int64
 	firstRow []int
 	lastRow  []int
@@ -142,13 +144,13 @@ func resolveAggNumericFn(agg aggregateInput) func(row int) (float64, bool) {
 }
 
 func typedRowIDsAggSupported(agg aggregateInput) bool {
-	if agg.Weight != nil {
-		return false
-	}
 	switch agg.Func {
 	case "count":
-		return true
+		return agg.Weight == nil
 	case "sum", "avg", "var", "dev":
+		if agg.Weight != nil {
+			return false
+		}
 		if agg.column != nil {
 			return isNumericArray(agg.column)
 		}
@@ -156,9 +158,16 @@ func typedRowIDsAggSupported(agg aggregateInput) bool {
 			return isNumericBinaryAggregateOp(agg.binaryOp) && isNumericArray(agg.leftColumn) && isNumericArray(agg.rightColumn)
 		}
 		return false
+	case "wavg":
+		return agg.Weight != nil && agg.weightColumn != nil && isNumericArray(agg.weightColumn) &&
+			((agg.column != nil && isNumericArray(agg.column)) ||
+				(agg.leftColumn != nil && agg.rightColumn != nil && isNumericBinaryAggregateOp(agg.binaryOp) && isNumericArray(agg.leftColumn) && isNumericArray(agg.rightColumn)))
 	case "first", "last":
-		return agg.column != nil
+		return agg.Weight == nil && agg.column != nil
 	case "min", "max", "med":
+		if agg.Weight != nil {
+			return false
+		}
 		if agg.column == nil {
 			return false
 		}
@@ -404,8 +413,11 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 	for i, agg := range aggs {
 		accs[i].input = agg
 		switch agg.Func {
-		case "sum", "avg", "var", "dev":
+		case "sum", "avg", "var", "dev", "wavg":
 			accs[i].valueFn = resolveAggNumericFn(agg)
+			if agg.Func == "wavg" {
+				accs[i].weightFn = resolveNumericColumnFn(agg.weightColumn)
+			}
 		}
 		switch agg.Func {
 		case "count":
@@ -416,6 +428,10 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 		case "var", "dev":
 			accs[i].sum = make([]float64, groupCount)
 			accs[i].sumsq = make([]float64, groupCount)
+			accs[i].count = make([]int64, groupCount)
+		case "wavg":
+			accs[i].sum = make([]float64, groupCount)
+			accs[i].weight = make([]float64, groupCount)
 			accs[i].count = make([]int64, groupCount)
 		case "first":
 			accs[i].firstRow = make([]int, groupCount)
@@ -512,6 +528,22 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 				if acc.sumsq != nil {
 					acc.sumsq[g] += value * value
 				}
+				acc.count[g]++
+			}
+		case "wavg":
+			if acc.valueFn == nil || acc.weightFn == nil {
+				return Frame{}, false, nil
+			}
+			valueFn, weightFn := acc.valueFn, acc.weightFn
+			for k, g := range gids {
+				row := rowAt(k)
+				value, vok := valueFn(row)
+				weight, wok := weightFn(row)
+				if !vok || !wok {
+					continue
+				}
+				acc.sum[g] += value * weight
+				acc.weight[g] += weight
 				acc.count[g]++
 			}
 		case "first":
@@ -650,6 +682,8 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 				values[g] = v
 			}
 			cols = append(cols, Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: values}})
+		case "wavg":
+			cols = append(cols, groupedWavgOutputColumn(agg.Name, acc.sum[:outGroups], acc.weight[:outGroups], acc.count[:outGroups]))
 		case "first":
 			gathered := acc.firstRow[:outGroups]
 			cols = append(cols, Column{Name: agg.Name, Data: agg.column.Gather(gathered)})
