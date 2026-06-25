@@ -14,6 +14,13 @@ package data
 // per-row loop would produce, so result construction (aggregateResult +
 // aggregateOutputColumn) is shared and output parity is structural.
 
+type ungroupedSrc struct {
+	src    []float64
+	owned  bool
+	wsrc   []float64
+	wowned bool
+}
+
 // ungroupedAggregateStatesTyped computes every aggregate state with typed
 // column reductions. ok=false leaves states untouched and defers to the
 // generic per-row loop with no side effects.
@@ -27,71 +34,11 @@ func ungroupedAggregateStatesTyped(frame Frame, indexes []int, aggs []aggregateI
 		}
 	}
 
-	// Phase 1: resolve every aggregate's dense sources up front so failure on
-	// a later aggregate cannot leave earlier states half-accumulated.
-	type ungroupedSrc struct {
-		src    []float64
-		owned  bool
-		wsrc   []float64
-		wowned bool
+	srcs, ok := resolveUngroupedAggregateSources(rows, aggs)
+	if !ok {
+		return false
 	}
-	srcs := make([]ungroupedSrc, len(aggs))
-	release := func(upto int) {
-		for i := 0; i < upto; i++ {
-			bulkF64Release(srcs[i].src, srcs[i].owned)
-			bulkF64Release(srcs[i].wsrc, srcs[i].wowned)
-		}
-	}
-	for i, agg := range aggs {
-		if agg.Weight != nil && agg.Func != "wavg" {
-			release(i)
-			return false
-		}
-		switch agg.Func {
-		case "count":
-			// No source needed.
-		case "sum", "avg", "var", "dev":
-			src, owned, ok := ungroupedAggF64Source(agg, rows)
-			if !ok {
-				release(i)
-				return false
-			}
-			srcs[i].src, srcs[i].owned = src, owned
-		case "wavg":
-			if agg.weightColumn == nil {
-				release(i)
-				return false
-			}
-			src, owned, ok := ungroupedAggF64Source(agg, rows)
-			if !ok {
-				release(i)
-				return false
-			}
-			srcs[i].src, srcs[i].owned = src, owned
-			wsrc, wowned, ok := fusedGroupSource(agg.weightColumn, rows)
-			if !ok {
-				bulkF64Release(src, owned)
-				release(i)
-				return false
-			}
-			srcs[i].wsrc, srcs[i].wowned = wsrc, wowned
-		case "min", "max":
-			if agg.column == nil || agg.column.Len() != rows {
-				release(i)
-				return false
-			}
-			switch unwrapAttributedArray(agg.column).(type) {
-			case columnArray[int64], columnArray[float64]:
-				// Typed reduction below; raw values match agg.value's boxing.
-			default:
-				release(i)
-				return false
-			}
-		default:
-			release(i)
-			return false
-		}
-	}
+	defer releaseUngroupedSources(srcs)
 
 	// Phase 2: reduce.
 	n := rows
@@ -116,8 +63,136 @@ func ungroupedAggregateStatesTyped(frame Frame, indexes []int, aggs []aggregateI
 			ungroupedMinMaxTyped(state, aggs[i].column, indexes, aggs[i].Func == "max")
 		}
 	}
-	release(len(aggs))
 	return true
+}
+
+func execUngroupedFilteredWhere(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	if plan.Where == nil || plan.PreProjectOrder || len(groupByItems(plan)) != 0 || len(plan.Aggregates) == 0 || len(plan.Select) != 0 {
+		return Frame{}, false, nil
+	}
+	predicate, ok, err := filterRowPredicate(frame, plan.Where)
+	if err != nil || !ok {
+		return Frame{}, ok, err
+	}
+	aggs, err := bindAggregateInputs(frame, plan.Aggregates)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	states := make([]aggregateState, len(aggs))
+	for i, agg := range aggs {
+		states[i].fn = agg.Func
+	}
+	if !ungroupedAggregateStatesPredicateTyped(frame.Len(), predicate, aggs, states) {
+		return Frame{}, false, nil
+	}
+	cols := make([]Column, 0, len(plan.Aggregates))
+	for i, agg := range plan.Aggregates {
+		values := []any{aggregateResult(states[i])}
+		cols = append(cols, aggregateOutputColumn(frame, agg, values))
+	}
+	out, err := NewFrame(cols...)
+	return out, true, err
+}
+
+func ungroupedAggregateStatesPredicateTyped(rows int, predicate rowPredicate, aggs []aggregateInput, states []aggregateState) bool {
+	srcs, ok := resolveUngroupedAggregateSources(rows, aggs)
+	if !ok {
+		return false
+	}
+	defer releaseUngroupedSources(srcs)
+
+	for row := 0; row < rows; row++ {
+		if !predicate(row) {
+			continue
+		}
+		for i, agg := range aggs {
+			state := &states[i]
+			switch agg.Func {
+			case "count":
+				state.count++
+			case "sum", "avg":
+				state.sum += srcs[i].src[row]
+				state.count++
+			case "var", "dev":
+				v := srcs[i].src[row]
+				state.sum += v
+				state.sumsq += v * v
+				state.count++
+			case "wavg":
+				w := srcs[i].wsrc[row]
+				state.sum += srcs[i].src[row] * w
+				state.weight += w
+				state.count++
+			case "min", "max":
+				ungroupedMinMaxTypedRow(state, agg.column, row, agg.Func == "max")
+			default:
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func resolveUngroupedAggregateSources(rows int, aggs []aggregateInput) ([]ungroupedSrc, bool) {
+	srcs := make([]ungroupedSrc, len(aggs))
+	for i, agg := range aggs {
+		if agg.Weight != nil && agg.Func != "wavg" {
+			releaseUngroupedSources(srcs[:i])
+			return nil, false
+		}
+		switch agg.Func {
+		case "count":
+			// No source needed.
+		case "sum", "avg", "var", "dev":
+			src, owned, ok := ungroupedAggF64Source(agg, rows)
+			if !ok {
+				releaseUngroupedSources(srcs[:i])
+				return nil, false
+			}
+			srcs[i].src, srcs[i].owned = src, owned
+		case "wavg":
+			if agg.weightColumn == nil {
+				releaseUngroupedSources(srcs[:i])
+				return nil, false
+			}
+			src, owned, ok := ungroupedAggF64Source(agg, rows)
+			if !ok {
+				releaseUngroupedSources(srcs[:i])
+				return nil, false
+			}
+			srcs[i].src, srcs[i].owned = src, owned
+			wsrc, wowned, ok := fusedGroupSource(agg.weightColumn, rows)
+			if !ok {
+				bulkF64Release(src, owned)
+				releaseUngroupedSources(srcs[:i])
+				return nil, false
+			}
+			srcs[i].wsrc, srcs[i].wowned = wsrc, wowned
+		case "min", "max":
+			if agg.column == nil || agg.column.Len() != rows {
+				releaseUngroupedSources(srcs[:i])
+				return nil, false
+			}
+			switch unwrapAttributedArray(agg.column).(type) {
+			case columnArray[int64], columnArray[float64]:
+				// Typed reduction below; raw values match agg.value's boxing.
+			default:
+				releaseUngroupedSources(srcs[:i])
+				return nil, false
+			}
+		default:
+			releaseUngroupedSources(srcs[:i])
+			return nil, false
+		}
+	}
+	return srcs, true
+}
+
+func releaseUngroupedSources(srcs []ungroupedSrc) {
+	for i := range srcs {
+		bulkF64Release(srcs[i].src, srcs[i].owned)
+		bulkF64Release(srcs[i].wsrc, srcs[i].wowned)
+	}
 }
 
 // ungroupedAggF64Source resolves an aggregate's value expression to a dense
@@ -195,6 +270,21 @@ func ungroupedMinMaxTyped(state *aggregateState, col Array, indexes []int, isMax
 		best, ok := ungroupedExtremum(c.data, indexes, isMax)
 		if ok {
 			state.value, state.hasValue = best, true
+		}
+	}
+}
+
+func ungroupedMinMaxTypedRow(state *aggregateState, col Array, row int, isMax bool) {
+	switch c := unwrapAttributedArray(col).(type) {
+	case columnArray[int64]:
+		v := c.data[row]
+		if !state.hasValue || (isMax && v > state.value.(int64)) || (!isMax && v < state.value.(int64)) {
+			state.value, state.hasValue = v, true
+		}
+	case columnArray[float64]:
+		v := c.data[row]
+		if !state.hasValue || (isMax && v > state.value.(float64)) || (!isMax && v < state.value.(float64)) {
+			state.value, state.hasValue = v, true
 		}
 	}
 }

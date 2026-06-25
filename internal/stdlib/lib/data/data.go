@@ -9722,26 +9722,17 @@ func execPlan(frame Frame, plan QueryPlan, transferOwned bool) (Frame, error) {
 	if frame.Len() < 0 {
 		return Frame{}, fmt.Errorf("query frame is empty")
 	}
+	if out, ok, err := execUngroupedFilteredWhere(frame, plan); ok || err != nil {
+		if err != nil {
+			return Frame{}, err
+		}
+		return finishGroupedQueryResult(out, plan)
+	}
 	if out, ok, err := execGroupedFilteredWhere(frame, plan); ok || err != nil {
 		if err != nil {
 			return Frame{}, err
 		}
-		if plan.Distinct {
-			out, err = Distinct(out)
-			if err != nil {
-				return Frame{}, err
-			}
-		}
-		if len(plan.OrderBy) > 0 && !plan.PreProjectOrder {
-			out, err = orderFrameLimit(out, plan.OrderBy, plan.LimitN)
-			if err != nil {
-				return Frame{}, err
-			}
-		}
-		if plan.LimitN >= 0 && plan.LimitN < out.Len() {
-			return out.Gather(allIndexes(plan.LimitN))
-		}
-		return out, nil
+		return finishGroupedQueryResult(out, plan)
 	}
 	if out, ok, err := execTypedFilterProject(frame, plan); ok || err != nil {
 		return out, err
@@ -9792,6 +9783,26 @@ func execPlan(frame Frame, plan QueryPlan, transferOwned bool) (Frame, error) {
 		}
 	}
 	if len(plan.OrderBy) > 0 && !plan.PreProjectOrder && !projectOrderBeforeProjection {
+		out, err = orderFrameLimit(out, plan.OrderBy, plan.LimitN)
+		if err != nil {
+			return Frame{}, err
+		}
+	}
+	if plan.LimitN >= 0 && plan.LimitN < out.Len() {
+		return out.Gather(allIndexes(plan.LimitN))
+	}
+	return out, nil
+}
+
+func finishGroupedQueryResult(out Frame, plan QueryPlan) (Frame, error) {
+	var err error
+	if plan.Distinct {
+		out, err = Distinct(out)
+		if err != nil {
+			return Frame{}, err
+		}
+	}
+	if len(plan.OrderBy) > 0 && !plan.PreProjectOrder {
 		out, err = orderFrameLimit(out, plan.OrderBy, plan.LimitN)
 		if err != nil {
 			return Frame{}, err
