@@ -2660,6 +2660,14 @@ func qRunSQLScoped(name string, args qSQLArgsResult) (Value, error) {
 		}
 		return qDataFrameValue(out)
 	}
+	if flatPlan, ok := qTryFlattenProjectionSubqueryTemplate(tmpl); ok {
+		plan, kernelKey := qPrepareSQLPlanForFrameWithKernelKey(args.source, flatPlan, frame, bindings, true)
+		out, err := qRunSQLPlanWithKernelKeyMode(args.source, plan, frame, kernelKey, false)
+		if err != nil {
+			return NilValue(), fmt.Errorf("%s: exec: %w", name, err)
+		}
+		return qDataFrameValue(out)
+	}
 	for si := range tmpl.subs {
 		subSrc := fmt.Sprintf("%s\x00sub%d", args.source, si)
 		// The warm no-binding path returns the schema-stable kernel cache key
@@ -2753,6 +2761,135 @@ func qExecUngroupedAggregateValue(frame data.Frame) (Value, error) {
 		keys[i] = name
 	}
 	return qEvalDictValue(stdq.Dict{Keys: keys, Values: atoms})
+}
+
+func qTryFlattenProjectionSubqueryTemplate(tmpl qSQLPlanTemplate) (data.QueryPlan, bool) {
+	if tmpl.op != stdq.SelectQuery || len(tmpl.subs) != 1 || len(tmpl.hiddenCols) > 0 || len(tmpl.joins) > 0 || tmpl.join != nil || tmpl.mutation != nil {
+		return data.QueryPlan{}, false
+	}
+	sub := tmpl.subs[0]
+	if len(sub.hidden) > 0 || !qSQLPlanIsPlainProjectFilter(sub.plan) || !qSQLPlanIsPlainProjectFilter(tmpl.plan) {
+		return data.QueryPlan{}, false
+	}
+	mapping, ok := qSQLProjectionColumnMap(sub.plan.Select)
+	if !ok {
+		return data.QueryPlan{}, false
+	}
+	selects := make([]data.SelectItem, len(tmpl.plan.Select))
+	for i, item := range tmpl.plan.Select {
+		ref, ok := item.Expr.(data.ColumnRef)
+		if !ok {
+			return data.QueryPlan{}, false
+		}
+		source, ok := mapping[ref.Name]
+		if !ok {
+			return data.QueryPlan{}, false
+		}
+		selects[i] = data.SelectItem{Name: item.Name, Expr: data.ColumnRef{Name: source}}
+	}
+	outerWhere, ok := qSQLRemapProjectionExpr(tmpl.plan.Where, mapping)
+	if !ok {
+		return data.QueryPlan{}, false
+	}
+	flat := sub.plan
+	flat.Select = selects
+	flat.Where = qSQLAndWhere(sub.plan.Where, outerWhere)
+	flat.Source = data.Frame{}
+	return flat, true
+}
+
+func qSQLPlanIsPlainProjectFilter(plan data.QueryPlan) bool {
+	return !plan.Distinct && !plan.PreProjectOrder && plan.LimitN < 0 &&
+		len(plan.By) == 0 && len(plan.ByExprs) == 0 && len(plan.Aggregates) == 0 &&
+		len(plan.OrderBy) == 0 && len(plan.Select) > 0
+}
+
+func qSQLProjectionColumnMap(selects []data.SelectItem) (map[data.Symbol]data.Symbol, bool) {
+	mapping := make(map[data.Symbol]data.Symbol, len(selects))
+	for _, item := range selects {
+		ref, ok := item.Expr.(data.ColumnRef)
+		if !ok {
+			return nil, false
+		}
+		mapping[item.Name] = ref.Name
+	}
+	return mapping, true
+}
+
+func qSQLRemapProjectionExpr(expr data.Expr, mapping map[data.Symbol]data.Symbol) (data.Expr, bool) {
+	if expr == nil {
+		return nil, true
+	}
+	switch e := expr.(type) {
+	case data.ColumnRef:
+		name, ok := mapping[e.Name]
+		if !ok {
+			return nil, false
+		}
+		return data.ColumnRef{Name: name}, true
+	case data.Literal:
+		return e, true
+	case data.RowIndexRef:
+		return nil, false
+	case data.Binary:
+		left, ok := qSQLRemapProjectionExpr(e.Left, mapping)
+		if !ok {
+			return nil, false
+		}
+		right, ok := qSQLRemapProjectionExpr(e.Right, mapping)
+		if !ok {
+			return nil, false
+		}
+		return data.Binary{Op: e.Op, Left: left, Right: right}, true
+	case data.Logical:
+		left, ok := qSQLRemapProjectionExpr(e.Left, mapping)
+		if !ok {
+			return nil, false
+		}
+		right, ok := qSQLRemapProjectionExpr(e.Right, mapping)
+		if !ok {
+			return nil, false
+		}
+		return data.Logical{Op: e.Op, Left: left, Right: right}, true
+	case data.Not:
+		inner, ok := qSQLRemapProjectionExpr(e.Expr, mapping)
+		if !ok {
+			return nil, false
+		}
+		return data.Not{Expr: inner}, true
+	case data.In:
+		ref, ok := e.Expr.(data.ColumnRef)
+		if !ok {
+			return nil, false
+		}
+		name, ok := mapping[ref.Name]
+		if !ok {
+			return nil, false
+		}
+		return data.In{Expr: data.ColumnRef{Name: name}, Values: append([]any(nil), e.Values...)}, true
+	case data.Within:
+		ref, ok := e.Expr.(data.ColumnRef)
+		if !ok {
+			return nil, false
+		}
+		name, ok := mapping[ref.Name]
+		if !ok {
+			return nil, false
+		}
+		return data.Within{Expr: data.ColumnRef{Name: name}, Low: e.Low, High: e.High, HighClosed: e.HighClosed}, true
+	default:
+		return nil, false
+	}
+}
+
+func qSQLAndWhere(left, right data.Expr) data.Expr {
+	if left == nil {
+		return right
+	}
+	if right == nil {
+		return left
+	}
+	return data.Logical{Op: "and", Left: left, Right: right}
 }
 
 func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplate, joins []*stdq.JoinPlan) (data.Frame, bool, error) {
