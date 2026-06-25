@@ -48,36 +48,40 @@ const (
 )
 
 type qPipelinePlan struct {
-	source         string
-	kind           qPipelineKind
-	shape          string
-	shapeSpec      qPipelineShapeSpec
-	stableShapeID  string
-	pipelineShape  string
-	operands       []qPipelineOperandPlan
-	valueExpr      string
-	valuePlan      qScriptBindingPlan
-	indexExpr      string
-	indexPlan      qScriptBindingPlan
-	maskExpr       string
-	maskPlan       qScriptBindingPlan
-	leftExpr       string
-	leftPlan       qScriptBindingPlan
-	rightExpr      string
-	rightPlan      qScriptBindingPlan
-	compareOp      string
-	comparePrefix  string
-	unaryOp        string
-	modExpr        string
-	modPlan        qScriptBindingPlan
-	modulusExpr    string
-	modulusPlan    qScriptBindingPlan
-	modTargetExpr  string
-	modTargetPlan  qScriptBindingPlan
-	reductionInput string
-	reductionPlan  qScriptBindingPlan
-	moduloMaskPlan *qPipelinePlan
-	castTerms      []qPipelineCastTermPlan
+	source               string
+	kind                 qPipelineKind
+	shape                string
+	shapeSpec            qPipelineShapeSpec
+	stableShapeID        string
+	pipelineShape        string
+	moduloStatsShapeKey  string
+	moduloStatsShape     string
+	moduloReduceShapeKey string
+	moduloReduceShape    string
+	operands             []qPipelineOperandPlan
+	valueExpr            string
+	valuePlan            qScriptBindingPlan
+	indexExpr            string
+	indexPlan            qScriptBindingPlan
+	maskExpr             string
+	maskPlan             qScriptBindingPlan
+	leftExpr             string
+	leftPlan             qScriptBindingPlan
+	rightExpr            string
+	rightPlan            qScriptBindingPlan
+	compareOp            string
+	comparePrefix        string
+	unaryOp              string
+	modExpr              string
+	modPlan              qScriptBindingPlan
+	modulusExpr          string
+	modulusPlan          qScriptBindingPlan
+	modTargetExpr        string
+	modTargetPlan        qScriptBindingPlan
+	reductionInput       string
+	reductionPlan        qScriptBindingPlan
+	moduloMaskPlan       *qPipelinePlan
+	castTerms            []qPipelineCastTermPlan
 }
 
 type qPipelineCastTermPlan struct {
@@ -2496,7 +2500,7 @@ func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan *qPipelinePla
 	if err != nil || !handled {
 		return 0, 0, handled, err
 	}
-	shape := plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
+	shape := qPipelineModuloStatsShape(plan, array.Kind(), qRuntimeKernelOperandKind(modulus, nil), qRuntimeKernelOperandKind(target, nil))
 	count, sum, handled, err = data.TryTypedModuloCompareIndexStatsI64(array, modulus, dataOp, target)
 	count, sum, handled, err = qTypedRuntimeResult2Reason("ArrayModuloCompareStats", shape, RuntimeFallbackUnsupportedType, count, sum, handled, err)
 	if err != nil || !handled {
@@ -2510,7 +2514,7 @@ func (s *EvalState) evalQPipelineModuloCompareValueSum(plan *qPipelinePlan, valu
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	shape := "where-mod-reduce/" + string(values.Kind()) + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
+	shape := qPipelineModuloReduceShape(plan, values.Kind(), array.Kind(), qRuntimeKernelOperandKind(modulus, nil), qRuntimeKernelOperandKind(target, nil))
 	out, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
 		kernel: "ArrayModuloCompareReduceSum",
 		shape:  shape,
@@ -2522,6 +2526,30 @@ func (s *EvalState) evalQPipelineModuloCompareValueSum(plan *qPipelinePlan, valu
 		return nil, handled, err
 	}
 	return out, true, nil
+}
+
+func qPipelineModuloStatsShape(plan *qPipelinePlan, arrayKind, modulusKind, targetKind data.Kind) string {
+	if plan == nil {
+		return "modulo-stats/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
+	}
+	key := string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
+	if plan.moduloStatsShape == "" || plan.moduloStatsShapeKey != key {
+		plan.moduloStatsShapeKey = key
+		plan.moduloStatsShape = plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
+	}
+	return plan.moduloStatsShape
+}
+
+func qPipelineModuloReduceShape(plan *qPipelinePlan, valuesKind, arrayKind, modulusKind, targetKind data.Kind) string {
+	if plan == nil {
+		return "where-mod-reduce/" + string(valuesKind) + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
+	}
+	key := string(valuesKind) + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
+	if plan.moduloReduceShape == "" || plan.moduloReduceShapeKey != key {
+		plan.moduloReduceShapeKey = key
+		plan.moduloReduceShape = "where-mod-reduce/" + string(valuesKind) + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
+	}
+	return plan.moduloReduceShape
 }
 
 func (s *EvalState) evalQPipelineModuloCompareOperands(plan *qPipelinePlan) (data.Array, any, any, data.Op, bool, error) {
