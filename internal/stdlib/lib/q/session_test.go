@@ -154,6 +154,10 @@ func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T)
 			src:  "x:8192#0N 3 6 9;v:til 8192;idx:where (not null x) and (x>4) and ((x mod 3)=0);(+/v[idx])+count idx",
 			want: int64(16783360),
 		},
+		{
+			src:  `x:til 8192;y:x mod 2;m:"b"$y;idx:where m;g:x[idx];(+/g)+count idx`,
+			want: int64(16781312),
+		},
 	}
 	for _, tt := range tests {
 		got, err := NewEvalState(nil).Eval(tt.src)

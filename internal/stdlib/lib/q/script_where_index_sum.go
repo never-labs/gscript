@@ -316,6 +316,14 @@ func qScriptWhereIndexPredicatePlan(maskExpr string, bindings map[string]qScript
 			return &qScriptWherePredicatePlan{kind: qScriptWherePredicateCompare, value: predicate, op: op, scalar: scalar}, true
 		}
 	}
+	if predicate, ok := qScriptWhereIndexBooleanMaskSummary(maskExpr, bindings); ok {
+		return &qScriptWherePredicatePlan{
+			kind:   qScriptWherePredicateCompare,
+			value:  predicate,
+			op:     "<>",
+			scalar: qScriptNumericSumSummary{length: -1, scalar: true, min: 0, max: 0},
+		}, true
+	}
 	return nil, false
 }
 
@@ -330,6 +338,44 @@ func qScriptWhereIndexExprSummary(src string, bindings map[string]qScriptNumeric
 	}
 	summary, ok, err := qScriptNumericSummarize(plan)
 	return summary, ok && err == nil
+}
+
+func qScriptWhereIndexBooleanMaskSummary(src string, bindings map[string]qScriptNumericExprPlan) (qScriptNumericSumSummary, bool) {
+	summary, ok := qScriptWhereIndexExprSummary(src, bindings)
+	if !ok || !qScriptWhereSummaryIsBooleanMask(summary) {
+		return qScriptNumericSumSummary{}, false
+	}
+	return summary, true
+}
+
+func qScriptWhereSummaryIsBooleanMask(summary qScriptNumericSumSummary) bool {
+	if summary.hasNull {
+		return false
+	}
+	n := summary.length
+	if n < 0 {
+		n = 1
+	}
+	if n <= 0 {
+		return false
+	}
+	if n > qScriptWhereIndexClosedFormMaxPeriod && qScriptWhereIndexSummaryPeriodLen(summary) == 0 && !summary.scalar {
+		return false
+	}
+	limit := n
+	if periodLen := qScriptWhereIndexSummaryPeriodLen(summary); periodLen > 0 {
+		limit = periodLen
+	}
+	if summary.scalar {
+		limit = 1
+	}
+	for row := 0; row < limit; row++ {
+		value := summary.FloatAt(row)
+		if value != 0 && value != 1 {
+			return false
+		}
+	}
+	return true
 }
 
 func qScriptSymbolExprSummary(src string, bindings map[string]qScriptSymbolSummary) (qScriptSymbolSummary, bool) {

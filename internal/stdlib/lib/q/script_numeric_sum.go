@@ -572,7 +572,7 @@ func qScriptNumericCastKind(x CastExpr) (data.Kind, bool) {
 
 func qScriptNumericIntegerKind(kind data.Kind) bool {
 	switch kind {
-	case data.KindI16, data.KindI32, data.KindI64, data.KindF32, data.KindF64:
+	case data.KindBool, data.KindI16, data.KindI32, data.KindI64, data.KindF32, data.KindF64:
 		return true
 	default:
 		return false
@@ -787,6 +787,11 @@ func qScriptNumericEvalRow(plan qScriptNumericExprPlan, row int, bindings map[st
 
 func qScriptNumericCastValue(kind data.Kind, value int64, row int) (int64, error) {
 	switch kind {
+	case data.KindBool:
+		if value == 0 || value == 1 {
+			return value, nil
+		}
+		return 0, fmt.Errorf("value %d must be boolean-compatible for %s", row+1, kind)
 	case data.KindI16:
 		if value < -32768 || value > 32767 {
 			return 0, fmt.Errorf("value %d must be i16 for %s", row+1, kind)
@@ -884,6 +889,8 @@ func qScriptNumericSummarize(plan qScriptNumericExprPlan) (qScriptNumericSumSumm
 
 func qScriptNumericSumSummaryCastCheck(kind data.Kind, summary qScriptNumericSumSummary) error {
 	switch kind {
+	case data.KindBool:
+		return qScriptNumericSumSummaryBoolCastCheck(summary)
 	case data.KindI16:
 		if summary.isFloat {
 			return qScriptNumericSumSummaryFloatCastCheck(kind, summary)
@@ -907,6 +914,23 @@ func qScriptNumericSumSummaryCastCheck(kind data.Kind, summary qScriptNumericSum
 		return nil
 	default:
 		return fmt.Errorf("unsupported numeric cast %s", kind)
+	}
+	return nil
+}
+
+func qScriptNumericSumSummaryBoolCastCheck(summary qScriptNumericSumSummary) error {
+	n := summary.length
+	if n < 0 {
+		n = 1
+	}
+	for row := 0; row < n; row++ {
+		if summary.IsNullAt(row) {
+			continue
+		}
+		value := summary.FloatAt(row)
+		if value != 0 && value != 1 {
+			return fmt.Errorf("value %d must be boolean-compatible for %s", row+1, data.KindBool)
+		}
 	}
 	return nil
 }
@@ -941,6 +965,11 @@ func qScriptNumericSumSummaryFloatCastCheck(kind data.Kind, summary qScriptNumer
 
 func qScriptNumericCastSummary(kind data.Kind, summary qScriptNumericSumSummary) (qScriptNumericSumSummary, bool, error) {
 	switch kind {
+	case data.KindBool:
+		if !summary.isFloat {
+			return summary, true, nil
+		}
+		return qScriptNumericCastSummaryInteger(summary)
 	case data.KindF32:
 		return qScriptNumericCastSummaryF32(summary), true, nil
 	case data.KindF64:
