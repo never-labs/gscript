@@ -942,6 +942,7 @@ type qScriptPlan struct {
 	deferScanCandidates bool
 	scriptPipeline      *qScriptPipelineDescriptor
 	executable          *qScriptExecutablePlan
+	fastPipelineSources []string
 }
 
 type qScriptStatement struct {
@@ -1086,6 +1087,7 @@ func qGlobalScriptPlanCacheProbe(src string) (qScriptPlan, bool) {
 	plan, ok := qGlobalScriptPlanCache[src]
 	if ok {
 		qGlobalScriptPlanStats.ScriptHits++
+		qRecordScriptPlanFastPipelineCacheHitsLocked(plan)
 	} else {
 		qGlobalScriptPlanStats.ScriptMisses++
 	}
@@ -1093,7 +1095,6 @@ func qGlobalScriptPlanCacheProbe(src string) (qScriptPlan, bool) {
 	if !ok {
 		return qScriptPlan{}, false
 	}
-	qRecordScriptPlanFastPipelineCacheHits(plan)
 	return plan, true
 }
 
@@ -1102,21 +1103,22 @@ func qGlobalScriptPlanCacheHit(src string) (qScriptPlan, bool) {
 	plan, ok := qGlobalScriptPlanCache[src]
 	if ok {
 		qGlobalScriptPlanStats.ScriptHits++
+		qRecordScriptPlanFastPipelineCacheHitsLocked(plan)
 	}
 	qGlobalScriptPlanCacheMu.Unlock()
 	if !ok {
 		return qScriptPlan{}, false
 	}
-	qRecordScriptPlanFastPipelineCacheHits(plan)
 	return plan, true
 }
 
-func qRecordScriptPlanFastPipelineCacheHits(plan qScriptPlan) {
-	for _, stmt := range plan.statements {
-		if stmt.fastPlan.kind != qEvalFastPipeline || stmt.fastPlan.pipeline.source == "" {
-			continue
+func qRecordScriptPlanFastPipelineCacheHitsLocked(plan qScriptPlan) {
+	for _, src := range plan.fastPipelineSources {
+		if _, ok := qGlobalPipelinePlanCache[src]; ok {
+			qGlobalScriptPlanStats.PipelineHits++
+		} else {
+			qGlobalScriptPlanStats.PipelineMisses++
 		}
-		qGlobalPipelinePlanCacheRecordProbe(stmt.fastPlan.pipeline.source)
 	}
 }
 
@@ -1219,9 +1221,25 @@ func buildQScriptPlan(src string) qScriptPlan {
 	if !indexedAssign {
 		pipeline, _ = buildQScriptPipelineDescriptor(statements)
 	}
-	plan := qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates, scriptPipeline: pipeline}
+	plan := qScriptPlan{
+		statements:          statements,
+		deferScanCandidates: deferScanCandidates,
+		scriptPipeline:      pipeline,
+		fastPipelineSources: qScriptPlanFastPipelineSources(statements),
+	}
 	plan.executable = buildQScriptExecutablePlan(plan)
 	return plan
+}
+
+func qScriptPlanFastPipelineSources(statements []qScriptStatement) []string {
+	var sources []string
+	for _, stmt := range statements {
+		if stmt.fastPlan.kind != qEvalFastPipeline || stmt.fastPlan.pipeline.source == "" {
+			continue
+		}
+		sources = append(sources, stmt.fastPlan.pipeline.source)
+	}
+	return sources
 }
 
 func buildQScriptExecutablePlan(plan qScriptPlan) *qScriptExecutablePlan {
@@ -1274,6 +1292,7 @@ func cloneQScriptPlan(plan qScriptPlan) qScriptPlan {
 		deferScanCandidates: plan.deferScanCandidates,
 		scriptPipeline:      cloneQScriptPipelineDescriptor(plan.scriptPipeline),
 		executable:          cloneQScriptExecutablePlan(plan.executable),
+		fastPipelineSources: append([]string(nil), plan.fastPipelineSources...),
 	}
 	if len(plan.statements) > 0 {
 		out.statements = make([]qScriptStatement, len(plan.statements))

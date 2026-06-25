@@ -260,18 +260,6 @@ func qGlobalPipelinePlanCacheProbe(src string) (qPipelinePlan, bool) {
 	return cloneQPipelinePlan(plan), true
 }
 
-func qGlobalPipelinePlanCacheRecordProbe(src string) bool {
-	qGlobalScriptPlanCacheMu.Lock()
-	_, ok := qGlobalPipelinePlanCache[src]
-	if ok {
-		qGlobalScriptPlanStats.PipelineHits++
-	} else {
-		qGlobalScriptPlanStats.PipelineMisses++
-	}
-	qGlobalScriptPlanCacheMu.Unlock()
-	return ok
-}
-
 func qGlobalPipelinePlanCacheStore(src string, plan qPipelinePlan) {
 	if src == "" || plan.kind == qPipelineInvalid {
 		return
