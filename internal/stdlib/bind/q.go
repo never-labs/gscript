@@ -640,6 +640,8 @@ var (
 	qQueryDataKernelUnsupported   = make(map[string]string)
 	qQueryDataFrameCache          = make(map[string]data.Frame)
 	qQueryDataFrameCacheOrder     []string
+	qQueryDataMaskFrameCache      = make(map[string]data.Frame)
+	qQueryDataMaskFrameOrder      []string
 
 	qFallbackStatsMu  sync.Mutex
 	qFallbackCounters qFallbackStats
@@ -2298,7 +2300,7 @@ func qQueryDataWhere(frame data.Frame, where Value) (data.Frame, data.Expr, bool
 		if mask.DType() != DenseArrayBool || mask.Len() != frame.Len() {
 			return data.Frame{}, nil, false, nil
 		}
-		withMask, name, err := qQueryDataFrameWithMask(frame, mask)
+		withMask, name, err := qQueryDataFrameWithMaskCached(frame, mask)
 		if err != nil {
 			return data.Frame{}, nil, false, err
 		}
@@ -2334,14 +2336,49 @@ func qQueryDataWhere(frame data.Frame, where Value) (data.Frame, data.Expr, bool
 	return frame, data.Binary{Op: dataOp, Left: data.ColumnRef{Name: data.Symbol(column.Str())}, Right: data.Literal{Value: lit}}, true, nil
 }
 
-func qQueryDataFrameWithMask(frame data.Frame, mask *DenseArray) (data.Frame, data.Symbol, error) {
+func qQueryDataFrameWithMaskCached(frame data.Frame, mask *DenseArray) (data.Frame, data.Symbol, error) {
+	if mask == nil {
+		return data.Frame{}, "", fmt.Errorf("q.query where mask is nil")
+	}
+	name := qQueryDataMaskColumnName(frame)
+	key := fmt.Sprintf("%s:%p:%s", frame.SchemaFingerprint(), mask, name)
+	qQueryKernelSupportCacheMu.Lock()
+	if cached, ok := qQueryDataMaskFrameCache[key]; ok {
+		qQueryKernelSupportCacheMu.Unlock()
+		return cached, name, nil
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+	out, _, err := qQueryDataFrameWithMask(frame, mask, name)
+	if err != nil {
+		return data.Frame{}, "", err
+	}
+	qQueryKernelSupportCacheMu.Lock()
+	if cached, ok := qQueryDataMaskFrameCache[key]; ok {
+		qQueryKernelSupportCacheMu.Unlock()
+		return cached, name, nil
+	}
+	qQueryDataMaskFrameCache[key] = out
+	qQueryDataMaskFrameOrder = append(qQueryDataMaskFrameOrder, key)
+	for len(qQueryDataMaskFrameOrder) > qQueryKernelSupportCacheLimit {
+		evict := qQueryDataMaskFrameOrder[0]
+		qQueryDataMaskFrameOrder = qQueryDataMaskFrameOrder[1:]
+		delete(qQueryDataMaskFrameCache, evict)
+	}
+	qQueryKernelSupportCacheMu.Unlock()
+	return out, name, nil
+}
+
+func qQueryDataMaskColumnName(frame data.Frame) data.Symbol {
 	name := data.Symbol("__q_where_mask")
 	for i := 0; ; i++ {
 		if _, exists := frame.Column(name); !exists {
-			break
+			return name
 		}
 		name = data.Symbol(fmt.Sprintf("__q_where_mask_%d", i+1))
 	}
+}
+
+func qQueryDataFrameWithMask(frame data.Frame, mask *DenseArray, name data.Symbol) (data.Frame, data.Symbol, error) {
 	xs, ok := mask.Bool()
 	if !ok {
 		return data.Frame{}, "", fmt.Errorf("q.query where mask must be bool")
@@ -7343,6 +7380,8 @@ func qClearCaches() {
 	qQueryDataKernelUnsupported = make(map[string]string)
 	qQueryDataFrameCache = make(map[string]data.Frame)
 	qQueryDataFrameCacheOrder = nil
+	qQueryDataMaskFrameCache = make(map[string]data.Frame)
+	qQueryDataMaskFrameOrder = nil
 	qQueryKernelSupportCacheMu.Unlock()
 
 	qFallbackStatsMu.Lock()
