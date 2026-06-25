@@ -224,6 +224,7 @@ type arrayMetadataProvider interface {
 type ArrayIndex struct {
 	Attribute      Symbol
 	Keys           []any
+	KeyArray       Array
 	Rows           [][]int
 	RowsByKey      map[string][]int
 	RowToGroup     []int
@@ -234,6 +235,7 @@ func (idx ArrayIndex) clone() ArrayIndex {
 	out := ArrayIndex{
 		Attribute:      idx.Attribute,
 		Keys:           append([]any(nil), idx.Keys...),
+		KeyArray:       idx.KeyArray,
 		Rows:           make([][]int, len(idx.Rows)),
 		RowToGroup:     append([]int(nil), idx.RowToGroup...),
 		typedRowsByKey: idx.typedRowsByKey,
@@ -433,6 +435,9 @@ func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
 		index.RowsByKey[key] = []int{row}
 	}
 	index.typedRowsByKey = typedRowsByKey(array)
+	if keyArray, ok, err := typedGroupedAggregateKeyArrayIdentity(array.Kind(), index.Keys); err == nil && ok {
+		index.KeyArray = keyArray
+	}
 	return index, nil
 }
 
@@ -466,9 +471,14 @@ func buildArrayIndexTyped(array Array, attr Symbol) (ArrayIndex, bool) {
 		}
 		rowsByKey[key] = groupRows
 	}
+	keyArray, keyArrayOK, err := typedGroupedAggregateKeyArrayIdentity(array.Kind(), keys)
+	if err != nil || !keyArrayOK {
+		return ArrayIndex{}, false
+	}
 	return ArrayIndex{
 		Attribute:      attr,
 		Keys:           keys,
+		KeyArray:       keyArray,
 		Rows:           rows,
 		RowsByKey:      rowsByKey,
 		RowToGroup:     ids,
@@ -12099,6 +12109,88 @@ func typedGroupedAggregateKeyColumn(name Symbol, kind Kind, keys []any, order []
 	default:
 		return Column{}, false, nil
 	}
+}
+
+func typedGroupedAggregateKeyColumnIdentity(name Symbol, kind Kind, keys []any) (Column, bool, error) {
+	switch kind {
+	case KindSymbol:
+		values := make([]Symbol, len(keys))
+		for group, key := range keys {
+			value, ok := key.(Symbol)
+			if !ok {
+				if text, textOK := key.(string); textOK {
+					value, ok = Symbol(text), true
+				}
+			}
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be symbol-compatible, got %T", group, key)
+			}
+			values[group] = value
+		}
+		return Column{Name: name, Data: columnArray[Symbol]{kind: KindSymbol, data: values}}, true, nil
+	case KindString:
+		values := make([]string, len(keys))
+		for group, key := range keys {
+			value, ok := key.(string)
+			if !ok {
+				if sym, symOK := key.(Symbol); symOK {
+					value, ok = string(sym), true
+				}
+			}
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be string-compatible, got %T", group, key)
+			}
+			values[group] = value
+		}
+		return Column{Name: name, Data: columnArray[string]{kind: KindString, data: values}}, true, nil
+	case KindI8:
+		values := make([]int8, len(keys))
+		for group, key := range keys {
+			value, ok := signedGroupKey[int8](key)
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i8-compatible, got %T", group, key)
+			}
+			values[group] = value
+		}
+		return Column{Name: name, Data: columnArray[int8]{kind: KindI8, data: values}}, true, nil
+	case KindI16:
+		values := make([]int16, len(keys))
+		for group, key := range keys {
+			value, ok := signedGroupKey[int16](key)
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i16-compatible, got %T", group, key)
+			}
+			values[group] = value
+		}
+		return Column{Name: name, Data: columnArray[int16]{kind: KindI16, data: values}}, true, nil
+	case KindI32:
+		values := make([]int32, len(keys))
+		for group, key := range keys {
+			value, ok := signedGroupKey[int32](key)
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i32-compatible, got %T", group, key)
+			}
+			values[group] = value
+		}
+		return Column{Name: name, Data: columnArray[int32]{kind: KindI32, data: values}}, true, nil
+	case KindI64:
+		values := make([]int64, len(keys))
+		for group, key := range keys {
+			value, ok := signedGroupKey[int64](key)
+			if !ok {
+				return Column{}, true, fmt.Errorf("group key %d must be i64-compatible, got %T", group, key)
+			}
+			values[group] = value
+		}
+		return Column{Name: name, Data: columnArray[int64]{kind: KindI64, data: values}}, true, nil
+	default:
+		return Column{}, false, nil
+	}
+}
+
+func typedGroupedAggregateKeyArrayIdentity(kind Kind, keys []any) (Array, bool, error) {
+	col, ok, err := typedGroupedAggregateKeyColumnIdentity("_", kind, keys)
+	return col.Data, ok, err
 }
 
 func signedGroupKey[T signedScalar](value any) (T, bool) {

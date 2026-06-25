@@ -193,6 +193,29 @@ func fusedReleaseSlots(slots []fusedSumSlot) {
 	}
 }
 
+func appendFusedGroupKeyColumns(cols []Column, frame Frame, allRows bool, byInputs []groupInput, byArrays []Array, repRows []int) ([]Column, error) {
+	if allRows && len(byInputs) == 1 && len(byArrays) == 1 && byInputs[0].column != nil {
+		if ref, ok := byInputs[0].Expr.(ColumnRef); ok {
+			if index, ok := groupedArrayIndexCached(frame, ref.Name, byArrays[0]); ok && len(index.Keys) == len(repRows) {
+				if index.KeyArray != nil && index.KeyArray.Kind() == byInputs[0].keyKind() && index.KeyArray.Len() == len(repRows) {
+					return append(cols, Column{Name: byInputs[0].Name, Data: index.KeyArray}), nil
+				}
+				col, handled, err := typedGroupedAggregateKeyColumnIdentity(byInputs[0].Name, byInputs[0].keyKind(), index.Keys)
+				if err != nil {
+					return nil, err
+				}
+				if handled {
+					return append(cols, col), nil
+				}
+			}
+		}
+	}
+	for i, item := range byInputs {
+		cols = append(cols, Column{Name: item.Name, Data: unwrapAttributedArray(byArrays[i]).Gather(repRows)})
+	}
+	return cols, nil
+}
+
 // execGroupedFusedNumeric executes count/sum/avg/var/dev aggregate sets over
 // at most two group-key columns in one fused pass. ok=false defers to the
 // generic grouped pipeline with no side effects.
@@ -340,7 +363,8 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 		}
 	}
 
-	repRows := make([]int, 0, capN)
+	repRows := bulkIntGet(capN)
+	defer bulkIntRelease(repRows)
 	switch {
 	case allRows:
 		for row := 0; row < rows; row++ {
@@ -419,8 +443,17 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 
 	groups := len(repRows)
 	cols := make([]Column, 0, len(byInputs)+len(aggs))
-	for i, item := range byInputs {
-		cols = append(cols, Column{Name: item.Name, Data: unwrapAttributedArray(byArrays[i]).Gather(repRows)})
+	cols, err := appendFusedGroupKeyColumns(cols, frame, allRows, byInputs, byArrays, repRows)
+	if err != nil {
+		bulkI64Release(count, true)
+		for i := range slots {
+			bulkF64Release(slots[i].sums, true)
+			if slots[i].sqsums != nil {
+				bulkF64Release(slots[i].sqsums, true)
+			}
+		}
+		fusedReleaseSlots(slots)
+		return Frame{}, true, err
 	}
 	for planIdx, plan := range plans {
 		switch plan.fn {
@@ -598,7 +631,8 @@ func execGroupedFusedI64Sums(frame Frame, indexes []int, allRows bool, byInputs 
 		clear(sum2)
 	}
 
-	repRows := make([]int, 0, capN)
+	repRows := bulkIntGet(capN)
+	defer bulkIntRelease(repRows)
 	if allRows {
 		for row := 0; row < rows; row++ {
 			key := ids0[row]
@@ -652,8 +686,13 @@ func execGroupedFusedI64Sums(frame Frame, indexes []int, allRows bool, byInputs 
 
 	groups := len(repRows)
 	cols := make([]Column, 0, len(byInputs)+len(aggs))
-	for i, item := range byInputs {
-		cols = append(cols, Column{Name: item.Name, Data: unwrapAttributedArray(byArrays[i]).Gather(repRows)})
+	cols, err := appendFusedGroupKeyColumns(cols, frame, allRows, byInputs, byArrays, repRows)
+	if err != nil {
+		bulkI64Release(count, true)
+		bulkI64Release(sum0, true)
+		bulkI64Release(sum1, true)
+		bulkI64Release(sum2, true)
+		return Frame{}, true, err
 	}
 	for _, plan := range plans {
 		switch plan.fn {
