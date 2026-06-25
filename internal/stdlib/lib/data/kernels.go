@@ -6010,6 +6010,11 @@ func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
 	if sum, handled, err := typedIntegerSumByI64IndexView(array, indexes); handled || err != nil {
 		return sum, handled, err
 	}
+	if rows, ok := i64Int32IndexRows(indexes); ok {
+		if sum, handled, err := typedIntegerSumByI32Indexes(array, rows); handled || err != nil {
+			return sum, handled, err
+		}
+	}
 	// Affine range sources reduce over a dense index vector in one tight
 	// loop: sum = start*count + step*sum(indexes).
 	source := array
@@ -6113,10 +6118,62 @@ func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
 	return total, true, nil
 }
 
+func i64Int32IndexRows(indexes Array) ([]int32, bool) {
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return i64Int32IndexRows(idx.array)
+	case i64Int32IndexArray:
+		return idx.rows, true
+	default:
+		return nil, false
+	}
+}
+
+func typedIntegerSumByI32Indexes(array Array, rows []int32) (any, bool, error) {
+	if len(rows) == 0 {
+		return NullValue, true, nil
+	}
+	source := array
+	if attributed, ok := source.(attributedArray); ok {
+		source = attributed.array
+	}
+	if values, ok := source.(i64RangeArray); ok {
+		var rowSum int64
+		for _, row := range rows {
+			if row < 0 || int(row) >= values.len {
+				return nil, true, fmt.Errorf("index %d out of bounds for length %d", row, values.len)
+			}
+			rowSum += int64(row)
+		}
+		return values.start*int64(len(rows)) + values.step*rowSum, true, nil
+	}
+	if values, owned, ok := tryBulkI64Values(array); ok && len(values) == array.Len() {
+		limit := int32(len(values))
+		if len(values) > math.MaxInt32 {
+			limit = math.MaxInt32
+		}
+		var total int64
+		for _, row := range rows {
+			if row < 0 || row >= limit || int(row) >= len(values) {
+				bulkI64Release(values, owned)
+				return nil, true, fmt.Errorf("index %d out of bounds for length %d", row, len(values))
+			}
+			total += values[row]
+		}
+		bulkI64Release(values, owned)
+		return total, true, nil
+	} else if ok {
+		bulkI64Release(values, owned)
+	}
+	return nil, false, nil
+}
+
 func typedIntegerSumByI64IndexView(array, indexes Array) (any, bool, error) {
 	switch idx := indexes.(type) {
 	case attributedArray:
 		return typedIntegerSumByI64IndexView(array, idx.array)
+	case i64Int32IndexArray:
+		return typedIntegerSumByI32Indexes(array, idx.rows)
 	case i64RangeArray:
 		return typedIntegerSumRange(array, idx)
 	case i64PeriodicIndexArray:
@@ -7457,6 +7514,16 @@ func indexedArrayIntegerSum(a indexedArray) (any, bool, error) {
 		case i64RangeArray, i64SegmentArray, i64PeriodicIndexArray:
 			return values.start*int64(a.len) + values.step*i64IndexArraySum(a.indexes), true, nil
 		}
+		if rows, ok := i64Int32IndexRows(a.indexes); ok {
+			var total int64
+			for _, index := range rows {
+				if index < 0 || int(index) >= values.len {
+					return nil, false, nil
+				}
+				total += int64(index)
+			}
+			return values.start*int64(a.len) + values.step*total, true, nil
+		}
 		indexes, owned, ok := tryBulkI64Values(a.indexes)
 		if !ok || len(indexes) != a.len {
 			bulkI64Release(indexes, owned)
@@ -7479,6 +7546,18 @@ func indexedArrayIntegerSum(a indexedArray) (any, bool, error) {
 	sourceValues, sourceOwned, ok := tryBulkI64Values(source)
 	if !ok {
 		return nil, false, nil
+	}
+	if rows, ok := i64Int32IndexRows(a.indexes); ok {
+		var total int64
+		for _, index := range rows {
+			if index < 0 || int(index) >= len(sourceValues) {
+				bulkI64Release(sourceValues, sourceOwned)
+				return nil, false, nil
+			}
+			total += sourceValues[index]
+		}
+		bulkI64Release(sourceValues, sourceOwned)
+		return total, true, nil
 	}
 	indexes, indexesOwned, ok := tryBulkI64Values(a.indexes)
 	if !ok || len(indexes) != a.len {
@@ -12053,7 +12132,7 @@ func isIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64Int32IndexArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray:
 		return true
 	case matrixRowArray:
@@ -12104,7 +12183,7 @@ func isDenseIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64Int32IndexArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray:
 		return true
 	case matrixRowArray:

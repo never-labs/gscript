@@ -33,6 +33,7 @@ var bulkF64Pool = sync.Pool{}
 var bulkBoolPool = sync.Pool{}
 var bulkIntPool = sync.Pool{}
 var bulkI32Pool = sync.Pool{}
+var bulkU64Pool = sync.Pool{}
 
 func bulkI64Get(n int) []int64 {
 	if v := bulkI64Pool.Get(); v != nil {
@@ -138,6 +139,23 @@ func bulkI32Release(values []int32) {
 		return
 	}
 	bulkI32Pool.Put(values[:0])
+}
+
+func bulkU64Get(n int) []uint64 {
+	if v := bulkU64Pool.Get(); v != nil {
+		s := v.([]uint64)
+		if cap(s) >= n {
+			return s[:n]
+		}
+	}
+	return make([]uint64, n)
+}
+
+func bulkU64Release(values []uint64) {
+	if cap(values) == 0 || cap(values) > bulkPoolMaxLen {
+		return
+	}
+	bulkU64Pool.Put(values[:0])
 }
 
 // TryBulkF64 exposes bulk float64 carrier flattening to sibling runtime

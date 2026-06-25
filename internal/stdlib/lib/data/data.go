@@ -595,6 +595,10 @@ type i64SegmentArray struct {
 	len      int
 }
 
+type i64Int32IndexArray struct {
+	rows []int32
+}
+
 type i64PeriodicIndexArray struct {
 	period       int64
 	residues     []int64
@@ -964,6 +968,36 @@ func (a intIndexArray) Gather(indexes []int) Array {
 		out[i] = a.rows[row]
 	}
 	return intIndexArray{rows: out}
+}
+
+func (a i64Int32IndexArray) Kind() Kind { return KindI64 }
+
+func (a i64Int32IndexArray) Len() int { return len(a.rows) }
+
+func (a i64Int32IndexArray) At(row int) (any, bool) {
+	if row < 0 || row >= len(a.rows) {
+		return nil, false
+	}
+	return int64(a.rows[row]), true
+}
+
+func (a i64Int32IndexArray) Values() []any {
+	out := make([]any, len(a.rows))
+	for i, row := range a.rows {
+		out[i] = int64(row)
+	}
+	return out
+}
+
+func (a i64Int32IndexArray) Gather(indexes []int) Array {
+	out := make([]int32, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= len(a.rows) {
+			panic(fmt.Sprintf("index %d out of bounds for int32 index-array length %d", row, len(a.rows)))
+		}
+		out[i] = a.rows[row]
+	}
+	return i64Int32IndexArray{rows: out}
 }
 
 func (a i64RangeArray) Kind() Kind { return KindI64 }
@@ -4314,6 +4348,13 @@ func validateI64IndexArray(indexes Array, length int) (bool, error) {
 			}
 		}
 		return true, nil
+	case i64Int32IndexArray:
+		for i, value := range idx.rows {
+			if value < 0 || int(value) >= length {
+				return true, fmt.Errorf("index vector row %d value %d outside length %d", i, value, length)
+			}
+		}
+		return true, nil
 	case i64PeriodicIndexArray:
 		// Periodic where-results are monotone increasing (sorted residues,
 		// strictly increasing cycle bases), so checking the first and last
@@ -4369,6 +4410,15 @@ func i64IndexArrayAt(indexes Array, row int) (int, bool, error) {
 		}
 		out, err := checkedI64Index(value)
 		return out, err == nil, err
+	case i64Int32IndexArray:
+		if row < 0 || row >= len(idx.rows) {
+			return 0, false, nil
+		}
+		value := idx.rows[row]
+		if value < 0 {
+			return 0, false, fmt.Errorf("index vector must contain non-negative integers")
+		}
+		return int(value), true, nil
 	case i64PeriodicIndexArray:
 		value, ok := idx.i64At(row)
 		if !ok {
@@ -4440,6 +4490,15 @@ func TryTypedI64Indexes(indexes Array) ([]int, bool, error) {
 		return out, true, nil
 	case intIndexArray:
 		return idx.rows, true, nil
+	case i64Int32IndexArray:
+		out := make([]int, len(idx.rows))
+		for i, value := range idx.rows {
+			if value < 0 {
+				return nil, true, fmt.Errorf("index vector must contain non-negative integers")
+			}
+			out[i] = int(value)
+		}
+		return out, true, nil
 	case columnArray[int64]:
 		out := make([]int, len(idx.data))
 		for i, value := range idx.data {

@@ -4581,6 +4581,34 @@ func TestTryTypedSortIndexesI64(t *testing.T) {
 	}
 }
 
+func TestTryTypedSortIndexesI64DenseUsesInt32Carrier(t *testing.T) {
+	values := []int64{9, 1, 3, 1, 8, 2, 5, 2, 7, 4, 6, 0}
+	indexes, ok, err := TryTypedSortIndexesI64(NewI64(values), false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 handled=%v err=%v; want true,nil", ok, err)
+	}
+	if _, ok := indexes.(i64Int32IndexArray); !ok {
+		t.Fatalf("sort indexes carrier = %T, want i64Int32IndexArray", indexes)
+	}
+	if got, want := indexes.Values(), []any{int64(11), int64(1), int64(3), int64(5), int64(7), int64(2), int64(9), int64(6), int64(10), int64(8), int64(4), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sort indexes = %#v, want %#v", got, want)
+	}
+	gathered, ok, err := TryGatherByI64IndexArray(NewI64(values), indexes)
+	if err != nil || !ok {
+		t.Fatalf("TryGatherByI64IndexArray handled=%v err=%v; want true,nil", ok, err)
+	}
+	if _, ok := gathered.(indexedArray); !ok {
+		t.Fatalf("gathered carrier = %T, want indexedArray", gathered)
+	}
+	sum, ok, err := TryTypedNumericSum(gathered)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedNumericSum handled=%v err=%v; want true,nil", ok, err)
+	}
+	if sum != int64(48) {
+		t.Fatalf("sorted gather sum = %#v, want 48", sum)
+	}
+}
+
 func TestTryTypedSortIndexesI64TiledStable(t *testing.T) {
 	symbols, err := TakeRepeat(NewSymbols([]string{"b", "a", "b", "c"}), 10)
 	if err != nil {

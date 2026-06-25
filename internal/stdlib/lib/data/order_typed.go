@@ -102,7 +102,33 @@ func typedSortIndexesI64Keys(values []int64, descending bool) Array {
 	if n == 0 {
 		return NewI64Range(0, 1, 0)
 	}
-	keys := make([]uint64, n)
+	if n > math.MaxInt32 {
+		keys := bulkU64Get(n)
+		defer bulkU64Release(keys)
+		if descending {
+			for i, v := range values {
+				keys[i] = ^(uint64(v) ^ (1 << 63))
+			}
+		} else {
+			for i, v := range values {
+				keys[i] = uint64(v) ^ (1 << 63)
+			}
+		}
+		out := make([]int64, n)
+		perm := stableKeyPermutation(keys)
+		if perm == nil {
+			for i := range out {
+				out[i] = int64(i)
+			}
+			return newI64Trusted(out)
+		}
+		for i, pos := range perm {
+			out[i] = int64(pos)
+		}
+		return newI64Trusted(out)
+	}
+	keys := bulkU64Get(n)
+	defer bulkU64Release(keys)
 	if descending {
 		for i, v := range values {
 			keys[i] = ^(uint64(v) ^ (1 << 63))
@@ -112,18 +138,11 @@ func typedSortIndexesI64Keys(values []int64, descending bool) Array {
 			keys[i] = uint64(v) ^ (1 << 63)
 		}
 	}
-	out := make([]int64, n)
-	perm := stableKeyPermutation(keys)
+	perm := stableKeyPermutationI32(keys)
 	if perm == nil {
-		for i := range out {
-			out[i] = int64(i)
-		}
-		return newI64Trusted(out)
+		return NewI64Range(0, 1, n)
 	}
-	for i, pos := range perm {
-		out[i] = int64(pos)
-	}
-	return newI64Trusted(out)
+	return i64Int32IndexArray{rows: perm}
 }
 
 func typedSortIndexesI64ModuloRange(array i64ScalarDyadicArray, descending bool) (Array, bool) {
@@ -310,8 +329,11 @@ func stableKeyPermutation(keys []uint64) []int {
 	for i := range positions {
 		positions[i] = int32(i)
 	}
-	tmpKeys := make([]uint64, n)
-	tmpPositions := make([]int32, n)
+	tmpKeysBuf := bulkU64Get(n)
+	defer bulkU64Release(tmpKeysBuf)
+	tmpKeys := tmpKeysBuf
+	tmpPositionsBuf := bulkI32Get(n)
+	tmpPositions := tmpPositionsBuf
 	var counts [256]int
 	for pass := 0; pass < passes; pass++ {
 		shift := uint(pass * 8)
@@ -341,7 +363,94 @@ func stableKeyPermutation(keys []uint64) []int {
 	for i := 0; i < n; i++ {
 		out[i] = int(positions[i])
 	}
+	bulkI32Release(tmpPositionsBuf)
 	return out
+}
+
+func stableKeyPermutationI32(keys []uint64) []int32 {
+	n := len(keys)
+	minKey, maxKey := keys[0], keys[0]
+	for _, k := range keys[1:] {
+		if k < minKey {
+			minKey = k
+		}
+		if k > maxKey {
+			maxKey = k
+		}
+	}
+	if minKey == maxKey {
+		return nil
+	}
+	if n < 256 {
+		pairs := make([]orderKeyPos[uint64], n)
+		for i := 0; i < n; i++ {
+			pairs[i] = orderKeyPos[uint64]{key: keys[i], pos: i}
+		}
+		slices.SortFunc(pairs, func(a, b orderKeyPos[uint64]) int {
+			if a.key < b.key {
+				return -1
+			}
+			if a.key > b.key {
+				return 1
+			}
+			return a.pos - b.pos
+		})
+		out := make([]int32, n)
+		for i, pair := range pairs {
+			out[i] = int32(pair.pos)
+		}
+		return out
+	}
+	span := maxKey - minKey
+	passes := 0
+	for s := span; s != 0; s >>= 8 {
+		passes++
+	}
+	positions := make([]int32, n)
+	for i := range positions {
+		positions[i] = int32(i)
+	}
+	tmpKeysBuf := bulkU64Get(n)
+	defer bulkU64Release(tmpKeysBuf)
+	tmpKeys := tmpKeysBuf
+	tmpPositionsBuf := bulkI32Get(n)
+	tmpPositions := tmpPositionsBuf
+	var counts [256]int
+	for pass := 0; pass < passes; pass++ {
+		shift := uint(pass * 8)
+		for i := range counts {
+			counts[i] = 0
+		}
+		for i := 0; i < n; i++ {
+			counts[byte((keys[i]-minKey)>>shift)]++
+		}
+		offset := 0
+		for i := 0; i < 256; i++ {
+			c := counts[i]
+			counts[i] = offset
+			offset += c
+		}
+		for i := 0; i < n; i++ {
+			digit := byte((keys[i] - minKey) >> shift)
+			j := counts[digit]
+			counts[digit]++
+			tmpKeys[j] = keys[i]
+			tmpPositions[j] = positions[i]
+		}
+		keys, tmpKeys = tmpKeys, keys
+		positions, tmpPositions = tmpPositions, positions
+	}
+	if !sameI32Backing(positions, tmpPositionsBuf) {
+		bulkI32Release(tmpPositionsBuf)
+	}
+	return positions
+}
+
+func sameI32Backing(a, b []int32) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return len(a) == 0 && len(b) == 0
+	}
+	return &a[0] == &b[0]
 }
 
 type orderKeyPos[T cmp.Ordered] struct {

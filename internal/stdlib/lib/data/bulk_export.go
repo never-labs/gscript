@@ -51,6 +51,11 @@ func TryExportI64Copy(array Array, dst []int64) (bool, error) {
 			dst[i] = int64(v)
 		}
 		return true, nil
+	case i64Int32IndexArray:
+		for i, v := range a.rows {
+			dst[i] = int64(v)
+		}
+		return true, nil
 	case columnArray[int16]:
 		for i, v := range a.data {
 			dst[i] = int64(v)
