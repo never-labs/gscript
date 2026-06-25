@@ -33,6 +33,7 @@ const (
 	EvalDispatchConstMemo        EvalDispatchRoute = "const_memo"
 	EvalDispatchApplyIndexPlan   EvalDispatchRoute = "apply_index_plan"
 	EvalDispatchScriptNumericSum EvalDispatchRoute = "script_numeric_sum_plan"
+	EvalDispatchScriptStats      EvalDispatchRoute = "script_numeric_stats_plan"
 
 	// String routes: per-call string probing/walking happened.
 	EvalDispatchApplyIndexString EvalDispatchRoute = "apply_index_string"
@@ -49,7 +50,8 @@ func IsCompiledEvalDispatchRoute(route EvalDispatchRoute) bool {
 	case EvalDispatchPipelineBackend, EvalDispatchCompareIndexPlan,
 		EvalDispatchAssignPool, EvalDispatchBindingPlan, EvalDispatchFastPlan,
 		EvalDispatchPipelinePlan, EvalDispatchValueExpr, EvalDispatchCompiledExpr,
-		EvalDispatchConstMemo, EvalDispatchApplyIndexPlan, EvalDispatchScriptNumericSum:
+		EvalDispatchConstMemo, EvalDispatchApplyIndexPlan, EvalDispatchScriptNumericSum,
+		EvalDispatchScriptStats:
 		return true
 	default:
 		return false

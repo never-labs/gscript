@@ -5305,6 +5305,42 @@ func TestEvalScriptNumericIntegerDivModSumUsesFusedPlan(t *testing.T) {
 	}
 }
 
+func TestEvalScriptNumericStatsEnvelopeUsesFusedPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	got, err := Eval("x:1+til 16;(+/x)+(avg x)+(med x)+(var x)+(dev x)+(wavg[x;x])")
+	if err != nil {
+		t.Fatalf("Eval(stats envelope) returned error: %v", err)
+	}
+	gotFloat, ok := got.(float64)
+	if !ok {
+		t.Fatalf("Eval(stats envelope) = %#v (%T), want float64", got, got)
+	}
+	var sum, sumSquares float64
+	for i := 1; i <= 16; i++ {
+		x := float64(i)
+		sum += x
+		sumSquares += x * x
+	}
+	avg := sum / 16
+	med := 8.5
+	variance := sumSquares/16 - avg*avg
+	want := sum + avg + med + variance + math.Sqrt(variance) + sumSquares/sum
+	if math.Abs(gotFloat-want) > 1e-9 {
+		t.Fatalf("Eval(stats envelope) = %.12f, want %.12f", gotFloat, want)
+	}
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericStatsPlan" && stat.Shape == "vector-reduce/stats-envelope" && stat.Outcome == "hit" {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing script numeric stats plan hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalScriptNumericCastSumPreservesRangeErrors(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
