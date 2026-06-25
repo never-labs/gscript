@@ -52,6 +52,8 @@ type qPipelinePlan struct {
 	kind           qPipelineKind
 	shape          string
 	shapeSpec      qPipelineShapeSpec
+	stableShapeID  string
+	pipelineShape  string
 	operands       []qPipelineOperandPlan
 	valueExpr      string
 	valuePlan      qScriptBindingPlan
@@ -1497,8 +1499,7 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 	if plan.kind == qPipelineInvalid {
 		return nil, false, nil
 	}
-	shape := plan.stableShape()
-	recordRuntimeKernelExecution("QPipelinePlan", shape, "attempt", "attempt")
+	recordRuntimeQPipelinePlanExecution(plan, "attempt", "attempt")
 	var (
 		out     any
 		handled bool
@@ -1568,16 +1569,16 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 	case qPipelineCastEnvelopeSum:
 		out, handled, err = s.evalQPipelineCastEnvelopeSum(plan)
 	default:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
+		recordRuntimeQPipelinePlanExecution(plan, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
 	}
 	switch {
 	case err != nil:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
+		recordRuntimeQPipelinePlanExecution(plan, "error", RuntimeFallbackPipelineError)
 	case handled:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "hit", "typed_pipeline")
+		recordRuntimeQPipelinePlanExecution(plan, "hit", "typed_pipeline")
 	default:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
+		recordRuntimeQPipelinePlanExecution(plan, "fallback", "unsupported_runtime_shape")
 	}
 	return out, handled, err
 }
@@ -2270,14 +2271,14 @@ func qPipelineGatherReduceSum(array, indexes data.Array) (any, bool, error) {
 }
 
 func qPipelineGatherReduceSumWithPlanStats(plan *qPipelinePlan, array, indexes data.Array) (any, bool, error) {
-	recordRuntimeKernelExecution("QPipelinePlan", plan.stableShape(), "attempt", "attempt")
+	recordRuntimeQPipelinePlanExecution(plan, "attempt", "attempt")
 	out, handled, err := qPipelineGatherReduceSum(array, indexes)
 	recordQPipelinePlanOutcome(plan, handled, err)
 	return out, handled, err
 }
 
 func qPipelineWhereReduceSumWithPlanStats(plan *qPipelinePlan, array, mask data.Array) (any, bool, error) {
-	recordRuntimeKernelExecution("QPipelinePlan", plan.stableShape(), "attempt", "attempt")
+	recordRuntimeQPipelinePlanExecution(plan, "attempt", "attempt")
 	shape := ""
 	if array.Kind() == data.KindI64 && mask.Kind() == data.KindBool {
 		shape = "where-reduce/i64/bool"
@@ -2291,15 +2292,24 @@ func qPipelineWhereReduceSumWithPlanStats(plan *qPipelinePlan, array, mask data.
 }
 
 func recordQPipelinePlanOutcome(plan *qPipelinePlan, handled bool, err error) {
-	shape := plan.stableShape()
 	switch {
 	case err != nil:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
+		recordRuntimeQPipelinePlanExecution(plan, "error", RuntimeFallbackPipelineError)
 	case handled:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "hit", "typed_pipeline")
+		recordRuntimeQPipelinePlanExecution(plan, "hit", "typed_pipeline")
 	default:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
+		recordRuntimeQPipelinePlanExecution(plan, "fallback", "unsupported_runtime_shape")
 	}
+}
+
+func recordRuntimeQPipelinePlanExecution(plan *qPipelinePlan, outcome, reasonCode string) {
+	shape := "unknown"
+	pipelineShape := ""
+	if plan != nil {
+		shape = plan.stableShape()
+		pipelineShape = plan.stablePipelineShape()
+	}
+	recordRuntimeExecutionWithPipelineShape("q_eval_vector_runtime", "QPipelinePlan", shape, pipelineShape, "typed_data_kernel", outcome, reasonCode)
 }
 
 func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool, error) {

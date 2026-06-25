@@ -517,6 +517,20 @@ func qPipelinePlanWithShapeSpec(plan qPipelinePlan) qPipelinePlan {
 			plan.shape = spec.ID
 		}
 	}
+	if plan.stableShapeID == "" {
+		if plan.shapeSpec.valid() && plan.shapeSpec.ID != "" {
+			plan.stableShapeID = plan.shapeSpec.ID
+		} else {
+			plan.stableShapeID = plan.shape
+		}
+	}
+	if plan.pipelineShape == "" {
+		if plan.shapeSpec.valid() && plan.shapeSpec.PipelineShape != "" {
+			plan.pipelineShape = plan.shapeSpec.PipelineShape
+		} else {
+			plan.pipelineShape = qRuntimeKernelPipelineShape("", plan.stableShapeID)
+		}
+	}
 	return plan
 }
 
@@ -551,15 +565,33 @@ func (plan qPipelinePlan) shapeVariant() string {
 }
 
 func (plan qPipelinePlan) stableShape() string {
+	if plan.stableShapeID != "" {
+		return plan.stableShapeID
+	}
+	if plan.shapeSpec.valid() && plan.shapeSpec.ID != "" {
+		return plan.shapeSpec.ID
+	}
+	if plan.shape != "" {
+		return plan.shape
+	}
 	if spec := qPipelinePlanShapeSpec(plan); spec.ID != "" {
 		return spec.ID
 	}
-	return plan.shape
+	return ""
 }
 
 func (plan qPipelinePlan) stablePipelineShape() string {
+	if plan.pipelineShape != "" {
+		return plan.pipelineShape
+	}
+	if plan.shapeSpec.valid() && plan.shapeSpec.PipelineShape != "" {
+		return plan.shapeSpec.PipelineShape
+	}
+	if shape := plan.stableShape(); shape != "" {
+		return qRuntimeKernelPipelineShape("", shape)
+	}
 	if spec := qPipelinePlanShapeSpec(plan); spec.PipelineShape != "" {
 		return spec.PipelineShape
 	}
-	return qRuntimeKernelPipelineShape("QPipelinePlan", plan.stableShape())
+	return "unknown"
 }

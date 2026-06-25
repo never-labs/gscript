@@ -173,7 +173,10 @@ func recordRuntimeExecution(source, kernel, shape, route, outcome, reasonCode st
 func recordRuntimeExecutionWithPipelineShape(source, kernel, shape, pipelineShape, route, outcome, reasonCode string) {
 	reasonCode = normalizeRuntimeKernelReasonCode(outcome, reasonCode)
 	shape = normalizeRuntimeStatField(shape, "unknown")
-	pipelineShape = normalizeRuntimeStatField(pipelineShape, qRuntimeKernelPipelineShape(kernel, shape))
+	if pipelineShape == "" {
+		pipelineShape = qRuntimeKernelPipelineShape(kernel, shape)
+	}
+	pipelineShape = normalizeRuntimeStatField(pipelineShape, "unknown")
 	key := runtimeKernelExecutionKey{
 		source:        normalizeRuntimeStatField(source, "q_eval_runtime"),
 		kernel:        normalizeRuntimeStatField(kernel, "unknown"),
