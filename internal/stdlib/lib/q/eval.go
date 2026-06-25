@@ -788,14 +788,6 @@ func (p *PreparedEval) EvalWithEnv(env map[string]any) (any, error) {
 	defer p.mu.Unlock()
 	p.state.resetBorrowedEnv(env)
 	defer p.state.clearBorrowedEnv()
-	if p.entry.executable.Valid() {
-		if out, handled, err := p.state.ExecuteEvalPipelineExecutablePlanRef(&p.entry.executable); err != nil || handled {
-			if handled && err == nil {
-				recordQEvalDispatch(p.entry.source, EvalDispatchPipelineBackend)
-			}
-			return out, err
-		}
-	}
 	return p.state.evalScriptPlan(p.entry.script)
 }
 

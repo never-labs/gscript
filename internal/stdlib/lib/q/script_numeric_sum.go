@@ -324,6 +324,19 @@ func buildQScriptNumericExprPlan(expr Expr, bindings map[string]qScriptNumericEx
 			return qScriptNumericExprPlan{}, false
 		}
 		return qScriptNumericExprPlan{kind: qScriptNumericExprTil, value: count, nonNegative: true}, true
+	case Vector:
+		if len(x.Items) != 2 {
+			return qScriptNumericExprPlan{}, false
+		}
+		ident, ok := x.Items[0].(Ident)
+		if !ok || ident.Name != "til" {
+			return qScriptNumericExprPlan{}, false
+		}
+		count, ok := qScriptNumericLiteralI64(x.Items[1])
+		if !ok || count < 0 || count > int64(math.MaxInt) {
+			return qScriptNumericExprPlan{}, false
+		}
+		return qScriptNumericExprPlan{kind: qScriptNumericExprTil, value: count, nonNegative: true}, true
 	case CastExpr:
 		kind, ok := qScriptNumericCastKind(x)
 		if !ok || !qScriptNumericIntegerKind(kind) {

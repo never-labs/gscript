@@ -2428,8 +2428,8 @@ func TestEvalScriptWhereIndexPeriodicSumUsesFusedPlan(t *testing.T) {
 			whereGatherHits += stat.Count
 		}
 	}
-	if hits != 5 || whereGatherHits != 1 {
-		t.Fatalf("where-index periodic hits = %d, where-gather hits = %d; want 5 and 1; stats=%#v", hits, whereGatherHits, RuntimeKernelExecutionStats())
+	if hits != 6 || whereGatherHits != 0 {
+		t.Fatalf("where-index periodic hits = %d, where-gather hits = %d; want 6 and 0; stats=%#v", hits, whereGatherHits, RuntimeKernelExecutionStats())
 	}
 }
 

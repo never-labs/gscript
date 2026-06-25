@@ -60,3 +60,83 @@ func TestEvalSessionPlannedMatchesEval(t *testing.T) {
 		t.Fatal("nil planned handle Eval must error")
 	}
 }
+
+func TestEvalSessionWarmKeepsScriptPlanPriority(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	session := NewEvalSession(nil)
+	tests := []struct {
+		src  string
+		want any
+	}{
+		{
+			src:  "x:8192#0Nh 1h 5h 9h;v:til 8192;idx:where x>2h;(+/v[idx])+count idx",
+			want: int64(16783360),
+		},
+		{
+			src:  "x:8192#0Ni 1i 5i 9i;v:til 8192;idx:where x<6i;(+/v[idx])+count idx",
+			want: int64(25165824),
+		},
+	}
+	for _, tt := range tests {
+		for i := 0; i < 2; i++ {
+			got, err := session.Eval(tt.src)
+			if err != nil || got != tt.want {
+				t.Fatalf("EvalSession.Eval #%d = %#v,%v; want %#v,nil", i, got, err, tt.want)
+			}
+		}
+	}
+
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptWhereIndexSumPlan" && stat.Shape == "where-index-reduce/periodic-sum-count" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != 4 {
+		t.Fatalf("QScriptWhereIndexSumPlan hits = %d, want 4; stats=%#v", hits, RuntimeKernelExecutionStats())
+	}
+}
+
+func TestQScriptWhereIndexSumPlanRecognizesCompositePredicates(t *testing.T) {
+	tests := []string{
+		"x:((til 128) mod 16)*0.5;idx:where x within 2.5 5.0;(+/x[idx])+count idx",
+		"x:til 128;y:(x mod 16)+5;idx:where (y>8) and (y<16) and (not (y in 10 12));(+/y[idx])+count idx",
+	}
+	for _, src := range tests {
+		plan := buildQScriptPlan(src)
+		if plan.whereIndexSum == nil {
+			t.Fatalf("where-index sum plan missing for %q", src)
+		}
+		if _, _, _, ok := qScriptWhereIndexSum(plan.whereIndexSum); !ok {
+			t.Fatalf("where-index sum plan did not close for %q: %#v", src, plan.whereIndexSum)
+		}
+	}
+}
+
+func TestQScriptWhereIndexSumPlanPreservesNonPeriodicPredicateSemantics(t *testing.T) {
+	tests := []struct {
+		src  string
+		want any
+	}{
+		{
+			src:  "x:til 8192;y:(x*3)+7;idx:where ((x mod 3)=1) and (x>64) and (not (x in 70 73 76));(+/y[idx])+count idx",
+			want: int64(33577374),
+		},
+		{
+			src:  "x:til 8192;v:(x*2)+1;idx:where (x within 100 7000) and ((x mod 5)>2) and ((x mod 7)<>0);(+/v[idx])+count idx",
+			want: int64(16804124),
+		},
+		{
+			src:  "x:til 8192;v:x+13;idx:where (not ((x mod 11)=3)) and (x within 50 8000) and (x>100);(+/v[idx])+count idx",
+			want: int64(29186815),
+		},
+	}
+	for _, tt := range tests {
+		got, err := NewEvalState(nil).Eval(tt.src)
+		if err != nil || got != tt.want {
+			t.Fatalf("Eval(%q) = %#v,%v; want %#v,nil", tt.src, got, err, tt.want)
+		}
+	}
+}

@@ -49,19 +49,13 @@ func (s *EvalSession) Eval(source string) (any, error) {
 	return s.evalPlanEntry(s.plan(source))
 }
 
-// evalPlanEntry executes one resolved plan entry: predecoded executable
-// pipeline plan first, then the per-statement script plan chain. Plan entries
-// are source-derived and state-independent; all session state binds at
-// execution time, so re-executing a pinned entry is semantically identical to
-// re-resolving the source on every call.
+// evalPlanEntry executes one resolved plan entry through the normal script-plan
+// dispatcher. Plan entries are source-derived and state-independent; all
+// session state binds at execution time, so re-executing a pinned entry is
+// semantically identical to re-resolving the source on every call.
 func (s *EvalSession) evalPlanEntry(entry *evalSessionPlan) (any, error) {
-	if entry != nil && entry.executable.Valid() {
-		if out, handled, err := s.state.ExecuteEvalPipelineExecutablePlanRef(&entry.executable); err != nil || handled {
-			if handled && err == nil {
-				recordQEvalDispatch(entry.source, EvalDispatchPipelineBackend)
-			}
-			return out, err
-		}
+	if entry == nil {
+		return nil, nil
 	}
 	return s.state.evalScriptPlan(entry.script)
 }
