@@ -612,6 +612,12 @@ type i64ProductArray struct {
 	right i64RangeArray
 }
 
+type i64DyadicProductArray struct {
+	left  Array
+	right Array
+	len   int
+}
+
 type i64BucketArray struct {
 	source Array
 	width  int64
@@ -1689,6 +1695,57 @@ func (a i64ProductArray) Gather(indexes []int) Array {
 		value, ok := a.i64At(row)
 		if !ok {
 			panic(fmt.Sprintf("data product gather index %d out of range", row))
+		}
+		out[i] = value
+	}
+	return columnArray[int64]{kind: KindI64, data: out}
+}
+
+func (a i64DyadicProductArray) Kind() Kind { return KindI64 }
+
+func (a i64DyadicProductArray) Len() int { return a.len }
+
+func (a i64DyadicProductArray) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64DyadicProductArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, nil
+	}
+	left, ok, err := integerArrayAt(a.left, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	right, ok, err := integerArrayAt(a.right, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return left * right, true, nil
+}
+
+func (a i64DyadicProductArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data i64 product row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64DyadicProductArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data i64 product gather index %d out of range", row))
 		}
 		out[i] = value
 	}

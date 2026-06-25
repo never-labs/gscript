@@ -6046,6 +6046,9 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 		if out, handled, err := s.tryEvalSumDeltas(expr.right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalTypedIntegerDyadicSum(expr.right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalTypedDyadicFloatSum(expr.right); err != nil || handled {
 			return out, err
 		}
@@ -6170,6 +6173,40 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	default:
 		return nil, fmt.Errorf("adverb %q is not supported", expr.adverb)
 	}
+}
+
+func (s *EvalState) tryEvalTypedIntegerDyadicSum(src string) (any, bool, error) {
+	leftExpr, dyadicOp, rightExpr, ok := splitTopLevelArithmeticOperator(src)
+	if !ok || dyadicOp == '%' {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	if qPipelineFusedSumEmptyOperand(left, right) {
+		return nil, false, nil
+	}
+	if !qTypedIntegerOperandOK(left) || !qTypedIntegerOperandOK(right) {
+		return nil, false, nil
+	}
+	out, handled, err := data.TryTypedIntegerDyadicSum(data.Op(string(dyadicOp)), left, right)
+	shape := "vector-reduce/sum-integer-dyadic-" + string(dyadicOp)
+	if array, ok := left.(data.Array); ok {
+		shape += "/left-" + string(array.Kind())
+	}
+	if array, ok := right.(data.Array); ok {
+		shape += "/right-" + string(array.Kind())
+	}
+	out, handled, err = qTypedRuntimeResult("ArrayIntegerDyadicSum", shape, out, handled, err)
+	if err != nil {
+		return nil, true, fmt.Errorf("sum integer %s: %w", string(dyadicOp), err)
+	}
+	return out, handled, nil
 }
 
 func (s *EvalState) tryEvalTypedDyadicFloatSum(src string) (any, bool, error) {

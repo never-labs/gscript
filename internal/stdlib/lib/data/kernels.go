@@ -4803,6 +4803,9 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case i64ProductArray:
 		sum := i64ProductSum(a)
 		return float64(sum), int64(a.Len()), true, nil
+	case i64DyadicProductArray:
+		sum, handled, err := i64DyadicProductSum(a)
+		return float64(sum), int64(a.Len()), handled, err
 	case columnArray[uint8]:
 		return numericSumSlice(a.data)
 	case columnArray[uint16]:
@@ -5058,6 +5061,112 @@ func numericAdd3(a, b, c any) (any, bool) {
 	return af + bf + cf, true
 }
 
+// TryTypedIntegerDyadicSum reduces sum(left op right) for integer operands
+// without materializing the dyadic result vector. It is a reusable reducer
+// primitive for q `+/x op y` and for JIT backends that recognize the same
+// vector-dyadic-reduce shape.
+func TryTypedIntegerDyadicSum(op Op, left, right any) (any, bool, error) {
+	switch op {
+	case OpAdd, OpSub, OpMul:
+	default:
+		return nil, false, nil
+	}
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	length := 0
+	switch {
+	case leftIsArray && rightIsArray:
+		if leftArray.Len() != rightArray.Len() {
+			return nil, true, fmt.Errorf("typed integer dyadic sum length mismatch: %d != %d", leftArray.Len(), rightArray.Len())
+		}
+		length = leftArray.Len()
+	case leftIsArray:
+		length = leftArray.Len()
+	case rightIsArray:
+		length = rightArray.Len()
+	}
+	if length == 0 {
+		return NullValue, true, nil
+	}
+	if !typedIntegerOperand(left) || !typedIntegerOperand(right) {
+		return nil, false, nil
+	}
+	if leftIsArray && rightIsArray {
+		leftValues, leftOwned, ok := tryBulkI64Values(leftArray)
+		if !ok || len(leftValues) < length {
+			bulkI64Release(leftValues, leftOwned)
+			return nil, false, nil
+		}
+		rightValues, rightOwned, ok := tryBulkI64Values(rightArray)
+		if !ok || len(rightValues) < length {
+			bulkI64Release(leftValues, leftOwned)
+			bulkI64Release(rightValues, rightOwned)
+			return nil, false, nil
+		}
+		var total int64
+		switch op {
+		case OpAdd:
+			for i := 0; i < length; i++ {
+				total += leftValues[i] + rightValues[i]
+			}
+		case OpSub:
+			for i := 0; i < length; i++ {
+				total += leftValues[i] - rightValues[i]
+			}
+		case OpMul:
+			for i := 0; i < length; i++ {
+				total += leftValues[i] * rightValues[i]
+			}
+		}
+		bulkI64Release(leftValues, leftOwned)
+		bulkI64Release(rightValues, rightOwned)
+		return total, true, nil
+	}
+	array := leftArray
+	scalar := right
+	scalarLeft := false
+	if rightIsArray {
+		array = rightArray
+		scalar = left
+		scalarLeft = true
+	}
+	scalarValue, ok := integerScalarValue(scalar)
+	if !ok {
+		return nil, false, nil
+	}
+	values, owned, ok := tryBulkI64Values(array)
+	if !ok || len(values) < length {
+		bulkI64Release(values, owned)
+		return nil, false, nil
+	}
+	var total int64
+	switch op {
+	case OpAdd:
+		for i := 0; i < length; i++ {
+			total += values[i] + scalarValue
+		}
+	case OpSub:
+		if scalarLeft {
+			for i := 0; i < length; i++ {
+				total += scalarValue - values[i]
+			}
+		} else {
+			for i := 0; i < length; i++ {
+				total += values[i] - scalarValue
+			}
+		}
+	case OpMul:
+		for i := 0; i < length; i++ {
+			total += values[i] * scalarValue
+		}
+	}
+	bulkI64Release(values, owned)
+	return total, true, nil
+}
+
 // TryTypedBinSum reduces q's `domain bin query` result directly. It preserves
 // the scalar result shape of sum while avoiding the intermediate i64 bin vector.
 func TryTypedBinSum(domain Array, query any) (any, bool, error) {
@@ -5127,6 +5236,37 @@ func xrankSignedSlice[T signedScalar](values []T, bucketCount int64) Array {
 	if len(values) == 0 {
 		return newI64Trusted(out)
 	}
+	if len(values) > math.MaxInt32 {
+		return xrankSignedSliceStableSort(values, bucketCount, out)
+	}
+	keys := bulkU64Get(len(values))
+	defer bulkU64Release(keys)
+	for i, value := range values {
+		keys[i] = uint64(int64(value)) ^ (1 << 63)
+	}
+	indexes := stableKeyPermutationI32(keys)
+	if indexes == nil {
+		return newI64Trusted(out)
+	}
+	rank := 0
+	for rank < len(indexes) {
+		next := rank + 1
+		for next < len(indexes) && values[indexes[next]] == values[indexes[rank]] {
+			next++
+		}
+		bucket := int64(rank) * bucketCount / int64(len(indexes))
+		if bucket >= bucketCount {
+			bucket = bucketCount - 1
+		}
+		for _, index := range indexes[rank:next] {
+			out[index] = bucket
+		}
+		rank = next
+	}
+	return newI64Trusted(out)
+}
+
+func xrankSignedSliceStableSort[T signedScalar](values []T, bucketCount int64, out []int64) Array {
 	indexes := make([]int, len(values))
 	for i := range indexes {
 		indexes[i] = i
@@ -7306,6 +7446,8 @@ func TryTypedNumericProduct(array Array) (any, bool, error) {
 		return numericProductIntegerArray(a), true, nil
 	case i64ProductArray:
 		return numericProductIntegerArray(a), true, nil
+	case i64DyadicProductArray:
+		return numericProductIntegerArray(a), true, nil
 	case columnArray[uint8]:
 		return numericProductUnsignedValue(a.data), true, nil
 	case columnArray[uint16]:
@@ -7440,6 +7582,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64PeriodicIndexSum(a), true, nil
 	case i64ProductArray:
 		return i64ProductSum(a), true, nil
+	case i64DyadicProductArray:
+		return i64DyadicProductSum(a)
 	case crossPairArray:
 		return numericSumCrossPairValue(a)
 	case matrixRowArray:
@@ -11504,6 +11648,12 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return float64(value), true, nil
 	case i64ProductArray:
 		return numericI64ProductAt(a, row)
+	case i64DyadicProductArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
 	case columnArray[uint8]:
 		return numericColumnAt(a.data, row)
 	case columnArray[uint16]:
@@ -11614,7 +11764,7 @@ func isNumericArray(array Array) bool {
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
-		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
+		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray, i64DyadicProductArray,
 		i64SparseAmendArray, i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
 		castF32Array, castI64Array,
 		qRatiosArray, i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray, f64FillArray,
@@ -11754,6 +11904,9 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 	if out, ok, err := numericIntegerDyadicArrayScalar(op, left, right, length); ok || err != nil {
 		return out, ok, err
 	}
+	if out, ok := numericIntegerDyadicLazyProduct(op, left, right, length); ok {
+		return out, true, nil
+	}
 	if out, ok := numericIntegerDyadicBulk(op, left, right, length); ok {
 		return out, true, nil
 	}
@@ -11815,6 +11968,21 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 		return newNullableArray(KindI64, nullable), true, nil
 	}
 	return columnArray[int64]{kind: KindI64, data: values}, true, nil
+}
+
+func numericIntegerDyadicLazyProduct(op Op, left, right any, length int) (Array, bool) {
+	if op != OpMul {
+		return nil, false
+	}
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray || !rightIsArray || leftArray.Len() != length || rightArray.Len() != length {
+		return nil, false
+	}
+	if !isDenseIntegerArray(leftArray) || !isDenseIntegerArray(rightArray) {
+		return nil, false
+	}
+	return i64DyadicProductArray{left: leftArray, right: rightArray, len: length}, true
 }
 
 func numericIntegerDyadicArrayScalar(op Op, left, right any, length int) (Array, bool, error) {
@@ -12132,7 +12300,7 @@ func isIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64Int32IndexArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64Int32IndexArray, i64PeriodicIndexArray, i64ProductArray, i64DyadicProductArray, i64BucketArray, i64XrankArray, i64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray:
 		return true
 	case matrixRowArray:
@@ -12183,7 +12351,7 @@ func isDenseIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64Int32IndexArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64Int32IndexArray, i64PeriodicIndexArray, i64ProductArray, i64DyadicProductArray, i64BucketArray, i64XrankArray, i64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray:
 		return true
 	case matrixRowArray:
@@ -12297,6 +12465,8 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
 		}
 		return value, true, nil
+	case i64DyadicProductArray:
+		return a.i64At(row)
 	case matrixRowArray:
 		if row < 0 || row >= a.Len() {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
@@ -14643,6 +14813,27 @@ func i64ProductSum(values i64ProductArray) int64 {
 		sum += value
 	}
 	return sum
+}
+
+func i64DyadicProductSum(values i64DyadicProductArray) (int64, bool, error) {
+	left, leftOwned, ok := tryBulkI64Values(values.left)
+	if !ok || len(left) < values.len {
+		bulkI64Release(left, leftOwned)
+		return 0, false, nil
+	}
+	right, rightOwned, ok := tryBulkI64Values(values.right)
+	if !ok || len(right) < values.len {
+		bulkI64Release(left, leftOwned)
+		bulkI64Release(right, rightOwned)
+		return 0, false, nil
+	}
+	var total int64
+	for i := 0; i < values.len; i++ {
+		total += left[i] * right[i]
+	}
+	bulkI64Release(left, leftOwned)
+	bulkI64Release(right, rightOwned)
+	return total, true, nil
 }
 
 func i64ProductRangeSum(values i64ProductArray) (int64, bool) {
