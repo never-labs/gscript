@@ -154,6 +154,40 @@ func BenchmarkPreparedEvalPipelinePlanWarm(b *testing.B) {
 	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
 }
 
+func BenchmarkPreparedEvalDensePipelinePlanWarm(b *testing.B) {
+	ClearEvalPlanCaches()
+	defer ClearEvalPlanCaches()
+
+	const src = "+/v where v>threshold"
+	values := make([]int64, 8192)
+	for i := range values {
+		values[i] = int64(i)
+	}
+	env := map[string]any{
+		"v":         data.NewI64(values),
+		"threshold": int64(4096),
+	}
+	prepared, err := PrepareEval(src)
+	if err != nil {
+		b.Fatalf("PrepareEval dense pipeline: %v", err)
+	}
+	if _, err := prepared.EvalWithEnv(env); err != nil {
+		b.Fatalf("warm PreparedEval dense pipeline setup: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, err := prepared.EvalWithEnv(env)
+		if err != nil {
+			b.Fatalf("PreparedEval dense pipeline warm: %v", err)
+		}
+		qEvalPlanBenchSink = out
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
+}
+
 func BenchmarkEvalWithEnvRuntimePrimitivePipelineWarm(b *testing.B) {
 	ClearEvalPlanCaches()
 	defer ClearEvalPlanCaches()

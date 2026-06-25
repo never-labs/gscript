@@ -1289,6 +1289,11 @@ func buildQPipelineSumGatherPlan(src string) (qPipelinePlan, bool) {
 		plan := qPipelineShapePlan(qPipelineSumWhereMask, "")
 		plan.valueExpr = strings.TrimSpace(valueExpr)
 		plan.maskExpr = strings.TrimSpace(maskExpr)
+		if leftExpr, rightExpr, op, ok := splitWhereCompareExpr(plan.maskExpr); ok {
+			plan.leftExpr = strings.TrimSpace(leftExpr)
+			plan.rightExpr = strings.TrimSpace(rightExpr)
+			plan.compareOp = op
+		}
 		return plan, true
 	}
 	collectionExpr, indexExpr, ok := findPostfixIndex(src)
@@ -2149,6 +2154,9 @@ func (s *EvalState) evalQPipelineSumWhereMask(plan *qPipelinePlan) (any, bool, e
 	if !ok {
 		return nil, false, nil
 	}
+	if out, handled, err := s.evalQPipelineSumWhereCompareMask(plan, array); err != nil || handled {
+		return out, handled, err
+	}
 	maskValue, err := s.evalQPipelinePlannedExpr(plan.maskExpr, &plan.maskPlan)
 	if err != nil {
 		return nil, true, err
@@ -2160,6 +2168,33 @@ func (s *EvalState) evalQPipelineSumWhereMask(plan *qPipelinePlan) (any, bool, e
 	shape := "where-reduce/" + string(array.Kind()) + "/" + string(mask.Kind())
 	out, handled, err := data.TryTypedNumericSumWhereMask(array, mask)
 	return qTypedRuntimeResult("ArrayWhereReduceSum", shape, out, handled, err)
+}
+
+func (s *EvalState) evalQPipelineSumWhereCompareMask(plan *qPipelinePlan, values data.Array) (any, bool, error) {
+	if plan.compareOp == "" {
+		return nil, false, nil
+	}
+	if _, _, _, ok := data.I64RangeView(values); ok {
+		return nil, false, nil
+	}
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	selfPredicate := strings.TrimSpace(plan.leftExpr) == strings.TrimSpace(plan.valueExpr)
+	runtimePlan, ok, err := qTypedWhereGatherSumCountDescriptorFor(values, left, right, plan.compareOp, "where-reduce/sum-count", selfPredicate)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	if _, _, _, ok := data.I64RangeView(runtimePlan.predicate); ok {
+		return nil, false, nil
+	}
+	sum, _, handled, err := evalQTypedWhereGatherSumCount(runtimePlan)
+	return sum, handled, err
 }
 
 func (s *EvalState) evalQPipelineSumWhereIndex(plan *qPipelinePlan) (any, bool, error) {

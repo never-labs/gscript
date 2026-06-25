@@ -746,6 +746,7 @@ func EvalWithEnv(src string, env map[string]any) (any, error) {
 type PreparedEval struct {
 	source string
 	entry  *evalSessionPlan
+	state  EvalState
 	mu     sync.Mutex
 }
 
@@ -783,18 +784,19 @@ func (p *PreparedEval) EvalWithEnv(env map[string]any) (any, error) {
 	if p == nil || p.entry == nil {
 		return nil, fmt.Errorf("q: prepared eval handle is empty")
 	}
-	state := EvalState{env: env, envBorrowed: true, namespace: ".", oneShot: true}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.state.resetBorrowedEnv(env)
+	defer p.state.clearBorrowedEnv()
 	if p.entry.executable.Valid() {
-		if out, handled, err := state.ExecuteEvalPipelineExecutablePlanRef(&p.entry.executable); err != nil || handled {
+		if out, handled, err := p.state.ExecuteEvalPipelineExecutablePlanRef(&p.entry.executable); err != nil || handled {
 			if handled && err == nil {
 				recordQEvalDispatch(p.entry.source, EvalDispatchPipelineBackend)
 			}
 			return out, err
 		}
 	}
-	return state.evalScriptPlan(p.entry.script)
+	return p.state.evalScriptPlan(p.entry.script)
 }
 
 // EvalSourceCacheable reports whether src is safe for callers to memoize across
@@ -2908,6 +2910,15 @@ func (s *EvalState) ensureOwnedEnv() {
 		return
 	}
 	s.env = cloneEnv(s.env)
+	s.envBorrowed = false
+}
+
+func (s *EvalState) resetBorrowedEnv(env map[string]any) {
+	*s = EvalState{env: env, envBorrowed: true, namespace: ".", oneShot: true}
+}
+
+func (s *EvalState) clearBorrowedEnv() {
+	s.env = nil
 	s.envBorrowed = false
 }
 

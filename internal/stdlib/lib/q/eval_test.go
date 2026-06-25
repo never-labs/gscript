@@ -2344,6 +2344,40 @@ func TestExecuteEvalPipelineUsesWhereGatherSumCountWithinPredicate(t *testing.T)
 	t.Fatalf("missing within predicate ArrayWhereGatherSumCount hit: %#v", RuntimeKernelExecutionStats())
 }
 
+func TestEvalPipelineSumWhereCompareAvoidsMaskMaterialization(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	env := map[string]any{
+		"v":         data.NewI64([]int64{1, 2, 3, 4, 5}),
+		"threshold": int64(2),
+	}
+	got, err := EvalWithEnv("+/v where v>threshold", env)
+	if err != nil || got != int64(12) {
+		t.Fatalf("EvalWithEnv sum where compare = %#v,%v; want 12,nil", got, err)
+	}
+	got, err = EvalWithEnv("+/v where threshold<v", env)
+	if err != nil || got != int64(12) {
+		t.Fatalf("EvalWithEnv reversed sum where compare = %#v,%v; want 12,nil", got, err)
+	}
+	hits := 0
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected sum where compare fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayWhereGatherSumCount" && strings.HasPrefix(stat.Shape, "where-reduce/sum-count/") &&
+			stat.Outcome == "hit" && stat.Count > 0 {
+			hits += int(stat.Count)
+		}
+		if stat.Kernel == "ArrayWhereReduceSum" && stat.Outcome == "hit" {
+			t.Fatalf("sum where compare materialized mask reduce path: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+	}
+	if hits < 2 {
+		t.Fatalf("missing fused sum where compare hits: hits=%d stats=%#v", hits, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
