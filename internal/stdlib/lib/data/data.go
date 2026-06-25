@@ -677,6 +677,10 @@ type indexedArray struct {
 	len     int
 }
 
+type intIndexArray struct {
+	rows []int
+}
+
 // EncodedArrayInfo exposes dictionary-encoded column storage. The decoded
 // values remain visible through Array.At and Array.Values; consumers that can
 // exploit categorical storage can inspect the stable domain and row codes.
@@ -930,6 +934,36 @@ func (a indexedArray) Gather(indexes []int) Array {
 
 func (a indexedArray) ArrayMetadata() ArrayMetadata {
 	return ArrayMetadataOf(a.source).cloneWithRebuiltIndexes(a)
+}
+
+func (a intIndexArray) Kind() Kind { return KindI64 }
+
+func (a intIndexArray) Len() int { return len(a.rows) }
+
+func (a intIndexArray) At(row int) (any, bool) {
+	if row < 0 || row >= len(a.rows) {
+		return nil, false
+	}
+	return int64(a.rows[row]), true
+}
+
+func (a intIndexArray) Values() []any {
+	out := make([]any, len(a.rows))
+	for i, row := range a.rows {
+		out[i] = int64(row)
+	}
+	return out
+}
+
+func (a intIndexArray) Gather(indexes []int) Array {
+	out := make([]int, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= len(a.rows) {
+			panic(fmt.Sprintf("index %d out of bounds for index-array length %d", row, len(a.rows)))
+		}
+		out[i] = a.rows[row]
+	}
+	return intIndexArray{rows: out}
 }
 
 func (a i64RangeArray) Kind() Kind { return KindI64 }
@@ -4296,6 +4330,13 @@ func validateI64IndexArray(indexes Array, length int) (bool, error) {
 			return true, fmt.Errorf("index vector row %d value %d outside length %d", idx.len-1, last, length)
 		}
 		return true, nil
+	case intIndexArray:
+		for i, value := range idx.rows {
+			if value < 0 || value >= length {
+				return true, fmt.Errorf("index vector row %d value %d outside length %d", i, value, length)
+			}
+		}
+		return true, nil
 	case columnArray[int64]:
 		for i, value := range idx.data {
 			if value < 0 || value >= int64(length) {
@@ -4332,6 +4373,11 @@ func i64IndexArrayAt(indexes Array, row int) (int, bool, error) {
 		}
 		out, err := checkedI64Index(value)
 		return out, err == nil, err
+	case intIndexArray:
+		if row < 0 || row >= len(idx.rows) {
+			return 0, false, nil
+		}
+		return idx.rows[row], true, nil
 	case columnArray[int64]:
 		if row < 0 || row >= len(idx.data) {
 			return 0, false, nil
@@ -4389,6 +4435,8 @@ func TryTypedI64Indexes(indexes Array) ([]int, bool, error) {
 			}
 		}
 		return out, true, nil
+	case intIndexArray:
+		return idx.rows, true, nil
 	case columnArray[int64]:
 		out := make([]int, len(idx.data))
 		for i, value := range idx.data {
@@ -10025,6 +10073,18 @@ func typedFilterIndexArray(frame Frame, where Expr) (Array, bool, error) {
 		indexes, handled, err := TryTypedCompareIndexesI64(col, op, normalized)
 		if err != nil || handled {
 			return indexes, handled, err
+		}
+		return nil, false, nil
+	case Logical:
+		if expr.Op != "and" {
+			return nil, false, nil
+		}
+		rows, handled, err := fastLogicalAndFilterIndexes(frame, expr)
+		if err != nil {
+			return nil, true, err
+		}
+		if handled {
+			return intIndexArray{rows: rows}, true, nil
 		}
 		return nil, false, nil
 	default:
