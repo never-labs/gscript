@@ -2325,6 +2325,10 @@ func TryTypedFindI64Sum(domain, query Array) (int64, bool) {
 	if !ok {
 		return 0, false
 	}
+	if sum, handled := tryTypedFindI64SumStreamingQuery(domainValues, query); handled {
+		bulkI64Release(domainValues, domainOwned)
+		return sum, true
+	}
 	queryValues, queryOwned, ok := tryBulkI64Values(query)
 	if !ok || len(queryValues) == 0 {
 		bulkI64Release(domainValues, domainOwned)
@@ -2371,6 +2375,206 @@ func TryTypedFindI64Sum(domain, query Array) (int64, bool) {
 	bulkI64Release(domainValues, domainOwned)
 	bulkI64Release(queryValues, queryOwned)
 	return sum, true
+}
+
+func tryTypedFindI64SumStreamingQuery(domainValues []int64, query Array) (int64, bool) {
+	if len(domainValues) == 0 || query == nil || query.Len() == 0 {
+		return 0, false
+	}
+	if sum, ok := findI64IdentityDomainStreamingSum(domainValues, query); ok {
+		return sum, true
+	}
+	if table, minValue, ok := findI64DenseTable(domainValues); ok {
+		return findI64DenseTableStreamingSum(table, minValue, int64(len(domainValues)), query)
+	}
+	if len(domainValues) <= 8 {
+		return findI64SmallDomainStreamingSum(domainValues, query)
+	}
+	return 0, false
+}
+
+func findI64IdentityDomainStreamingSum(domainValues []int64, query Array) (int64, bool) {
+	if len(domainValues) == 0 {
+		return 0, false
+	}
+	minValue := domainValues[0]
+	for i, value := range domainValues {
+		if value != minValue+int64(i) {
+			return 0, false
+		}
+	}
+	miss := int64(len(domainValues))
+	switch q := unwrapAttributedArray(query).(type) {
+	case i64RangeArray:
+		return findI64IdentityDomainRangeSum(minValue, miss, q.start, q.step, q.len)
+	case i64ScalarDyadicArray:
+		if q.len <= 0 {
+			return 0, false
+		}
+		if q.op == OpMod && !q.scalarLeft && q.scalar > 0 && minValue == 0 && q.scalar == miss {
+			if r, ok := unwrapAttributedArray(q.source).(i64RangeArray); ok && q.len <= r.len {
+				return sumI64RangeMod(r.start, r.step, q.len, q.scalar), true
+			}
+		}
+		if r, ok := unwrapAttributedArray(q.source).(i64RangeArray); ok && q.len <= r.len {
+			return findI64IdentityDomainRangeScalarDyadicSum(minValue, miss, r, q)
+		}
+	}
+	return 0, false
+}
+
+func findI64IdentityDomainRangeSum(minValue, miss, start, step int64, length int) (int64, bool) {
+	if length <= 0 {
+		return 0, false
+	}
+	var sum int64
+	for row := 0; row < length; row++ {
+		value := start + int64(row)*step
+		index := miss
+		if offset := value - minValue; offset >= 0 && offset < miss {
+			index = offset
+		}
+		sum += index
+	}
+	return sum, true
+}
+
+func findI64IdentityDomainRangeScalarDyadicSum(minValue, miss int64, source i64RangeArray, query i64ScalarDyadicArray) (int64, bool) {
+	switch query.op {
+	case OpAdd, OpSub, OpMul, OpMod:
+	default:
+		return 0, false
+	}
+	if query.op == OpMod && (query.scalar == 0 || query.scalarLeft) {
+		return 0, false
+	}
+	var sum int64
+	for row := 0; row < query.len; row++ {
+		value := source.start + int64(row)*source.step
+		switch query.op {
+		case OpAdd:
+			value += query.scalar
+		case OpSub:
+			if query.scalarLeft {
+				value = query.scalar - value
+			} else {
+				value -= query.scalar
+			}
+		case OpMul:
+			value *= query.scalar
+		case OpMod:
+			value = qModInt64(value, query.scalar)
+		}
+		index := miss
+		if offset := value - minValue; offset >= 0 && offset < miss {
+			index = offset
+		}
+		sum += index
+	}
+	return sum, true
+}
+
+func sumI64RangeMod(start, step int64, length int, modulus int64) int64 {
+	if length <= 0 || modulus <= 0 {
+		return 0
+	}
+	if start == 0 && step == 1 && modulus <= int64(length) {
+		cycles := int64(length) / modulus
+		rem := int64(length) % modulus
+		return cycles*(modulus*(modulus-1)/2) + rem*(rem-1)/2
+	}
+	var sum int64
+	for row := 0; row < length; row++ {
+		sum += qModInt64(start+int64(row)*step, modulus)
+	}
+	return sum
+}
+
+func findI64DenseTableStreamingSum(table []int64, minValue, miss int64, query Array) (int64, bool) {
+	span := int64(len(table))
+	valueAt := i64StreamingValueAt(query)
+	if valueAt == nil {
+		return 0, false
+	}
+	var sum int64
+	for row := 0; row < query.Len(); row++ {
+		value, ok := valueAt(row)
+		if !ok {
+			return 0, false
+		}
+		index := miss
+		if offset := value - minValue; offset >= 0 && offset < span {
+			if hit := table[offset]; hit >= 0 {
+				index = hit
+			}
+		}
+		sum += index
+	}
+	return sum, true
+}
+
+func findI64SmallDomainStreamingSum(domainValues []int64, query Array) (int64, bool) {
+	valueAt := i64StreamingValueAt(query)
+	if valueAt == nil {
+		return 0, false
+	}
+	miss := int64(len(domainValues))
+	var sum int64
+	for row := 0; row < query.Len(); row++ {
+		value, ok := valueAt(row)
+		if !ok {
+			return 0, false
+		}
+		index := miss
+		for j, candidate := range domainValues {
+			if candidate == value {
+				index = int64(j)
+				break
+			}
+		}
+		sum += index
+	}
+	return sum, true
+}
+
+func i64StreamingValueAt(array Array) func(int) (int64, bool) {
+	switch a := unwrapAttributedArray(array).(type) {
+	case i64RangeArray:
+		return func(row int) (int64, bool) {
+			if row < 0 || row >= a.len {
+				return 0, false
+			}
+			return a.start + int64(row)*a.step, true
+		}
+	case i64ScalarDyadicArray:
+		if fn := i64StreamingValueAt(a.source); fn != nil {
+			return func(row int) (int64, bool) {
+				value, ok := fn(row)
+				if !ok {
+					return 0, false
+				}
+				out, ok, err := applyI64ScalarDyadicValue(a.op, value, a.scalar, a.scalarLeft)
+				if err != nil || !ok {
+					return 0, false
+				}
+				return out, true
+			}
+		}
+	case tiledArray:
+		if a.source.Len() <= 0 {
+			return nil
+		}
+		if fn := i64StreamingValueAt(a.source); fn != nil {
+			sourceLen := a.source.Len()
+			return func(row int) (int64, bool) {
+				if row < 0 || row >= a.len {
+					return 0, false
+				}
+				return fn((a.start + row) % sourceLen)
+			}
+		}
+	}
+	return nil
 }
 
 // TryTypedFindComparableSum reduces +/domain?query for the same shapes as

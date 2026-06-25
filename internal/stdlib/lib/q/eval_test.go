@@ -2103,6 +2103,59 @@ func TestEvalPipelineBackendEntrypointsRestoreFindIndexes(t *testing.T) {
 	}
 }
 
+func TestEvalPipelineBackendEntrypointsRestoreScriptFindSum(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	src := "x:(til 12) mod 4;+/0 1 2 3?x"
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize script find-sum pipeline", src)
+	}
+	if descriptor.Shape != "script-pipeline/find-reduce/sum/assignments" ||
+		descriptor.ValueExpr != "0 1 2 3" || descriptor.IndexExpr != "x" ||
+		len(descriptor.Assignments) != 1 || descriptor.Assignments[0].Name != "x" {
+		t.Fatalf("script find-sum descriptor = %#v", descriptor)
+	}
+	backend, ok := DescribeEvalPipelineBackendPlan(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipelineBackendPlan(%q) did not recognize script find-sum pipeline", src)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
+	}
+	for _, run := range []struct {
+		name string
+		call func() (any, bool, error)
+	}{
+		{name: "source", call: func() (any, bool, error) { return ExecuteEvalPipeline(src) }},
+		{name: "descriptor", call: func() (any, bool, error) { return ExecuteEvalPipelineDescriptor(descriptor) }},
+		{name: "backend", call: func() (any, bool, error) { return ExecuteEvalPipelineBackendPlan(backend) }},
+		{name: "executable", call: func() (any, bool, error) {
+			return NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+		}},
+	} {
+		got, handled, err := run.call()
+		if err != nil || !handled || got != int64(18) {
+			t.Fatalf("%s script find-sum pipeline run = %#v,%v,%v; want 18,true,nil", run.name, got, handled, err)
+		}
+	}
+
+	seenFindSum := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayFindSum" && stat.Shape == "vector-reduce/find-sum/i64/i64" && stat.Outcome == "hit" {
+			seenFindSum = true
+		}
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected script find-sum fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+	}
+	if !seenFindSum {
+		t.Fatalf("missing ArrayFindSum hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestExecuteEvalPipelineDescriptorRestoresModuloScriptSubPlan(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

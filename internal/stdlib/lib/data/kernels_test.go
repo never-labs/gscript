@@ -4441,6 +4441,37 @@ func TestTypedFindComparableStringSymbol(t *testing.T) {
 	}
 }
 
+func TestTypedFindI64SumStreamsLazyIntegerQuery(t *testing.T) {
+	query, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 8192), int64(4))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range mod did not match")
+	}
+	if _, ok := query.(i64ScalarDyadicArray); !ok {
+		t.Fatalf("query = %T, want i64ScalarDyadicArray", query)
+	}
+	sum, handled := TryTypedFindComparableSum(NewI64([]int64{0, 1, 2, 3}), query.(Array))
+	if !handled || sum != 12288 {
+		t.Fatalf("TryTypedFindComparableSum lazy query = %d, %v; want 12288, true", sum, handled)
+	}
+}
+
+func TestTypedFindI64SumStreamingPreservesFirstMatch(t *testing.T) {
+	query, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 12), int64(3))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic range mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic range mod did not match")
+	}
+	sum, handled := TryTypedFindComparableSum(NewI64([]int64{2, 0, 2, 1}), query.(Array))
+	if !handled || sum != 16 {
+		t.Fatalf("TryTypedFindComparableSum repeated domain = %d, %v; want 16, true", sum, handled)
+	}
+}
+
 func TestTypedJoinRowsByKeyIncludesNullAndDuplicateKeys(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), nil, Symbol("a"), NullValue}),

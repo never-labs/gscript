@@ -642,6 +642,8 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.kind = qScriptPipelineSequenceSumCount
 	case strings.Contains(shape, "gather-reduce/sum-count"):
 		out.kind = qScriptPipelineGatherReduceSumCount
+	case strings.Contains(shape, "find-reduce/sum"):
+		out.kind = qScriptPipelineFindReduceSum
 	case strings.Contains(shape, "multi-reduce/sum-plus-dyadic-float-sum"):
 		out.kind = qScriptPipelineSumPlusDyadicFloat
 	case strings.Contains(shape, "multi-reduce/integer-divmod-sum-count"):

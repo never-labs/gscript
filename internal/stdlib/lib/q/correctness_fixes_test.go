@@ -253,8 +253,9 @@ func TestNondeterministicSourcesExcludedFromAllMemoLayers(t *testing.T) {
 			t.Errorf("cachedValueExprTextEligible(%q) = true, want false", src)
 		}
 	}
-	// Deterministic forms keep their eligibility.
-	for _, src := range []string{"1+2", "til 10"} {
+	// Deterministic forms keep their eligibility, including q find (`?`)
+	// with an obvious vector/symbol-list left operand.
+	for _, src := range []string{"1+2", "til 10", "0 1 2 3?x", "`A`B?`B", "x:(til 12) mod 4;+/0 1 2 3?x"} {
 		if !EvalSourceCacheable(src) {
 			t.Errorf("EvalSourceCacheable(%q) = false, want true", src)
 		}
@@ -264,8 +265,11 @@ func TestNondeterministicSourcesExcludedFromAllMemoLayers(t *testing.T) {
 	if qSourceHasRandomVerb("?[t;();0b;()]") {
 		t.Error("qSourceHasRandomVerb flagged the functional query form")
 	}
-	if !qSourceHasRandomVerb("rand 10") || !qSourceHasRandomVerb("5?10") {
+	if !qSourceHasRandomVerb("rand 10") || !qSourceHasRandomVerb("5?10") || !qSourceHasRandomVerb("n?10") {
 		t.Error("qSourceHasRandomVerb missed a random verb")
+	}
+	if qSourceHasRandomVerb("0 1 2 3?x") || qSourceHasRandomVerb("`A`B?`B") {
+		t.Error("qSourceHasRandomVerb flagged deterministic find")
 	}
 }
 

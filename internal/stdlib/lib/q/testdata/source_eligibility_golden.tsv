@@ -96,7 +96,7 @@ false	false	false	false	rand 1f
 false	false	false	false	n?10
 false	false	false	false	x:5?10
 false	false	false	false	20?1000000
-false	false	false	false	1 2 3?2
+true	false	true	false	1 2 3?2
 false	false	false	false	x:1 2 3;x?2
 false	false	false	false	2?`a`b`c
 false	false	false	false	-3?5

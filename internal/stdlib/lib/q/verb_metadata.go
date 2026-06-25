@@ -254,11 +254,9 @@ func qVerbFlagsUnion(a, b qVerbProps) qVerbProps {
 
 // qScanMentionsRandomVerb conservatively reports whether the (literal-
 // blanked) scan text may invoke a Random-flagged verb: the dyadic `?`
-// roll/deal operator or a random word verb (rand). Any dyadic `?` counts
-// unless it is the functional query prefix `?[...]` or a prefix `?x`
-// distinct; the textual scan cannot know whether a name LHS is an integer
-// atom, so vector-LHS find expressions are also (safely) excluded from
-// memoization.
+// roll/deal operator or a random word verb (rand). Integer-atom and unknown
+// name LHS forms remain random; obvious vector/symbol-list LHS forms are
+// deterministic find and may enter the plan/result caches.
 // qScanMentionsSessionValueVerb reports whether the (literal-blanked) scan
 // text may apply `value` to a session-dependent operand: a string (evaluated
 // as q source against the live env), a symbol (workspace read), a parse tree,
@@ -342,6 +340,9 @@ func qScanMentionsRandomVerb(scan string) bool {
 			case '(', ';', '[', ',', '!', '+', '-', '*', '%', '&', '|', '^', '=', '<', '>', ':', '#', '_', '@', '~':
 				continue
 			}
+			if qQuestionMarkHasDeterministicFindLHS(scan, i) {
+				continue
+			}
 			if qVerbMetadata(qVerbNameRoll).Random {
 				return true
 			}
@@ -362,6 +363,52 @@ func qScanMentionsRandomVerb(scan string) bool {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+func qQuestionMarkHasDeterministicFindLHS(scan string, question int) bool {
+	if question <= 0 || question > len(scan) {
+		return false
+	}
+	start := question - 1
+	for start >= 0 {
+		ch := scan[start]
+		if ch == ';' || ch == '(' || ch == '[' || ch == ',' || ch == '!' ||
+			ch == '+' || ch == '*' || ch == '%' || ch == '&' || ch == '|' ||
+			ch == '^' || ch == '=' || ch == '<' || ch == '>' || ch == ':' ||
+			ch == '#' || ch == '_' || ch == '@' || ch == '~' || ch == '/' {
+			start++
+			break
+		}
+		if ch == '-' {
+			prev := start - 1
+			for prev >= 0 && isQWhitespace(scan[prev]) {
+				prev--
+			}
+			if prev < 0 || strings.ContainsRune(";([,!+*%&|^=<>:#_@~/", rune(scan[prev])) {
+				start++
+				break
+			}
+		}
+		start--
+	}
+	if start < 0 {
+		start = 0
+	}
+	lhs := strings.TrimSpace(scan[start:question])
+	if lhs == "" {
+		return true
+	}
+	if strings.ContainsAny(lhs, "`\"") {
+		return true
+	}
+	fields := strings.Fields(lhs)
+	if len(fields) > 1 {
+		return true
+	}
+	if strings.ContainsAny(lhs, ")$]") {
+		return true
 	}
 	return false
 }

@@ -14,6 +14,7 @@ const (
 	qScriptPipelineWhereIndexReduceSum  qScriptPipelineKind = "where-index-reduce/sum"
 	qScriptPipelineGatherReduceSum      qScriptPipelineKind = "gather-reduce/sum"
 	qScriptPipelineGatherReduceSumCount qScriptPipelineKind = "gather-reduce/sum-count"
+	qScriptPipelineFindReduceSum        qScriptPipelineKind = "find-reduce/sum"
 	qScriptPipelineIndexExprSumCount    qScriptPipelineKind = "index-expr-reduce/sum-count"
 	qScriptPipelineSequenceEdgeSum      qScriptPipelineKind = "sequence-edge-reduce/sum-first-last"
 	qScriptPipelineSequenceSumCount     qScriptPipelineKind = "sequence-reduce/sum-count"
@@ -158,6 +159,14 @@ func qNormalizeScriptPipelineDescriptor(descriptor qScriptPipelineDescriptor) qS
 		descriptor.valuePlan = buildQScriptWarmBindingPlan(descriptor.valueBinding, parseCachedValueExpr(descriptor.valueBinding))
 	}
 	descriptor.indexPlan = buildQScriptBindingPlanForRHS(descriptor.indexExpr, nil)
+	if descriptor.kind == qScriptPipelineFindReduceSum {
+		if binding := strings.TrimSpace(descriptor.valueBinding); binding != "" {
+			descriptor.valuePlan = buildQScriptWarmBindingPlan(binding, parseCachedValueExpr(binding))
+		}
+		if binding := strings.TrimSpace(descriptor.indexBinding); binding != "" {
+			descriptor.indexPlan = buildQScriptWarmBindingPlan(binding, parseCachedValueExpr(binding))
+		}
+	}
 	descriptor.maskPlan = buildQScriptBindingPlanForRHS(descriptor.maskExpr, nil)
 	descriptor.rowValuePlan = buildQScriptBindingPlanForRHS(descriptor.rowValueExpr, nil)
 	descriptor.rowIndexPlan = buildQScriptBindingPlanForRHS(descriptor.rowIndexExpr, nil)
@@ -261,6 +270,13 @@ func qScriptPipelineDescriptorTerminalPlan(descriptor qScriptPipelineDescriptor)
 			shape:     "gather-reduce/sum-count",
 			valueExpr: descriptor.valueExpr,
 			indexExpr: descriptor.indexExpr,
+		})
+	case qScriptPipelineFindReduceSum:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineFindSum,
+			shape:     "vector-reduce/find-sum",
+			leftExpr:  descriptor.valueExpr,
+			rightExpr: descriptor.indexExpr,
 		})
 	default:
 		if strings.TrimSpace(descriptor.terminal) != "" {
@@ -374,6 +390,15 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 	body := strings.TrimSpace(src[len("+/"):])
 	if body == "" {
 		return qScriptPipelineDescriptor{}, false
+	}
+	if plan, ok := buildQPipelineFindPlan(body, qPipelineFindSum, "vector-reduce/find-sum"); ok {
+		return qScriptPipelineDescriptor{
+			kind:         qScriptPipelineFindReduceSum,
+			valueExpr:    plan.leftExpr,
+			valueBinding: qScriptPipelineBinding(plan.leftExpr, bindings),
+			indexExpr:    plan.rightExpr,
+			indexBinding: qScriptPipelineBinding(plan.rightExpr, bindings),
+		}, true
 	}
 	if valueExpr, maskExpr, ok := splitTopLevelWord(body, "where"); ok {
 		d := qScriptPipelineDescriptor{
@@ -3269,6 +3294,33 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 	switch terminal.kind {
 	case qPipelineApplyScalarIndex, qPipelineApplyGatherIndex:
 		return s.evalQPipelinePlan(terminal)
+	case qPipelineFindSum:
+		left, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		right, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		desc, ok := qTypedFindDescriptorFor(left, right)
+		if !ok {
+			return nil, false, nil
+		}
+		out, handled, err := evalQTypedFindSum(desc)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return nil, false, nil
+		}
+		return out, true, nil
 	case qPipelineSumWhereIndex:
 		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
 		if err != nil {
@@ -3389,13 +3441,21 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 }
 
 func qScriptPipelineCanDeferAssignment(descriptor *qScriptPipelineDescriptor, assignment qScriptPipelineAssignment) bool {
-	if descriptor == nil || descriptor.kind != qScriptPipelineWhereIndexReduceSum {
+	if descriptor == nil {
 		return false
 	}
-	if strings.TrimSpace(descriptor.indexExpr) != assignment.name {
+	switch descriptor.kind {
+	case qScriptPipelineFindReduceSum:
+		name := strings.TrimSpace(assignment.name)
+		return name != "" && (name == strings.TrimSpace(descriptor.valueExpr) || name == strings.TrimSpace(descriptor.indexExpr))
+	case qScriptPipelineWhereIndexReduceSum:
+		if strings.TrimSpace(descriptor.indexExpr) != assignment.name {
+			return false
+		}
+		return descriptor.moduloMaskPlan != nil
+	default:
 		return false
 	}
-	return descriptor.moduloMaskPlan != nil
 }
 
 func qScriptPipelineModuloMaskPlan(maskExpr string) *qPipelinePlan {
