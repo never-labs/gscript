@@ -1094,7 +1094,7 @@ func qRecordScriptPlanFastPipelineCacheHits(plan qScriptPlan) {
 		if stmt.fastPlan.kind != qEvalFastPipeline || stmt.fastPlan.pipeline.source == "" {
 			continue
 		}
-		qGlobalPipelinePlanCacheProbe(stmt.fastPlan.pipeline.source)
+		qGlobalPipelinePlanCacheRecordProbe(stmt.fastPlan.pipeline.source)
 	}
 }
 
@@ -2087,6 +2087,9 @@ func buildNamePostfixSymbolPlan(src string) (string, data.Symbol, bool) {
 }
 
 func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
+	if s.oneShot {
+		return s.evalCachedOrStringUncached(src, expr, bindingPlan, fastPlan)
+	}
 	// Constant statement memoization: closed expressions (no free names, no
 	// nondeterministic forms) evaluate to the same value on every call, so
 	// the session-warm steady state is a single map probe. Values memoize
