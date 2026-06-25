@@ -665,6 +665,33 @@ func TestTryTypedCompareIndexStatsI64(t *testing.T) {
 	if count != 5 {
 		t.Fatalf("TryTypedCompareCount rotated tiled date = %d; want 5", count)
 	}
+
+	tiledInts, err := TakeRepeat(NewI64([]int64{10, 600, 501, 1}), 10)
+	if err != nil {
+		t.Fatalf("TakeRepeat int returned error: %v", err)
+	}
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(tiledInts, OpGT, int64(500))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 tiled int returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 tiled int did not handle typed compare")
+	}
+	if count != 5 || sum != 23 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 tiled int = count %d sum %d; want 5, 23", count, sum)
+	}
+	count, handled, err = TryTypedCompareCount(tiledInts, OpGT, int64(500))
+	if err != nil || !handled || count != 5 {
+		t.Fatalf("TryTypedCompareCount tiled int = %d,%v,%v; want 5,true,nil", count, handled, err)
+	}
+	rotatedInts, err := Slice(tiledInts, 2, 8)
+	if err != nil {
+		t.Fatalf("Slice tiled int returned error: %v", err)
+	}
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(rotatedInts, OpGT, int64(500))
+	if err != nil || !handled || count != 4 || sum != 14 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 rotated tiled int = count %d sum %d handled %v err %v; want 4,14,true,nil", count, sum, handled, err)
+	}
 }
 
 func TestTryTypedCompareNullableTemporalCarrier(t *testing.T) {

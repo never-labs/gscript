@@ -3889,6 +3889,9 @@ func compareTiledIndexStats(array tiledArray, op Op, value any) (count, sum int6
 	if array.source.Len() == 0 || array.len == 0 {
 		return 0, 0, true, nil
 	}
+	if count, sum, ok := compareTiledIndexStatsI64(array, op, value); ok {
+		return count, sum, true, nil
+	}
 	period := array.source.Len()
 	for sourceRow := 0; sourceRow < period; sourceRow++ {
 		sourceValue, ok := array.source.At(sourceRow)
@@ -3916,6 +3919,9 @@ func compareTiledCount(array tiledArray, op Op, value any) (count int64, handled
 	if array.source.Len() == 0 || array.len == 0 {
 		return 0, true, nil
 	}
+	if count, ok := compareTiledCountI64(array, op, value); ok {
+		return count, true, nil
+	}
 	period := array.source.Len()
 	for sourceRow := 0; sourceRow < period; sourceRow++ {
 		sourceValue, ok := array.source.At(sourceRow)
@@ -3932,6 +3938,61 @@ func compareTiledCount(array tiledArray, op Op, value any) (count int64, handled
 		count += int64(1 + (array.len-1-first)/period)
 	}
 	return count, true, nil
+}
+
+func compareTiledIndexStatsI64(array tiledArray, op Op, value any) (count, sum int64, ok bool) {
+	values, owned, bulkOK := tryBulkI64Values(array.source)
+	if !bulkOK || len(values) != array.source.Len() {
+		bulkI64Release(values, owned)
+		return 0, 0, false
+	}
+	target, exact := coerceInt64Exact(value)
+	if !exact {
+		bulkI64Release(values, owned)
+		return 0, 0, false
+	}
+	period := len(values)
+	for sourceRow, sourceValue := range values {
+		if !boolCompare(op, sourceValue == target, compareInt64(sourceValue, target)) {
+			continue
+		}
+		first := positiveModInt(sourceRow-array.start, period)
+		if first >= array.len {
+			continue
+		}
+		hits := int64(1 + (array.len-1-first)/period)
+		count += hits
+		sum += hits*int64(first) + int64(period)*hits*(hits-1)/2
+	}
+	bulkI64Release(values, owned)
+	return count, sum, true
+}
+
+func compareTiledCountI64(array tiledArray, op Op, value any) (int64, bool) {
+	values, owned, bulkOK := tryBulkI64Values(array.source)
+	if !bulkOK || len(values) != array.source.Len() {
+		bulkI64Release(values, owned)
+		return 0, false
+	}
+	target, exact := coerceInt64Exact(value)
+	if !exact {
+		bulkI64Release(values, owned)
+		return 0, false
+	}
+	period := len(values)
+	var count int64
+	for sourceRow, sourceValue := range values {
+		if !boolCompare(op, sourceValue == target, compareInt64(sourceValue, target)) {
+			continue
+		}
+		first := positiveModInt(sourceRow-array.start, period)
+		if first >= array.len {
+			continue
+		}
+		count += int64(1 + (array.len-1-first)/period)
+	}
+	bulkI64Release(values, owned)
+	return count, true
 }
 
 func positiveModInt(value, modulus int) int {
