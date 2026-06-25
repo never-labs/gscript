@@ -1592,6 +1592,17 @@ func tryBulkBoolValues(mask Array) (values []bool, owned bool, ok bool) {
 		fillCompareI64Mask(source, effectiveRangeCompareOp(a.op, a.scalarLeft), a.scalar, out)
 		bulkI64Release(source, sourceOwned)
 		return out, true, true
+	case i64ArrayCompareMask:
+		source, sourceOwned, ok := tryBulkI64Values(a.source)
+		if !ok || len(source) < a.len {
+			bulkI64Release(source, sourceOwned)
+			return nil, false, false
+		}
+		source = source[:a.len]
+		out := bulkBoolGet(len(source))
+		fillCompareI64Mask(source, effectiveRangeCompareOp(a.op, a.scalarLeft), a.scalar, out)
+		bulkI64Release(source, sourceOwned)
+		return out, true, true
 	case i64RangeCompareMask:
 		out := bulkBoolGet(a.values.len)
 		for i := range out {

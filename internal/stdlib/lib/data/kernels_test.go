@@ -4470,6 +4470,19 @@ func TestTypedDyadicSymbolAndTemporalComparisons(t *testing.T) {
 	if got, want := applied.(Array).Values(), []any{true, false, false}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedDyadic values = %v, want %v", got, want)
 	}
+	scalarMask, handled, err := TryTypedDyadic(OpGT, NewI64([]int64{1, 7, 9, 3}), int64(5))
+	if err != nil {
+		t.Fatalf("TryTypedDyadic scalar compare returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedDyadic scalar compare did not handle")
+	}
+	if _, ok := scalarMask.(i64ArrayCompareMask); !ok {
+		t.Fatalf("TryTypedDyadic scalar compare returned %T, want i64ArrayCompareMask", scalarMask)
+	}
+	if got, want := scalarMask.(Array).Values(), []any{false, true, true, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDyadic scalar compare values = %v, want %v", got, want)
+	}
 	if _, handled, err := TryTypedDyadic(OpLT, NewI64([]int64{1, 2}), NewI64([]int64{1})); err != nil || handled {
 		t.Fatalf("TryTypedDyadic broadcastable mismatch err = %v handled = %v, want decline", err, handled)
 	}
@@ -4519,6 +4532,41 @@ func TestTypedDyadicSymbolAndTemporalComparisons(t *testing.T) {
 	}
 	if got, want := nulls.(Array).Values(), []any{true, true, false}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("nullable compare Dyadic values = %v, want %v", got, want)
+	}
+}
+
+func TestTypedNumericSumWhereDenseI64CompareChain(t *testing.T) {
+	a, handled, err := TryTypedDyadic(OpGT, NewI64([]int64{1, 6, 7, 8, 9}), int64(5))
+	if err != nil || !handled {
+		t.Fatalf("a compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	b, handled, err := TryTypedDyadic(OpGT, NewI64([]int64{9, 1, 7, 8, 2}), int64(5))
+	if err != nil || !handled {
+		t.Fatalf("b compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	c, handled, err := TryTypedDyadic(OpGT, NewI64([]int64{9, 6, 1, 8, 9}), int64(5))
+	if err != nil || !handled {
+		t.Fatalf("c compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	d, handled, err := TryTypedDyadic(OpGT, NewI64([]int64{9, 6, 7, 9, 9}), int64(5))
+	if err != nil || !handled {
+		t.Fatalf("d compare handled=%v err=%v; want true,nil", handled, err)
+	}
+	ab, handled, err := TryTypedBoolLogical("and", a, b)
+	if err != nil || !handled {
+		t.Fatalf("ab logical handled=%v err=%v; want true,nil", handled, err)
+	}
+	abc, handled, err := TryTypedBoolLogical("and", ab, c)
+	if err != nil || !handled {
+		t.Fatalf("abc logical handled=%v err=%v; want true,nil", handled, err)
+	}
+	mask, handled, err := TryTypedBoolLogical("and", abc, d)
+	if err != nil || !handled {
+		t.Fatalf("mask logical handled=%v err=%v; want true,nil", handled, err)
+	}
+	sum, handled, err := TryTypedNumericSumWhereMask(NewI64([]int64{10, 20, 30, 40, 50}), mask)
+	if err != nil || !handled || sum != int64(40) {
+		t.Fatalf("TryTypedNumericSumWhereMask dense chain = %v handled=%v err=%v; want 40,true,nil", sum, handled, err)
 	}
 }
 

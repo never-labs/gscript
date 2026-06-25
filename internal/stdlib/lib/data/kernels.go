@@ -12607,6 +12607,9 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 	if out, ok := compareI64ScalarDyadicScalarDyadic(op, left, right, length); ok {
 		return out, true, nil
 	}
+	if out, ok := compareI64ArrayScalarDyadic(op, left, right, length); ok {
+		return out, true, nil
+	}
 	if out, ok := lazyF64CompareMask(op, left, right, length); ok {
 		return out, true, nil
 	}
@@ -12654,6 +12657,14 @@ type i64ScalarDyadicCompareMask struct {
 	op         Op
 	scalar     int64
 	scalarLeft bool
+}
+
+type i64ArrayCompareMask struct {
+	source     Array
+	op         Op
+	scalar     int64
+	scalarLeft bool
+	len        int
 }
 
 func (a i64ScalarDyadicCompareMask) Kind() Kind { return KindBool }
@@ -12723,6 +12734,77 @@ func (a i64ScalarDyadicCompareMask) trueCount() (int64, bool, error) {
 			count++
 		}
 	}
+	return count, true, nil
+}
+
+func (a i64ArrayCompareMask) Kind() Kind { return KindBool }
+
+func (a i64ArrayCompareMask) Len() int { return a.len }
+
+func (a i64ArrayCompareMask) At(row int) (any, bool) {
+	if row < 0 || row >= a.len {
+		return nil, false
+	}
+	value, ok, err := a.valueAt(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64ArrayCompareMask) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data i64 compare row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64ArrayCompareMask) Gather(indexes []int) Array {
+	out := make([]bool, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.len {
+			panic(fmt.Sprintf("data i64 compare gather index %d out of range", row))
+		}
+		value, ok, err := a.valueAt(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data i64 compare row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newBoolTrusted(out)
+}
+
+func (a i64ArrayCompareMask) valueAt(row int) (bool, bool, error) {
+	value, ok, err := integerArrayAt(a.source, row)
+	if err != nil || !ok {
+		return false, ok, err
+	}
+	if a.scalarLeft {
+		return boolCompare(a.op, a.scalar == value, compareInt64(a.scalar, value)), true, nil
+	}
+	return boolCompare(a.op, value == a.scalar, compareInt64(value, a.scalar)), true, nil
+}
+
+func (a i64ArrayCompareMask) trueCount() (int64, bool, error) {
+	values, owned, ok := tryBulkI64Values(a.source)
+	if !ok || len(values) < a.len {
+		bulkI64Release(values, owned)
+		return 0, false, nil
+	}
+	values = values[:a.len]
+	op := effectiveRangeCompareOp(a.op, a.scalarLeft)
+	var count int64
+	for _, value := range values {
+		if boolCompare(op, value == a.scalar, compareInt64(value, a.scalar)) {
+			count++
+		}
+	}
+	bulkI64Release(values, owned)
 	return count, true, nil
 }
 
@@ -12878,6 +12960,36 @@ func compareI64ScalarDyadicScalarDyadic(op Op, left, right any, length int) (Arr
 	default:
 		return nil, false
 	}
+}
+
+func compareI64ArrayScalarDyadic(op Op, left, right any, length int) (Array, bool) {
+	leftArray, leftOK := left.(Array)
+	rightArray, rightOK := right.(Array)
+	leftScalar, leftScalarOK := integerScalarValue(left)
+	rightScalar, rightScalarOK := integerScalarValue(right)
+	switch {
+	case leftOK && !rightOK && rightScalarOK:
+		if leftArray.Len() != length || !i64ArrayCompareMaskSource(leftArray, length) {
+			return nil, false
+		}
+		return i64ArrayCompareMask{source: leftArray, op: op, scalar: rightScalar, len: length}, true
+	case !leftOK && rightOK && leftScalarOK:
+		if rightArray.Len() != length || !i64ArrayCompareMaskSource(rightArray, length) {
+			return nil, false
+		}
+		return i64ArrayCompareMask{source: rightArray, op: op, scalar: leftScalar, scalarLeft: true, len: length}, true
+	default:
+		return nil, false
+	}
+}
+
+func i64ArrayCompareMaskSource(array Array, length int) bool {
+	if array == nil || array.Len() != length {
+		return false
+	}
+	values, owned, ok := tryBulkI64Values(array)
+	bulkI64Release(values, owned)
+	return ok && len(values) >= length
 }
 
 func compareI64RangeScalarDyadic(op Op, left, right any, length int) (Array, bool) {

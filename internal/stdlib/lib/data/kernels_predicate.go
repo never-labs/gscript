@@ -95,7 +95,7 @@ const predNodeBudget = 32
 // for the existing paths.
 func fusedPredicateWhereIndexArray(mask Array) (Array, bool) {
 	switch mask.(type) {
-	case boolLogicalMask, notMask, i64MembershipMask, i64WithinMask:
+	case boolLogicalMask, notMask, i64ArrayCompareMask, i64MembershipMask, i64WithinMask:
 	default:
 		return nil, false
 	}
@@ -140,7 +140,7 @@ func fusedPredicateWhereIndexArray(mask Array) (Array, bool) {
 // caller: release it with bulkBoolRelease(mask, true).
 func fusedPredicateDenseBoolMask(mask Array) ([]bool, bool) {
 	switch mask.(type) {
-	case boolLogicalMask, notMask, i64MembershipMask, i64WithinMask:
+	case boolLogicalMask, notMask, i64ArrayCompareMask, i64MembershipMask, i64WithinMask:
 	default:
 		return nil, false
 	}
@@ -335,6 +335,11 @@ func (c *predCompiler) compile(mask Array, negate bool) (*predNode, bool) {
 			return c.boolsLeaf(mask, negate)
 		}
 		return c.cmpLeaf(a.values, a.op, a.scalar, a.scalarLeft, negate, mask)
+	case i64ArrayCompareMask:
+		if a.len != c.length || a.source == nil || a.source.Len() != c.length {
+			return c.boolsLeaf(mask, negate)
+		}
+		return c.cmpLeaf(a.source, a.op, a.scalar, a.scalarLeft, negate, mask)
 	case i64RangeCompareMask:
 		if a.values.len != c.length {
 			return c.boolsLeaf(mask, negate)

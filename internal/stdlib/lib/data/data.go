@@ -2633,6 +2633,8 @@ func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
 		return i64SegmentCompareMaskIndexArray(a)
 	case i64ScalarDyadicCompareMask:
 		return i64ScalarDyadicCompareMaskIndexArray(a)
+	case i64ArrayCompareMask:
+		return i64ArrayCompareMaskIndexArray(a)
 	case boolLogicalMask:
 		return boolLogicalMaskIndexArray(a)
 	default:
@@ -2749,6 +2751,30 @@ func i64SegmentCompareMaskIndexArray(mask i64SegmentCompareMask) (Array, bool, e
 	}
 	out, ok := i64SegmentIntervalIndexArray(mask.values, low, high)
 	return out, ok, nil
+}
+
+func i64ArrayCompareMaskIndexArray(mask i64ArrayCompareMask) (Array, bool, error) {
+	values, owned, ok := tryBulkI64Values(mask.source)
+	if !ok || len(values) < mask.len {
+		bulkI64Release(values, owned)
+		return nil, false, nil
+	}
+	values = values[:mask.len]
+	op := effectiveRangeCompareOp(mask.op, mask.scalarLeft)
+	count := 0
+	for _, value := range values {
+		if boolCompare(op, value == mask.scalar, compareInt64(value, mask.scalar)) {
+			count++
+		}
+	}
+	out := make([]int64, 0, count)
+	for row, value := range values {
+		if boolCompare(op, value == mask.scalar, compareInt64(value, mask.scalar)) {
+			out = append(out, int64(row))
+		}
+	}
+	bulkI64Release(values, owned)
+	return newI64Trusted(out), true, nil
 }
 
 func i64ScalarDyadicCompareMaskIndexArray(mask i64ScalarDyadicCompareMask) (Array, bool, error) {
