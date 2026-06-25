@@ -6059,6 +6059,9 @@ func TryTypedNumericSumWhereModuloCompare(values, modSource Array, modulus any, 
 		return nil, false, nil
 	}
 	if plan, ok := i64ModuloComparePlanForArray(modSource, modulusI64, op, targetI64); ok {
+		if out, handled, err := tryTypedNumericSumWhereModuloComparePlan(values, plan); err != nil || handled {
+			return out, handled, err
+		}
 		indexes := i64ModuloComparePlanIndexArray(plan)
 		return TryTypedNumericSumByI64Indexes(values, indexes)
 	}
@@ -6110,6 +6113,27 @@ func TryTypedNumericSumWhereModuloCompare(values, modSource Array, modulus any, 
 		return NullValue, true, nil
 	}
 	return total, true, nil
+}
+
+func tryTypedNumericSumWhereModuloComparePlan(values Array, plan i64ModuloComparePlan) (any, bool, error) {
+	count, ok := plan.trueCount()
+	if !ok {
+		return nil, false, nil
+	}
+	if count == 0 {
+		return NullValue, true, nil
+	}
+	switch a := values.(type) {
+	case attributedArray:
+		return tryTypedNumericSumWhereModuloComparePlan(a.array, plan)
+	case i64RangeArray:
+		if a.len != plan.length {
+			return nil, true, fmt.Errorf("modulo compare sum length mismatch: values=%d source=%d", a.len, plan.length)
+		}
+		return a.start*count + a.step*plan.indexSum(), true, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func moduloCompareOperands(modulus any, op Op, target any) (int64, int64, bool) {
