@@ -761,7 +761,7 @@ func TestEvalPipelineExecutablePlanMetadataComesFromRunner(t *testing.T) {
 	if executable.Backend() != EvalPipelineTypedRuntimeBackend || executable.Kind() != evalPipelineKindExpression {
 		t.Fatalf("executable metadata = backend %q kind %q, want typed runtime expression", executable.Backend(), executable.Kind())
 	}
-	invalidRunner := evalPipelineExecutablePlanForRunner(qEvalPipelineExpressionExecutable{})
+	invalidRunner := evalPipelineExecutablePlanForRunner(&qEvalPipelineExpressionExecutable{})
 	if invalidRunner.Valid() {
 		t.Fatalf("invalid expression runner produced valid executable")
 	}

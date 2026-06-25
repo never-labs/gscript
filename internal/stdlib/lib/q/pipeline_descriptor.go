@@ -118,19 +118,28 @@ type qEvalPipelineExpressionExecutable struct {
 	plan qPipelinePlan
 }
 
-func (e qEvalPipelineExpressionExecutable) kind() string {
+func (e *qEvalPipelineExpressionExecutable) kind() string {
 	return evalPipelineKindExpression
 }
 
-func (e qEvalPipelineExpressionExecutable) valid() bool {
+func (e *qEvalPipelineExpressionExecutable) valid() bool {
+	if e == nil {
+		return false
+	}
 	return e.plan.kind != qPipelineInvalid
 }
 
-func (e qEvalPipelineExpressionExecutable) clone() qEvalPipelineExecutable {
-	return qEvalPipelineExpressionExecutable{plan: cloneQPipelinePlan(e.plan)}
+func (e *qEvalPipelineExpressionExecutable) clone() qEvalPipelineExecutable {
+	if e == nil {
+		return nil
+	}
+	return &qEvalPipelineExpressionExecutable{plan: cloneQPipelinePlan(e.plan)}
 }
 
-func (e qEvalPipelineExpressionExecutable) run(s *EvalState) (any, bool, error) {
+func (e *qEvalPipelineExpressionExecutable) run(s *EvalState) (any, bool, error) {
+	if e == nil {
+		return nil, false, nil
+	}
 	return s.evalQPipelinePlan(&e.plan)
 }
 
@@ -138,19 +147,28 @@ type qEvalPipelineScriptExecutable struct {
 	descriptor *qScriptPipelineDescriptor
 }
 
-func (e qEvalPipelineScriptExecutable) kind() string {
+func (e *qEvalPipelineScriptExecutable) kind() string {
 	return evalPipelineKindScript
 }
 
-func (e qEvalPipelineScriptExecutable) valid() bool {
+func (e *qEvalPipelineScriptExecutable) valid() bool {
+	if e == nil {
+		return false
+	}
 	return e.descriptor != nil && e.descriptor.kind != qScriptPipelineUnsupported
 }
 
-func (e qEvalPipelineScriptExecutable) clone() qEvalPipelineExecutable {
-	return qEvalPipelineScriptExecutable{descriptor: cloneQScriptPipelineDescriptor(e.descriptor)}
+func (e *qEvalPipelineScriptExecutable) clone() qEvalPipelineExecutable {
+	if e == nil {
+		return nil
+	}
+	return &qEvalPipelineScriptExecutable{descriptor: cloneQScriptPipelineDescriptor(e.descriptor)}
 }
 
-func (e qEvalPipelineScriptExecutable) run(s *EvalState) (any, bool, error) {
+func (e *qEvalPipelineScriptExecutable) run(s *EvalState) (any, bool, error) {
+	if e == nil {
+		return nil, false, nil
+	}
 	return s.tryEvalQScriptPipeline(e.descriptor)
 }
 
@@ -249,12 +267,12 @@ func evalPipelineBackendPlan(descriptor EvalPipelineDescriptor) EvalPipelineBack
 
 func evalPipelineExpressionExecutable(plan qPipelinePlan) EvalPipelineExecutablePlan {
 	expression := cloneQPipelinePlan(plan)
-	return evalPipelineExecutablePlanForRunner(qEvalPipelineExpressionExecutable{plan: expression})
+	return evalPipelineExecutablePlanForRunner(&qEvalPipelineExpressionExecutable{plan: expression})
 }
 
 func evalPipelineScriptExecutable(plan *qScriptPipelineDescriptor) EvalPipelineExecutablePlan {
 	script := cloneQScriptPipelineDescriptor(plan)
-	return evalPipelineExecutablePlanForRunner(qEvalPipelineScriptExecutable{descriptor: script})
+	return evalPipelineExecutablePlanForRunner(&qEvalPipelineScriptExecutable{descriptor: script})
 }
 
 func evalPipelineExecutableForDescriptor(descriptor EvalPipelineDescriptor) (EvalPipelineExecutablePlan, bool) {
