@@ -28,6 +28,12 @@ type QEvalPipelineExecutor interface {
 	ExecuteQEvalPipelinePlan(ref QEvalPipelinePlanRef) (any, bool, error)
 }
 
+// QEvalPipelineValueExecutor is the lower-overhead execution-side extension
+// for backends that can run a plan ref and return a VM value directly.
+type QEvalPipelineValueExecutor interface {
+	ExecuteQEvalPipelinePlanValue(ref QEvalPipelinePlanRef) (runtime.Value, bool, error)
+}
+
 // QEvalPipelinePlan is intentionally metadata-only in MethodJIT. Ownership of
 // q AST normalization, schema binding, and kernel dispatch stays behind the
 // backend boundary.
@@ -303,6 +309,9 @@ func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipeli
 		if _, ok := runtimeBackend.lookupBackendPlan(ref); !ok {
 			return runtime.NilValue(), false, nil
 		}
+	}
+	if valueExecutor, ok := backend.(QEvalPipelineValueExecutor); ok {
+		return valueExecutor.ExecuteQEvalPipelinePlanValue(ref)
 	}
 	out, handled, err := executor.ExecuteQEvalPipelinePlan(ref)
 	if err != nil || !handled {
