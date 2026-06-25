@@ -283,6 +283,9 @@ func (s *EvalState) rememberQPipelinePlanKnownSource(src string, plan qPipelineP
 	if src == "" || plan.kind == qPipelineInvalid {
 		return
 	}
+	if s.skipPipelineRemember {
+		return
+	}
 	if s.pipelineCache != nil {
 		if _, ok := s.pipelineCache[src]; ok {
 			return

@@ -427,6 +427,21 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlanRef(plan *EvalPipelineExecu
 	return runner.run(s)
 }
 
+// ExecuteEvalPipelineExecutablePlanRefHot executes a predecoded plan on a JIT
+// or runtime hot path. The plan already owns its terminal pipeline metadata, so
+// script execution skips repopulating the EvalState source-plan cache.
+func (s *EvalState) ExecuteEvalPipelineExecutablePlanRefHot(plan *EvalPipelineExecutablePlan) (any, bool, error) {
+	if s == nil {
+		return nil, false, nil
+	}
+	previous := s.skipPipelineRemember
+	s.skipPipelineRemember = true
+	defer func() {
+		s.skipPipelineRemember = previous
+	}()
+	return s.ExecuteEvalPipelineExecutablePlanRef(plan)
+}
+
 func (s *EvalState) compileEvalPipelineSource(source string) (EvalPipelineBackendPlan, EvalPipelineExecutablePlan, bool) {
 	source = strings.TrimSpace(source)
 	if s == nil || source == "" {

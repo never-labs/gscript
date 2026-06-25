@@ -667,6 +667,7 @@ type EvalState struct {
 	pipelineCache        map[string]*qPipelinePlan
 	pipelineCache1Src    string
 	pipelineCache1Plan   *qPipelinePlan
+	skipPipelineRemember bool
 	constValueCache      map[string]any
 	applyIndexCache      map[string]qScalarApplyIndexPlan
 	dotApplyCache        map[string]qDotApplyPlan

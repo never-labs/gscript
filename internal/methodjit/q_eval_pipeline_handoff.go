@@ -459,7 +459,7 @@ func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
 			err     error
 		)
 		if h.hasExecutablePlan {
-			out, handled, err = h.evalState.ExecuteEvalPipelineExecutablePlanRef(&h.executablePlan)
+			out, handled, err = h.evalState.ExecuteEvalPipelineExecutablePlanRefHot(&h.executablePlan)
 		} else if h.hasBackendPlan {
 			out, handled, err = h.evalState.ExecuteEvalPipelineBackendPlan(h.backendPlan)
 		} else if h.hasDescriptor {
@@ -484,7 +484,7 @@ func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
 		err     error
 	)
 	if h.hasExecutablePlan {
-		out, handled, err = stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRef(&h.executablePlan)
+		out, handled, err = stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRefHot(&h.executablePlan)
 	} else if h.hasBackendPlan {
 		execute := h.executeBackendPlan
 		if execute == nil {
@@ -552,7 +552,7 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlanValue(ref QEvalPipe
 	if executable, ok := b.lookupExecutablePlan(ref); ok && b.executeExecutable == nil {
 		if state := b.lookupEvalState(ref.ID); state != nil {
 			state.mu.Lock()
-			out, handled, err := state.state.ExecuteEvalPipelineExecutablePlanRef(&executable)
+			out, handled, err := state.state.ExecuteEvalPipelineExecutablePlanRefHot(&executable)
 			state.mu.Unlock()
 			if err != nil || !handled {
 				return runtime.NilValue(), handled, err
@@ -622,7 +622,7 @@ func (b qRuntimeEvalPipelineBackend) executeEvalPipelineExecutablePlan(plan stdq
 	if b.executeExecutable != nil {
 		return b.executeExecutable(plan)
 	}
-	return stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRef(&plan)
+	return stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRefHot(&plan)
 }
 
 func (b qRuntimeEvalPipelineBackend) executeEvalPipelineDescriptor(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
