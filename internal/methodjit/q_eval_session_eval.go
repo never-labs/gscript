@@ -528,12 +528,10 @@ func (cf *CompiledFunction) executeQEvalSessionEval(instrID, aux int, receiver r
 			}
 			if planned != nil {
 				out, err := planned.exec(runtime.NilValue())
-				cf.recordQEvalSessionEvalPlannedExecution(err)
 				site.recordPlannedExecution(err)
 				return out, err
 			}
 			out, err := executeQEvalSessionEvalValue(cf.protoConstants(), aux, receiver)
-			cf.recordQEvalSessionEvalExecution(err)
 			site.recordShellExecution(err)
 			return out, err
 		}

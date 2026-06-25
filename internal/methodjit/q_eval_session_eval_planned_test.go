@@ -101,13 +101,13 @@ func TestExecuteQEvalSessionEvalPlannedRoute(t *testing.T) {
 			t.Fatalf("executeQEvalSessionEval #%d = %s,%v; want %d,nil", i, out.String(), err, want)
 		}
 	}
-	if got := cf.QEvalSessionEvalStats.plannedSuccess.Load(); got != 3 {
-		t.Fatalf("planned success counter = %d, want 3", got)
-	}
-	if got := cf.QEvalSessionEvalStats.success.Load(); got != 0 {
-		t.Fatalf("shell success counter = %d, want 0 (all executions must take the planned route)", got)
-	}
 	site := cf.QEvalSessionEvalSites[7]
+	if got := site.stats.plannedSuccess.Load(); got != 3 {
+		t.Fatalf("site planned success counter = %d, want 3", got)
+	}
+	if got := site.stats.success.Load(); got != 0 {
+		t.Fatalf("site shell success counter = %d, want 0 (all executions must take the planned route)", got)
+	}
 	planned := site.planned.Load()
 	if planned == nil || planned.receiver != receiver.Table() {
 		t.Fatalf("site cache = %#v, want pinned executor for the receiver session", planned)
@@ -123,8 +123,8 @@ func TestExecuteQEvalSessionEvalPlannedRoute(t *testing.T) {
 	if replaced := site.planned.Load(); replaced == nil || replaced.receiver != other.Table() {
 		t.Fatalf("site cache after receiver switch = %#v, want executor pinned to the new session", replaced)
 	}
-	if got := cf.QEvalSessionEvalStats.plannedSuccess.Load(); got != 4 {
-		t.Fatalf("planned success counter after receiver switch = %d, want 4", got)
+	if got := site.stats.plannedSuccess.Load(); got != 4 {
+		t.Fatalf("site planned success counter after receiver switch = %d, want 4", got)
 	}
 
 	// Stats fold into the public rows under the planned route label.
@@ -193,11 +193,11 @@ func TestExecuteQEvalSessionEvalShellFallback(t *testing.T) {
 	if err != nil || !out.IsInt() || out.Int() != 3 {
 		t.Fatalf("executeQEvalSessionEval(shell receiver) = %s,%v; want 3,nil", out.String(), err)
 	}
-	if got := cf.QEvalSessionEvalStats.success.Load(); got != 1 {
-		t.Fatalf("shell success counter = %d, want 1", got)
+	if got := cf.QEvalSessionEvalSites[7].stats.success.Load(); got != 1 {
+		t.Fatalf("site shell success counter = %d, want 1", got)
 	}
-	if got := cf.QEvalSessionEvalStats.plannedSuccess.Load(); got != 0 {
-		t.Fatalf("planned success counter = %d, want 0", got)
+	if got := cf.QEvalSessionEvalSites[7].stats.plannedSuccess.Load(); got != 0 {
+		t.Fatalf("site planned success counter = %d, want 0", got)
 	}
 
 	// Unknown site ID (no compile-time site entry) still executes via shell.
@@ -244,12 +244,6 @@ func TestExecuteQEvalSessionEvalRecordsPlannedErrorStats(t *testing.T) {
 	if err == nil || err.Error() != wantErr || !out.IsNil() {
 		t.Fatalf("executeQEvalSessionEval planned error = %s,%v; want nil,%q", out.String(), err, wantErr)
 	}
-	if got := cf.QEvalSessionEvalStats.plannedErrors.Load(); got != 1 {
-		t.Fatalf("planned error counter = %d, want 1", got)
-	}
-	if got := cf.QEvalSessionEvalStats.errors.Load(); got != 0 {
-		t.Fatalf("shell error counter = %d, want 0", got)
-	}
 	if got := cf.QEvalSessionEvalSites[7].stats.plannedErrors.Load(); got != 1 {
 		t.Fatalf("site planned error counter = %d, want 1", got)
 	}
@@ -283,14 +277,11 @@ func TestExecuteQEvalSessionEvalRecordsShellErrorStats(t *testing.T) {
 	if err == nil || err.Error() != wantErr || !out.IsNil() {
 		t.Fatalf("executeQEvalSessionEval shell error = %s,%v; want nil,%q", out.String(), err, wantErr)
 	}
-	if got := cf.QEvalSessionEvalStats.errors.Load(); got != 1 {
-		t.Fatalf("shell error counter = %d, want 1", got)
-	}
-	if got := cf.QEvalSessionEvalStats.plannedErrors.Load(); got != 0 {
-		t.Fatalf("planned error counter = %d, want 0", got)
-	}
 	if got := cf.QEvalSessionEvalSites[7].stats.errors.Load(); got != 1 {
 		t.Fatalf("site shell error counter = %d, want 1", got)
+	}
+	if got := cf.QEvalSessionEvalSites[7].stats.plannedErrors.Load(); got != 0 {
+		t.Fatalf("site planned error counter = %d, want 0", got)
 	}
 	stats := cf.QKernelExecutionStats()
 	assertQEvalSessionEvalStat(t, stats, "QEvalSessionEval", "q-eval/session-eval", "unknown", qEvalSessionEvalRouteShell, "error", qEvalSessionEvalReasonShellError, 1)
