@@ -5289,6 +5289,22 @@ func TestEvalScriptNumericFloatToIntCastSumUsesFusedPlan(t *testing.T) {
 	}
 }
 
+func TestEvalScriptNumericIntegerDivModSumUsesFusedPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:`int$(til 32) mod 9;d:x div 4;m:x mod 4;s:d+m;+/s", int64(61))
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "hit" {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing script numeric div/mod sum plan hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalScriptNumericCastSumPreservesRangeErrors(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

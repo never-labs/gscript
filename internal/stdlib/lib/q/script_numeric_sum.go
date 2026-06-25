@@ -238,7 +238,7 @@ func buildQScriptNumericExprPlan(expr Expr, bindings map[string]qScriptNumericEx
 
 func buildQScriptNumericBinaryPlan(op string, leftExpr, rightExpr Expr, bindings map[string]qScriptNumericExprPlan) (qScriptNumericExprPlan, bool) {
 	switch op {
-	case "+", "-", "*", "%", "mod":
+	case "+", "-", "*", "%", "div", "mod":
 	default:
 		return qScriptNumericExprPlan{}, false
 	}
@@ -255,6 +255,11 @@ func buildQScriptNumericBinaryPlan(op string, leftExpr, rightExpr Expr, bindings
 			return qScriptNumericExprPlan{}, false
 		}
 	}
+	if op == "div" {
+		if right.kind != qScriptNumericExprScalar || right.value <= 0 || !left.nonNegative {
+			return qScriptNumericExprPlan{}, false
+		}
+	}
 	plan := qScriptNumericExprPlan{kind: qScriptNumericExprBinary, op: op, left: &left, right: &right}
 	switch op {
 	case "+":
@@ -262,6 +267,8 @@ func buildQScriptNumericBinaryPlan(op string, leftExpr, rightExpr Expr, bindings
 	case "*":
 		plan.nonNegative = left.nonNegative && right.nonNegative
 	case "mod":
+		plan.nonNegative = true
+	case "div":
 		plan.nonNegative = true
 	}
 	plan.hasCast = left.hasCast || right.hasCast
@@ -508,6 +515,8 @@ func qScriptNumericEvalRow(plan qScriptNumericExprPlan, row int, bindings map[st
 			return left * right, nil
 		case "mod":
 			return left % right, nil
+		case "div":
+			return left / right, nil
 		default:
 			return 0, fmt.Errorf("unsupported numeric op %s", plan.op)
 		}
@@ -743,6 +752,12 @@ func qScriptNumericSummarizeBinary(op string, left, right qScriptNumericSumSumma
 		}
 		return qScriptNumericSummarizeMod(left, right.value)
 	}
+	if op == "div" {
+		if !right.scalar || right.value <= 0 {
+			return qScriptNumericSumSummary{}, false, nil
+		}
+		return qScriptNumericSummarizeDiv(left, right.value)
+	}
 	length, ok := qScriptNumericSumSummaryResultLength(left, right)
 	if !ok {
 		return qScriptNumericSumSummary{}, false, nil
@@ -885,6 +900,32 @@ func qScriptNumericSummarizeMod(left qScriptNumericSumSummary, modulus int64) (q
 	return qScriptNumericSumSummary{}, false, nil
 }
 
+func qScriptNumericSummarizeDiv(left qScriptNumericSumSummary, divisor int64) (qScriptNumericSumSummary, bool, error) {
+	if left.scalar {
+		value := left.value / divisor
+		return qScriptNumericSumSummary{length: -1, scalar: true, value: value, min: value, max: value}, true, nil
+	}
+	if left.linear && left.start == 0 && left.step == 1 {
+		if divisor > qScriptNumericClosedFormMaxPeriod {
+			return qScriptNumericSumSummary{}, false, nil
+		}
+		periodLen := int(divisor)
+		period := make([]int64, periodLen)
+		for i := range period {
+			period[i] = int64(i) / divisor
+		}
+		return qScriptNumericPeriodSummary(left.length, period), true, nil
+	}
+	if len(left.period) > 0 {
+		period := make([]int64, len(left.period))
+		for i, value := range left.period {
+			period[i] = value / divisor
+		}
+		return qScriptNumericPeriodSummary(left.length, period), true, nil
+	}
+	return qScriptNumericSumSummary{}, false, nil
+}
+
 func qScriptNumericLinearScalar(op string, linear qScriptNumericSumSummary, scalar int64) qScriptNumericSumSummary {
 	out := linear
 	if op == "+" {
@@ -990,6 +1031,8 @@ func qScriptNumericApplyBinary(op string, left, right int64) int64 {
 		return left * right
 	case "mod":
 		return left % right
+	case "div":
+		return left / right
 	default:
 		return 0
 	}
