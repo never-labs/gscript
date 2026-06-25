@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -1964,6 +1965,99 @@ type schemaFingerprintMemo struct {
 	value string
 }
 
+const cachedFrameSchemaMaxColumns = 8
+
+type cachedFrameSchemaKey struct {
+	n      int
+	n0, n1 Symbol
+	n2, n3 Symbol
+	n4, n5 Symbol
+	n6, n7 Symbol
+	k0, k1 Kind
+	k2, k3 Kind
+	k4, k5 Kind
+	k6, k7 Kind
+}
+
+func (k *cachedFrameSchemaKey) set(i int, name Symbol, kind Kind) {
+	switch i {
+	case 0:
+		k.n0, k.k0 = name, kind
+	case 1:
+		k.n1, k.k1 = name, kind
+	case 2:
+		k.n2, k.k2 = name, kind
+	case 3:
+		k.n3, k.k3 = name, kind
+	case 4:
+		k.n4, k.k4 = name, kind
+	case 5:
+		k.n5, k.k5 = name, kind
+	case 6:
+		k.n6, k.k6 = name, kind
+	case 7:
+		k.n7, k.k7 = name, kind
+	}
+}
+
+func (k cachedFrameSchemaKey) column(i int) (Symbol, Kind) {
+	switch i {
+	case 0:
+		return k.n0, k.k0
+	case 1:
+		return k.n1, k.k1
+	case 2:
+		return k.n2, k.k2
+	case 3:
+		return k.n3, k.k3
+	case 4:
+		return k.n4, k.k4
+	case 5:
+		return k.n5, k.k5
+	case 6:
+		return k.n6, k.k6
+	case 7:
+		return k.n7, k.k7
+	default:
+		return "", ""
+	}
+}
+
+type cachedFrameSchemaEntry struct {
+	key    cachedFrameSchemaKey
+	schema Schema
+}
+
+var cachedFrameSchemaSlots [64]atomic.Pointer[cachedFrameSchemaEntry]
+
+func buildCachedFrameSchema(key cachedFrameSchemaKey) Schema {
+	names := make([]Symbol, key.n)
+	kinds := make(map[Symbol]Kind, key.n)
+	for i := 0; i < key.n; i++ {
+		name, kind := key.column(i)
+		names[i] = name
+		kinds[name] = kind
+	}
+	return Schema{names: names, kinds: kinds, fp: &schemaFingerprintMemo{}}
+}
+
+func cachedFrameSchema(key cachedFrameSchemaKey) Schema {
+	for i := range cachedFrameSchemaSlots {
+		entry := cachedFrameSchemaSlots[i].Load()
+		if entry != nil && entry.key == key {
+			return entry.schema
+		}
+	}
+	schema := buildCachedFrameSchema(key)
+	entry := &cachedFrameSchemaEntry{key: key, schema: schema}
+	for i := range cachedFrameSchemaSlots {
+		if cachedFrameSchemaSlots[i].CompareAndSwap(nil, entry) {
+			return schema
+		}
+	}
+	return schema
+}
+
 func (s Schema) Names() []Symbol {
 	return append([]Symbol(nil), s.names...)
 }
@@ -2044,11 +2138,19 @@ func newFrame(cols []Column, cloneColumns bool) (Frame, error) {
 	if len(cols) == 0 {
 		return Frame{}, fmt.Errorf("frame requires at least one column")
 	}
-	frame := Frame{
-		schema: Schema{
+	cacheSchema := !cloneColumns && len(cols) <= cachedFrameSchemaMaxColumns
+	var schemaKey cachedFrameSchemaKey
+	if cacheSchema {
+		schemaKey.n = len(cols)
+	}
+	schema := Schema{}
+	if !cacheSchema {
+		schema = Schema{
 			names: make([]Symbol, 0, len(cols)),
 			kinds: make(map[Symbol]Kind, len(cols)),
-		},
+		}
+	}
+	frame := Frame{
 		columns: make(map[Symbol]Array, len(cols)),
 		rows:    -1,
 	}
@@ -2067,15 +2169,25 @@ func newFrame(cols []Column, cloneColumns bool) (Frame, error) {
 		} else if frame.rows != col.Data.Len() {
 			return Frame{}, fmt.Errorf("frame column %q length %d does not match frame length %d", col.Name, col.Data.Len(), frame.rows)
 		}
-		frame.schema.names = append(frame.schema.names, col.Name)
-		frame.schema.kinds[col.Name] = col.Data.Kind()
+		kind := col.Data.Kind()
+		if cacheSchema {
+			schemaKey.set(i, col.Name, kind)
+		} else {
+			schema.names = append(schema.names, col.Name)
+			schema.kinds[col.Name] = kind
+		}
 		if cloneColumns {
 			frame.columns[col.Name] = col.Data.Gather(allIndexes(col.Data.Len()))
 		} else {
 			frame.columns[col.Name] = col.Data
 		}
 	}
-	frame.schema.fp = &schemaFingerprintMemo{}
+	if cacheSchema {
+		frame.schema = cachedFrameSchema(schemaKey)
+	} else {
+		schema.fp = &schemaFingerprintMemo{}
+		frame.schema = schema
+	}
 	return frame, nil
 }
 
