@@ -962,6 +962,11 @@ func (s *EvalState) evalScriptPlanBody(plan qScriptPlan) (any, error) {
 			return out, err
 		}
 	}
+	if plan.countWhere != nil {
+		if out, handled, err := s.evalQScriptCountWherePlan(plan.countWhere); err != nil || handled {
+			return out, err
+		}
+	}
 	if plan.executable != nil {
 		if out, handled, err := s.evalQScriptExecutablePlan(plan.executable); err != nil || handled {
 			return out, err
@@ -1016,6 +1021,7 @@ type qScriptPlan struct {
 	numericSum          *qScriptNumericSumPlan
 	numericStats        *qScriptNumericStatsPlan
 	whereIndexSum       *qScriptWhereIndexSumPlan
+	countWhere          *qScriptCountWherePlan
 	fastPipelineSources []string
 }
 
@@ -1302,6 +1308,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 		numericSum:          buildQScriptNumericSumPlan(statements),
 		numericStats:        buildQScriptNumericStatsPlan(statements),
 		whereIndexSum:       buildQScriptWhereIndexSumPlan(statements),
+		countWhere:          buildQScriptCountWherePlan(statements),
 		fastPipelineSources: qScriptPlanFastPipelineSources(statements),
 	}
 	plan.executable = buildQScriptExecutablePlan(plan)

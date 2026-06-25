@@ -167,3 +167,27 @@ func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T)
 		t.Fatalf("QScriptWhereIndexSumPlan constrained hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
 	}
 }
+
+func TestQScriptCountWherePlanClosesPeriodicPredicates(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	src := "x:((til 8192) mod 8)*0.25;c1:count where x=1.25;c2:count where x<>0.5;c1+c2"
+	plan := buildQScriptPlan(src)
+	if plan.countWhere == nil {
+		t.Fatalf("count-where plan missing for %q", src)
+	}
+	got, err := NewEvalState(nil).Eval(src)
+	if err != nil || got != int64(8192) {
+		t.Fatalf("Eval(%q) = %#v,%v; want 8192,nil", src, got, err)
+	}
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptCountWherePlan" && stat.Shape == "count-where/periodic" && stat.Outcome == "hit" {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing QScriptCountWherePlan hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
