@@ -58,7 +58,6 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRouteAndReason(i
 		return
 	}
 	if reasonCode == "" && cf.recordQEvalPipelinePlanExecutionCounter(id, route, outcome) {
-		cf.recordQEvalPipelinePlanDescriptorCacheLookup(id, route)
 		return
 	}
 	shape := qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id)
@@ -303,12 +302,24 @@ func (cf *CompiledFunction) QKernelDescriptorCacheStats() []QKernelDescriptorCac
 		return nil
 	}
 	cf.qKernelDescriptorCacheMu.Lock()
-	defer cf.qKernelDescriptorCacheMu.Unlock()
-	if len(cf.qKernelDescriptorStats) == 0 {
+	merged := make(map[qKernelDescriptorCacheKey]qKernelDescriptorCacheCounters, len(cf.qKernelDescriptorStats)+len(cf.QEvalPipelinePlanStats)*3)
+	entrySet := make(map[qKernelDescriptorCacheKey]bool, len(cf.qKernelDescriptorCache)+len(cf.QEvalPipelinePlanStats)*3)
+	for key, counters := range cf.qKernelDescriptorStats {
+		merged[key] = counters
+	}
+	for key, present := range cf.qKernelDescriptorCache {
+		if present {
+			entrySet[key] = true
+		}
+	}
+	cf.qKernelDescriptorCacheMu.Unlock()
+
+	cf.appendQEvalPipelinePlanDescriptorCacheStats(merged, entrySet)
+	if len(merged) == 0 {
 		return nil
 	}
-	keys := make([]qKernelDescriptorCacheKey, 0, len(cf.qKernelDescriptorStats))
-	for key := range cf.qKernelDescriptorStats {
+	keys := make([]qKernelDescriptorCacheKey, 0, len(merged))
+	for key := range merged {
 		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i, j int) bool {
@@ -331,10 +342,10 @@ func (cf *CompiledFunction) QKernelDescriptorCacheStats() []QKernelDescriptorCac
 	})
 	out := make([]QKernelDescriptorCacheStat, 0, len(keys))
 	for _, key := range keys {
-		counters := cf.qKernelDescriptorStats[key]
-		entries := uint64(0)
-		if cf.qKernelDescriptorCache[key] {
-			entries = 1
+		counters := merged[key]
+		entryCount := uint64(0)
+		if entrySet[key] {
+			entryCount = 1
 		}
 		out = append(out, QKernelDescriptorCacheStat{
 			Source:        key.source,
@@ -343,13 +354,51 @@ func (cf *CompiledFunction) QKernelDescriptorCacheStats() []QKernelDescriptorCac
 			PipelineShape: key.pipelineShape,
 			Route:         key.route,
 			SchemaHash:    key.schemaHash,
-			Entries:       entries,
+			Entries:       entryCount,
 			Hits:          counters.hits,
 			Misses:        counters.misses,
 			Evictions:     counters.evictions,
 		})
 	}
 	return out
+}
+
+func (cf *CompiledFunction) appendQEvalPipelinePlanDescriptorCacheStats(stats map[qKernelDescriptorCacheKey]qKernelDescriptorCacheCounters, entries map[qKernelDescriptorCacheKey]bool) {
+	if cf == nil || len(cf.QEvalPipelinePlanStats) == 0 {
+		return
+	}
+	for id := range cf.QEvalPipelinePlanStats {
+		counter := &cf.QEvalPipelinePlanStats[id]
+		shape := qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id)
+		pipelineShape := cf.qEvalPipelinePlanDescriptorCachePipelineShape(id, shape)
+		cf.appendQEvalPipelinePlanDescriptorRouteCacheStats(stats, entries, shape, pipelineShape, string(qEvalPipelineExecutionRouteNativeExit), counter.nativeSuccess.Load())
+		cf.appendQEvalPipelinePlanDescriptorRouteCacheStats(stats, entries, shape, pipelineShape, string(qEvalPipelineExecutionRouteOpExit), counter.opSuccess.Load())
+		cf.appendQEvalPipelinePlanDescriptorRouteCacheStats(stats, entries, shape, pipelineShape, string(qEvalPipelineExecutionRouteDirectEntry), counter.directSuccess.Load())
+	}
+}
+
+func (cf *CompiledFunction) appendQEvalPipelinePlanDescriptorRouteCacheStats(stats map[qKernelDescriptorCacheKey]qKernelDescriptorCacheCounters, entries map[qKernelDescriptorCacheKey]bool, shape, pipelineShape, route string, count uint64) {
+	if count == 0 {
+		return
+	}
+	if route == "" {
+		route = "unknown"
+	}
+	key := qKernelDescriptorCacheKey{
+		source:        "methodjit_q_eval_runtime",
+		kernel:        "QEvalPipelinePlan",
+		shape:         shape,
+		pipelineShape: pipelineShape,
+		route:         route,
+		schemaHash:    "unknown",
+	}
+	counters := stats[key]
+	counters.misses++
+	if count > 1 {
+		counters.hits += count - 1
+	}
+	stats[key] = counters
+	entries[key] = true
 }
 
 func (cf *CompiledFunction) QKernelExecutionStats() []QKernelExecutionStat {
