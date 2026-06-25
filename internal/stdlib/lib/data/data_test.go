@@ -4532,6 +4532,53 @@ func TestTryTypedSortIndexesI64(t *testing.T) {
 	if got, want := gathered.Values(), []any{int64(0), int64(1), int64(2), int64(3), int64(4)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("gathered sorted range = %#v, want %#v", got, want)
 	}
+
+	mod, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 8), int64(3))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	lazyIndexes, ok, err := TryTypedSortIndexesI64(mod.(Array), false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 lazy mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := lazyIndexes.Values(), []any{int64(0), int64(3), int64(6), int64(1), int64(4), int64(7), int64(2), int64(5)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("lazy mod sort indexes = %#v, want %#v", got, want)
+	}
+	lazyDesc, ok, err := TryTypedSortIndexesI64(mod.(Array), true)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 lazy mod desc handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := lazyDesc.Values(), []any{int64(2), int64(5), int64(1), int64(4), int64(7), int64(0), int64(3), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("lazy mod desc sort indexes = %#v, want %#v", got, want)
+	}
+
+	scaled, ok, err := TryTypedIntegerDyadic(OpMul, NewI64Range(0, 1, 8), int64(2))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic mul handled=%v err=%v; want true,nil", ok, err)
+	}
+	scaledMod, ok, err := TryTypedIntegerDyadic(OpMod, scaled.(Array), int64(5))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic scaled mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	scaledIndexes, ok, err := TryTypedSortIndexesI64(scaledMod.(Array), false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 scaled mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := scaledIndexes.Values(), []any{int64(0), int64(5), int64(3), int64(1), int64(6), int64(4), int64(2), int64(7)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("scaled lazy mod sort indexes = %#v, want %#v", got, want)
+	}
+
+	shifted, ok, err := TryTypedIntegerDyadic(OpAdd, mod.(Array), int64(100))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic add handled=%v err=%v; want true,nil", ok, err)
+	}
+	shiftedIndexes, ok, err := TryTypedSortIndexesI64(shifted.(Array), false)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedSortIndexesI64 shifted mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	if got, want := shiftedIndexes.Values(), []any{int64(0), int64(3), int64(6), int64(1), int64(4), int64(7), int64(2), int64(5)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("shifted lazy mod sort indexes = %#v, want %#v", got, want)
+	}
 }
 
 func TestTryTypedSortIndexesI64TiledStable(t *testing.T) {
@@ -4645,6 +4692,42 @@ func TestTrySortFrameByColumnsUsesTypedGather(t *testing.T) {
 	sym, _ := sorted.Column("sym")
 	if got, want := sym.Values(), []any{"AAPL", "MSFT"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("sorted sym = %#v, want %#v", got, want)
+	}
+}
+
+func TestSortFrameByColumnsUsesTypedLazyGather(t *testing.T) {
+	mod, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 8), int64(3))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic mod handled=%v err=%v; want true,nil", ok, err)
+	}
+	price, ok, err := TryTypedIntegerDyadic(OpAdd, mod.(Array), int64(100))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedIntegerDyadic add handled=%v err=%v; want true,nil", ok, err)
+	}
+	frame, err := NewFrame(
+		NewColumn("id", []any{int64(0), int64(1), int64(2), int64(3), int64(4), int64(5), int64(6), int64(7)}),
+		Column{Name: "price", Data: price.(Array)},
+	)
+	if err != nil {
+		t.Fatalf("NewFrame returned error: %v", err)
+	}
+	sorted, err := SortFrameByColumns(frame, []Symbol{"price"}, false)
+	if err != nil {
+		t.Fatalf("SortFrameByColumns returned error: %v", err)
+	}
+	sortedPrice, _ := sorted.Column("price")
+	if _, ok := sortedPrice.(indexedArray); !ok {
+		t.Fatalf("sorted price column = %T, want indexedArray", sortedPrice)
+	}
+	if got, want := sortedPrice.Values(), []any{int64(100), int64(100), int64(100), int64(101), int64(101), int64(101), int64(102), int64(102)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sorted price = %#v, want %#v", got, want)
+	}
+	id, _ := sorted.Column("id")
+	if _, ok := id.(indexedArray); !ok {
+		t.Fatalf("sorted id column = %T, want indexedArray", id)
+	}
+	if got, want := id.Values(), []any{int64(0), int64(3), int64(6), int64(1), int64(4), int64(7), int64(2), int64(5)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("sorted id = %#v, want %#v", got, want)
 	}
 }
 

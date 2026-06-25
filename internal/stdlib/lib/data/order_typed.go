@@ -6,6 +6,12 @@ import (
 	"slices"
 )
 
+const (
+	maxTypedSortModuloResidues = 1 << 16
+	sortMaxInt64Value          = int64(^uint64(0) >> 1)
+	sortMinInt64Value          = -sortMaxInt64Value - 1
+)
+
 // orderIndexesTypedSingle sorts indexes by one bound order spec through a
 // typed key extraction plus a pdqsort over (key, position) pairs. The
 // position tie-break reproduces stable-sort semantics exactly, while the
@@ -118,6 +124,140 @@ func typedSortIndexesI64Keys(values []int64, descending bool) Array {
 		out[i] = int64(pos)
 	}
 	return newI64Trusted(out)
+}
+
+func typedSortIndexesI64ModuloRange(array i64ScalarDyadicArray, descending bool) (Array, bool) {
+	array, descending, ok := normalizeI64ModuloSortArray(array, descending)
+	if !ok || array.len < 0 {
+		return nil, false
+	}
+	var source i64RangeArray
+	switch s := array.source.(type) {
+	case i64RangeArray:
+		source = s
+	case i64ScalarDyadicArray:
+		affine, ok := i64ScalarDyadicAffineRange(s)
+		if !ok {
+			return nil, false
+		}
+		source = affine
+	default:
+		return nil, false
+	}
+	if source.len < array.len {
+		return nil, false
+	}
+	if array.len == 0 {
+		return NewI64Range(0, 1, 0), true
+	}
+	if source.step == 0 {
+		return NewI64Range(0, 1, array.len), true
+	}
+	modulus := array.scalar
+	if modulus > maxTypedSortModuloResidues {
+		return nil, false
+	}
+	period := modulus / gcdInt64(source.step, modulus)
+	if period <= 0 || period > maxTypedSortModuloResidues {
+		return nil, false
+	}
+	offsets := make([]int, int(modulus))
+	for i := range offsets {
+		offsets[i] = -1
+	}
+	value := qPositiveMod(source.start, modulus)
+	step := qPositiveMod(source.step, modulus)
+	for offset := int64(0); offset < period; offset++ {
+		offsets[int(value)] = int(offset)
+		value = (value + step) % modulus
+	}
+	segments := make([]i64RangeArray, 0, min(int(modulus), array.len))
+	writeResidue := func(residue int64, outLen int) int {
+		offset := offsets[int(residue)]
+		if offset < 0 {
+			return outLen
+		}
+		segmentLen := ((array.len - 1 - offset) / int(period)) + 1
+		if segmentLen <= 0 {
+			return outLen
+		}
+		segments = append(segments, i64RangeArray{start: int64(offset), step: period, len: segmentLen})
+		return outLen + segmentLen
+	}
+	outLen := 0
+	if descending {
+		for residue := modulus - 1; residue >= 0; residue-- {
+			outLen = writeResidue(residue, outLen)
+		}
+	} else {
+		for residue := int64(0); residue < modulus; residue++ {
+			outLen = writeResidue(residue, outLen)
+		}
+	}
+	if outLen != array.len {
+		return nil, false
+	}
+	return newI64SegmentArray(segments...), true
+}
+
+func normalizeI64ModuloSortArray(array i64ScalarDyadicArray, descending bool) (i64ScalarDyadicArray, bool, bool) {
+	switch array.op {
+	case OpMod:
+		if array.scalarLeft || array.scalar <= 0 {
+			return i64ScalarDyadicArray{}, false, false
+		}
+		return array, descending, true
+	case OpAdd:
+		inner, ok := array.source.(i64ScalarDyadicArray)
+		if !ok {
+			return i64ScalarDyadicArray{}, false, false
+		}
+		mod, desc, ok := normalizeI64ModuloSortArray(inner, descending)
+		if !ok || !i64SortAddPreservesModuloRange(array.scalar, mod.scalar) {
+			return i64ScalarDyadicArray{}, false, false
+		}
+		return mod, desc, true
+	case OpSub:
+		inner, ok := array.source.(i64ScalarDyadicArray)
+		if !ok {
+			return i64ScalarDyadicArray{}, false, false
+		}
+		mod, desc, ok := normalizeI64ModuloSortArray(inner, descending)
+		if !ok {
+			return i64ScalarDyadicArray{}, false, false
+		}
+		if array.scalarLeft {
+			if !i64SortLeftSubPreservesModuloRange(array.scalar, mod.scalar) {
+				return i64ScalarDyadicArray{}, false, false
+			}
+			return mod, !desc, true
+		}
+		if array.scalar == sortMinInt64Value || !i64SortAddPreservesModuloRange(-array.scalar, mod.scalar) {
+			return i64ScalarDyadicArray{}, false, false
+		}
+		return mod, desc, true
+	default:
+		return i64ScalarDyadicArray{}, false, false
+	}
+}
+
+func i64SortAddPreservesModuloRange(shift, modulus int64) bool {
+	if modulus <= 0 {
+		return false
+	}
+	maxValue := modulus - 1
+	if shift > 0 {
+		return shift <= sortMaxInt64Value-maxValue
+	}
+	return true
+}
+
+func i64SortLeftSubPreservesModuloRange(shift, modulus int64) bool {
+	if modulus <= 0 {
+		return false
+	}
+	maxValue := modulus - 1
+	return shift >= sortMinInt64Value+maxValue
 }
 
 // stableKeyPermutation returns the stable ascending order of keys as original

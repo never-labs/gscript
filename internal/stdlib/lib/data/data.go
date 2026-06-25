@@ -12543,6 +12543,12 @@ func SortFrameByColumns(frame Frame, names []Symbol, descending bool) (Frame, er
 	if len(names) == 0 {
 		return frame.Gather(allIndexes(frame.Len()))
 	}
+	if out, handled, err := TrySortFrameByColumns(frame, names, descending); err != nil || handled {
+		if err != nil {
+			return Frame{}, err
+		}
+		return out, nil
+	}
 	specs := make([]OrderSpec, len(names))
 	for i, name := range names {
 		specs[i] = OrderSpec{Column: name, Desc: descending}

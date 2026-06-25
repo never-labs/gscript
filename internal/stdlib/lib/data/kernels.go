@@ -6736,6 +6736,18 @@ func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
 		// Dense i64 runs the prepared-key radix/pair sort instead of a
 		// sort.SliceStable comparison loop; the permutation is identical.
 		return typedSortIndexesI64Keys(a.data, descending), true, nil
+	case i64ScalarDyadicArray:
+		if indexes, ok := typedSortIndexesI64ModuloRange(a, descending); ok {
+			return indexes, true, nil
+		}
+		values, owned, ok := tryBulkI64Values(a)
+		if !ok || len(values) < a.len {
+			bulkI64Release(values, owned)
+			return nil, false, nil
+		}
+		indexes := typedSortIndexesI64Keys(values[:a.len], descending)
+		bulkI64Release(values, owned)
+		return indexes, true, nil
 	case i64RangeArray:
 		if a.len == 0 {
 			return NewI64Range(0, 1, 0), true, nil
@@ -9509,7 +9521,6 @@ func fbyGroupIDsTextInto[T ~string](values []T, rowGroups []int) ([]int, int, er
 	fbyTextGroupIDMapPool.Put(groupIDs)
 	return rowGroups, count, nil
 }
-
 
 func (typedKernelRegistry) NumericSumRows(array Array, rows []int) (float64, int64, bool, error) {
 	switch a := array.(type) {
