@@ -479,9 +479,11 @@ func qPipelineShapePlan(kind qPipelineKind, variant string) qPipelinePlan {
 		return qPipelinePlan{kind: kind}
 	}
 	return qPipelinePlan{
-		kind:      kind,
-		shape:     spec.ID,
-		shapeSpec: spec,
+		kind:          kind,
+		shape:         spec.ID,
+		shapeSpec:     spec,
+		stableShapeID: spec.ID,
+		pipelineShape: spec.PipelineShape,
 	}
 }
 

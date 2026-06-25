@@ -2326,8 +2326,16 @@ func recordRuntimeQPipelinePlanExecution(plan *qPipelinePlan, outcome, reasonCod
 	shape := "unknown"
 	pipelineShape := ""
 	if plan != nil {
-		shape = plan.stableShape()
-		pipelineShape = plan.stablePipelineShape()
+		shape = plan.stableShapeID
+		if shape == "" {
+			shape = plan.stableShape()
+			plan.stableShapeID = shape
+		}
+		pipelineShape = plan.pipelineShape
+		if pipelineShape == "" {
+			pipelineShape = plan.stablePipelineShape()
+			plan.pipelineShape = pipelineShape
+		}
 	}
 	recordRuntimeExecutionWithPipelineShape("q_eval_vector_runtime", "QPipelinePlan", shape, pipelineShape, "typed_data_kernel", outcome, reasonCode)
 }
