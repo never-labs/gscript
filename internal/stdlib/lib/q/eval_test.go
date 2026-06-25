@@ -3091,6 +3091,34 @@ func TestEvalGlobalPipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) 
 	}
 }
 
+func TestEvalGlobalPipelinePlanCacheStoresNegativeCandidates(t *testing.T) {
+	ClearEvalPlanCaches()
+	t.Cleanup(ClearEvalPlanCaches)
+
+	src := "+/sum v fby g"
+	env := map[string]any{
+		"v": data.NewI64([]int64{1, 2, 3, 4}),
+		"g": data.NewSymbols([]string{"a", "a", "b", "b"}),
+	}
+	if got, err := EvalWithEnv(src, env); err != nil || got != int64(20) {
+		t.Fatalf("cold EvalWithEnv returned %#v,%v; want 20,nil", got, err)
+	}
+	afterCold := EvalPlanCacheStatsSnapshot()
+	if afterCold.PipelineEntries == 0 || afterCold.PipelineMisses == 0 {
+		t.Fatalf("cold eval did not cache negative pipeline candidate: %#v", afterCold)
+	}
+	if got, err := EvalWithEnv(src, env); err != nil || got != int64(20) {
+		t.Fatalf("warm EvalWithEnv returned %#v,%v; want 20,nil", got, err)
+	}
+	afterWarm := EvalPlanCacheStatsSnapshot()
+	if afterWarm.PipelineHits <= afterCold.PipelineHits {
+		t.Fatalf("warm negative pipeline candidate did not hit cache: before=%#v after=%#v", afterCold, afterWarm)
+	}
+	if afterWarm.PipelineEntries != afterCold.PipelineEntries {
+		t.Fatalf("warm negative pipeline candidate changed cache entries: before=%#v after=%#v", afterCold, afterWarm)
+	}
+}
+
 func TestEvalWithEnvDoesNotMutateHostEnv(t *testing.T) {
 	env := map[string]any{"x": int64(1)}
 	if got, err := EvalWithEnv("x:2;x", env); err != nil || got != int64(2) {

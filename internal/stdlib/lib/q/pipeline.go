@@ -204,6 +204,12 @@ func (s *EvalState) qPipelinePlanRef(src string) *qPipelinePlan {
 	}
 	if qPipelinePlanGlobalCacheable(src) {
 		if plan, ok := qGlobalPipelinePlanCacheProbe(src); ok {
+			if plan.kind == qPipelineInvalid {
+				if !s.oneShot {
+					s.storeQPipelinePlan(src, qPipelinePlanInvalidShared)
+				}
+				return qPipelinePlanInvalidShared
+			}
 			cached := new(qPipelinePlan)
 			*cached = plan
 			s.storeQPipelinePlan(src, cached)
@@ -211,6 +217,15 @@ func (s *EvalState) qPipelinePlanRef(src string) *qPipelinePlan {
 		}
 	}
 	plan := buildQPipelinePlan(src)
+	if plan.kind == qPipelineInvalid {
+		if qPipelinePlanGlobalCacheable(src) {
+			qGlobalPipelinePlanCacheStore(src, plan)
+		}
+		if !s.oneShot {
+			s.storeQPipelinePlan(src, qPipelinePlanInvalidShared)
+		}
+		return qPipelinePlanInvalidShared
+	}
 	if qPipelinePlanGlobalCacheable(src) {
 		qGlobalPipelinePlanCacheStore(src, plan)
 	}
@@ -265,7 +280,7 @@ func qGlobalPipelinePlanCacheProbe(src string) (qPipelinePlan, bool) {
 }
 
 func qGlobalPipelinePlanCacheStore(src string, plan qPipelinePlan) {
-	if src == "" || plan.kind == qPipelineInvalid {
+	if src == "" {
 		return
 	}
 	qGlobalScriptPlanCacheMu.Lock()
