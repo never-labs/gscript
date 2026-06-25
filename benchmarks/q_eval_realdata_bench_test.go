@@ -317,6 +317,11 @@ func qRealDataColumnI64s(tb testing.TB, v any, name string) []int64 {
 		tb.Fatalf("q result frame has no column %q", name)
 	}
 	out := make([]int64, col.Len())
+	if handled, err := data.TryExportI64Copy(col, out); err != nil {
+		tb.Fatalf("column %q typed i64 export failed: %v", name, err)
+	} else if handled {
+		return out
+	}
 	for i := 0; i < col.Len(); i++ {
 		item, ok := col.At(i)
 		if !ok {

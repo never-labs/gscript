@@ -340,7 +340,7 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 		}
 	}
 
-	repRows := make([]int, 0, 16)
+	repRows := make([]int, 0, capN)
 	switch {
 	case allRows:
 		for row := 0; row < rows; row++ {
@@ -598,37 +598,54 @@ func execGroupedFusedI64Sums(frame Frame, indexes []int, allRows bool, byInputs 
 		clear(sum2)
 	}
 
-	repRows := make([]int, 0, 16)
-	accumulate := func(row int) {
-		key := ids0[row]
-		if ids1 != nil {
-			key = key*c1 + ids1[row]
-		}
-		g := slate[key]
-		if g == 0 {
-			repRows = append(repRows, row)
-			g = int32(len(repRows))
-			slate[key] = g
-		}
-		gi := int(g - 1)
-		count[gi]++
-		if sum0 != nil {
-			sum0[gi] += sources[0][row]
-		}
-		if sum1 != nil {
-			sum1[gi] += sources[1][row]
-		}
-		if sum2 != nil {
-			sum2[gi] += sources[2][row]
-		}
-	}
+	repRows := make([]int, 0, capN)
 	if allRows {
 		for row := 0; row < rows; row++ {
-			accumulate(row)
+			key := ids0[row]
+			if ids1 != nil {
+				key = key*c1 + ids1[row]
+			}
+			g := slate[key]
+			if g == 0 {
+				repRows = append(repRows, row)
+				g = int32(len(repRows))
+				slate[key] = g
+			}
+			gi := int(g - 1)
+			count[gi]++
+			if sum0 != nil {
+				sum0[gi] += sources[0][row]
+			}
+			if sum1 != nil {
+				sum1[gi] += sources[1][row]
+			}
+			if sum2 != nil {
+				sum2[gi] += sources[2][row]
+			}
 		}
 	} else {
 		for _, row := range indexes {
-			accumulate(row)
+			key := ids0[row]
+			if ids1 != nil {
+				key = key*c1 + ids1[row]
+			}
+			g := slate[key]
+			if g == 0 {
+				repRows = append(repRows, row)
+				g = int32(len(repRows))
+				slate[key] = g
+			}
+			gi := int(g - 1)
+			count[gi]++
+			if sum0 != nil {
+				sum0[gi] += sources[0][row]
+			}
+			if sum1 != nil {
+				sum1[gi] += sources[1][row]
+			}
+			if sum2 != nil {
+				sum2[gi] += sources[2][row]
+			}
 		}
 	}
 	bulkI32Release(slate)
