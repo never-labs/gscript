@@ -108,9 +108,6 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 		}
 		countNull = &countNullPlan
 	}
-	if !root.hasCast && !root.hasNull {
-		return nil
-	}
 	plan := &qScriptNumericSumPlan{source: terminal, sources: qScriptNumericSumStatementSources(statements), root: root, count: count, countNull: countNull}
 	if summary, ok, err := qScriptNumericSummarize(root); ok {
 		plan.closed = summary
@@ -119,10 +116,36 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 			plan.closedErr = err.Error()
 		}
 	}
+	if !plan.closedOK && !root.hasCast && !root.hasNull {
+		return nil
+	}
+	if plan.closedOK && !root.hasCast && !root.hasNull && !qScriptNumericPlainClosedAllowed(root) {
+		return nil
+	}
 	if plan.closedErr == "" && !plan.closedOK && root.isFloat {
 		return nil
 	}
 	return plan
+}
+
+func qScriptNumericPlainClosedAllowed(plan qScriptNumericExprPlan) bool {
+	if plan.kind == qScriptNumericExprName && plan.left != nil {
+		return qScriptNumericPlainClosedAllowed(*plan.left)
+	}
+	if plan.kind != qScriptNumericExprBinary {
+		return false
+	}
+	if plan.op == "mod" || plan.op == "%" {
+		return plan.isFloat
+	}
+	return qScriptNumericPlainClosedAllowedPtr(plan.left) || qScriptNumericPlainClosedAllowedPtr(plan.right)
+}
+
+func qScriptNumericPlainClosedAllowedPtr(plan *qScriptNumericExprPlan) bool {
+	if plan == nil {
+		return false
+	}
+	return qScriptNumericPlainClosedAllowed(*plan)
 }
 
 type qScriptNumericSumTerminalPlan struct {
@@ -1194,18 +1217,6 @@ func qScriptNumericSummarizeXbar(width int64, right qScriptNumericSumSummary) (q
 	if right.scalar {
 		value := (right.value / width) * width
 		return qScriptNumericSumSummary{length: -1, scalar: true, value: value, min: value, max: value}, true, nil
-	}
-	if right.linear && right.start == 0 && right.step == 1 {
-		periodLen := int(width)
-		if periodLen <= 0 || periodLen > qScriptNumericClosedFormMaxPeriod {
-			return qScriptNumericSumSummary{}, false, nil
-		}
-		period := make([]int64, periodLen)
-		for i := range period {
-			value := int64(i)
-			period[i] = (value / width) * width
-		}
-		return qScriptNumericPeriodSummary(right.length, period), true, nil
 	}
 	if len(right.period) > 0 {
 		period := make([]int64, len(right.period))

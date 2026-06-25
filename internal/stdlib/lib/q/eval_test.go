@@ -5488,6 +5488,9 @@ func TestEvalFloatModuloRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayDyadicArithmetic" && stat.Shape == "vector-dyadic/r/f64/i64" && stat.Outcome == "hit" {
 			seenFloatMod = true
 		}
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "hit" {
+			seenFloatMod = true
+		}
 		if stat.Kernel == "ArrayDyadicArithmetic" && stat.Shape == "vector-dyadic/r/f64/i64" && stat.Outcome == "fallback" {
 			t.Fatalf("float mod fell back: %#v", RuntimeKernelExecutionStats())
 		}
