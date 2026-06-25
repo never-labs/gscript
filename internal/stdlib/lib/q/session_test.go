@@ -176,14 +176,14 @@ func TestQScriptCountWherePlanClosesPeriodicPredicates(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
-	src := "x:((til 8192) mod 8)*0.25;n:8192#0N 3 6 9;c1:count where x=1.25;c2:count where x<>0.5;c3:count where null n;c1+c2+c3"
+	src := "x:((til 8192) mod 8)*0.25;n:8192#0N 3 6 9;c1:count where x=1.25;c2:count where x<>0.5;c3:count where null n;c4:count where n=0N;c1+c2+c3+c4"
 	plan := buildQScriptPlan(src)
 	if plan.countWhere == nil {
 		t.Fatalf("count-where plan missing for %q", src)
 	}
 	got, err := NewEvalState(nil).Eval(src)
-	if err != nil || got != int64(10240) {
-		t.Fatalf("Eval(%q) = %#v,%v; want 10240,nil", src, got, err)
+	if err != nil || got != int64(12288) {
+		t.Fatalf("Eval(%q) = %#v,%v; want 12288,nil", src, got, err)
 	}
 	seen := false
 	for _, stat := range RuntimeKernelExecutionStats() {

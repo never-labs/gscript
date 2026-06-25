@@ -513,6 +513,8 @@ func qScriptNumericExprPeriodValues(plan qScriptNumericExprPlan) (int, bool) {
 
 func qScriptNumericScalarPlan(value any) (qScriptNumericExprPlan, bool) {
 	switch v := value.(type) {
+	case data.Null:
+		return qScriptNumericExprPlan{kind: qScriptNumericExprScalar, hasNull: true, nullPeriod: []bool{true}}, true
 	case int:
 		return qScriptNumericExprPlan{kind: qScriptNumericExprScalar, value: int64(v), nonNegative: v >= 0}, true
 	case int8:
@@ -833,6 +835,9 @@ const qScriptNumericClosedFormMaxPeriod = 1 << 16
 func qScriptNumericSummarize(plan qScriptNumericExprPlan) (qScriptNumericSumSummary, bool, error) {
 	switch plan.kind {
 	case qScriptNumericExprScalar:
+		if plan.hasNull {
+			return qScriptNumericSumSummary{length: -1, scalar: true, hasNull: true, nulls: []bool{true}}, true, nil
+		}
 		if plan.isFloat {
 			return qScriptNumericSumSummary{length: -1, scalar: true, isFloat: true, fvalue: plan.fvalue, fmin: plan.fvalue, fmax: plan.fvalue}, true, nil
 		}
