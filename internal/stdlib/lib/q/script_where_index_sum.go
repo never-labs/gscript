@@ -43,6 +43,14 @@ type qScriptWherePredicatePlan struct {
 	values []qScriptNumericSumSummary
 }
 
+type qScriptWhereRowConstraint struct {
+	start          int
+	end            int
+	changed        bool
+	exclusions     [8]int
+	exclusionCount int
+}
+
 func buildQScriptWhereIndexSumPlan(statements []qScriptStatement) *qScriptWhereIndexSumPlan {
 	if len(statements) < 3 {
 		return nil
@@ -318,7 +326,7 @@ func qScriptWhereIndexSum(plan *qScriptWhereIndexSumPlan) (float64, int64, bool,
 	length := plan.value.length
 	periodLen, ok := qScriptWhereIndexPeriodLen(plan)
 	if !ok || periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
-		return 0, 0, false, false
+		return qScriptWhereIndexConstrainedPeriodicSum(plan)
 	}
 	var sum float64
 	var count int64
@@ -335,6 +343,67 @@ func qScriptWhereIndexSum(plan *qScriptWhereIndexSumPlan) (float64, int64, bool,
 		if part, partFloat, ok := qScriptWhereIndexValueResidueSum(plan.value, offset, periodLen, rows); ok {
 			sum += part
 			isFloat = isFloat || partFloat
+		}
+	}
+	return sum, count, isFloat, true
+}
+
+func qScriptWhereIndexConstrainedPeriodicSum(plan *qScriptWhereIndexSumPlan) (float64, int64, bool, bool) {
+	if plan == nil || plan.predicatePlan == nil || plan.value.length <= 0 {
+		return 0, 0, false, false
+	}
+	constraint := qScriptWhereRowConstraint{start: 0, end: plan.value.length - 1}
+	if !qScriptWherePredicateConstrainRows(plan.predicatePlan, &constraint) || constraint.start > constraint.end {
+		return 0, 0, false, false
+	}
+	if !constraint.changed && constraint.exclusionCount == 0 {
+		return 0, 0, false, false
+	}
+	periodLen := qScriptWherePredicateResidualPeriodLen(plan.predicatePlan)
+	if periodLen == 0 && (constraint.changed || constraint.exclusionCount > 0) {
+		periodLen = 1
+	}
+	if periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
+		return 0, 0, false, false
+	}
+	if valuePeriod := qScriptWhereIndexSummaryPeriodLen(plan.value); valuePeriod > 0 {
+		periodLen = qScriptNumericLCM(periodLen, valuePeriod)
+	}
+	if periodLen <= 0 || periodLen > qScriptWhereIndexClosedFormMaxPeriod {
+		return 0, 0, false, false
+	}
+	var sum float64
+	var count int64
+	isFloat := plan.value.isFloat
+	for offset := 0; offset < periodLen && offset <= constraint.end; offset++ {
+		first := offset
+		if first < constraint.start {
+			delta := constraint.start - first
+			first += ((delta + periodLen - 1) / periodLen) * periodLen
+		}
+		if first > constraint.end || !qScriptWherePredicateResidualAt(plan.predicatePlan, offset) {
+			continue
+		}
+		rawRows := (constraint.end-first)/periodLen + 1
+		excludedRows := qScriptWhereConstraintExclusionCount(constraint, first, periodLen)
+		rows := rawRows - excludedRows
+		if rawRows <= 0 || rows <= 0 {
+			continue
+		}
+		count += int64(rows)
+		if part, partFloat, ok := qScriptWhereIndexValueResidueSum(plan.value, first, periodLen, rawRows); ok {
+			sum += part
+			isFloat = isFloat || partFloat
+		}
+		for i := 0; i < constraint.exclusionCount; i++ {
+			excluded := constraint.exclusions[i]
+			if excluded < first || excluded > constraint.end || (excluded-first)%periodLen != 0 {
+				continue
+			}
+			if plan.value.IsNullAt(excluded) {
+				continue
+			}
+			sum -= plan.value.FloatAt(excluded)
 		}
 	}
 	return sum, count, isFloat, true
@@ -456,6 +525,211 @@ func qScriptWherePredicatePeriodLen(plan *qScriptWherePredicatePlan) int {
 	default:
 		return 0
 	}
+}
+
+func qScriptWherePredicateConstrainRows(plan *qScriptWherePredicatePlan, constraint *qScriptWhereRowConstraint) bool {
+	if plan == nil || constraint == nil {
+		return false
+	}
+	switch plan.kind {
+	case qScriptWherePredicateAnd:
+		return qScriptWherePredicateConstrainRows(plan.left, constraint) &&
+			qScriptWherePredicateConstrainRows(plan.right, constraint)
+	case qScriptWherePredicateNot:
+		if qScriptWherePredicateAddLinearInExclusions(plan.left, constraint) {
+			return true
+		}
+		return qScriptWherePredicateResidualPeriodLen(plan) > 0
+	case qScriptWherePredicateCompare:
+		if qScriptWhereSummaryIsLinear(plan.value) {
+			return qScriptWhereConstraintApplyCompare(constraint, plan.value, plan.op, plan.scalar)
+		}
+		return qScriptWhereIndexSummaryPeriodLen(plan.value) > 0
+	case qScriptWherePredicateWithin:
+		if qScriptWhereSummaryIsLinear(plan.value) {
+			if !qScriptWhereConstraintApplyCompare(constraint, plan.value, ">=", plan.lo) {
+				return false
+			}
+			return qScriptWhereConstraintApplyCompare(constraint, plan.value, "<=", plan.hi)
+		}
+		return qScriptWhereIndexSummaryPeriodLen(plan.value) > 0
+	case qScriptWherePredicateIn:
+		if qScriptWhereSummaryIsLinear(plan.value) {
+			return false
+		}
+		return qScriptWhereIndexSummaryPeriodLen(plan.value) > 0
+	default:
+		return false
+	}
+}
+
+func qScriptWherePredicateResidualPeriodLen(plan *qScriptWherePredicatePlan) int {
+	if plan == nil {
+		return 0
+	}
+	switch plan.kind {
+	case qScriptWherePredicateAnd:
+		left := qScriptWherePredicateResidualPeriodLen(plan.left)
+		right := qScriptWherePredicateResidualPeriodLen(plan.right)
+		if left == 0 {
+			return right
+		}
+		if right == 0 {
+			return left
+		}
+		return qScriptNumericLCM(left, right)
+	case qScriptWherePredicateNot:
+		return qScriptWherePredicateResidualPeriodLen(plan.left)
+	case qScriptWherePredicateCompare, qScriptWherePredicateWithin, qScriptWherePredicateIn:
+		if qScriptWhereSummaryIsLinear(plan.value) {
+			return 0
+		}
+		return qScriptWhereIndexSummaryPeriodLen(plan.value)
+	default:
+		return 0
+	}
+}
+
+func qScriptWherePredicateResidualAt(plan *qScriptWherePredicatePlan, row int) bool {
+	if plan == nil {
+		return true
+	}
+	switch plan.kind {
+	case qScriptWherePredicateAnd:
+		return qScriptWherePredicateResidualAt(plan.left, row) && qScriptWherePredicateResidualAt(plan.right, row)
+	case qScriptWherePredicateNot:
+		if qScriptWherePredicateLinearIn(plan.left) {
+			return true
+		}
+		return !qScriptWherePredicateResidualAt(plan.left, row)
+	case qScriptWherePredicateCompare, qScriptWherePredicateWithin, qScriptWherePredicateIn:
+		if qScriptWhereSummaryIsLinear(plan.value) {
+			return true
+		}
+		return qScriptWherePredicateAt(plan, row)
+	default:
+		return false
+	}
+}
+
+func qScriptWherePredicateAddLinearInExclusions(plan *qScriptWherePredicatePlan, constraint *qScriptWhereRowConstraint) bool {
+	if !qScriptWherePredicateLinearIn(plan) || constraint == nil {
+		return false
+	}
+	for _, value := range plan.values {
+		row, ok := qScriptWhereLinearRowForScalar(plan.value, value)
+		if !ok {
+			return false
+		}
+		if row >= constraint.start && row <= constraint.end {
+			if constraint.exclusionCount >= len(constraint.exclusions) {
+				return false
+			}
+			constraint.exclusions[constraint.exclusionCount] = row
+			constraint.exclusionCount++
+		}
+	}
+	return true
+}
+
+func qScriptWherePredicateLinearIn(plan *qScriptWherePredicatePlan) bool {
+	return plan != nil && plan.kind == qScriptWherePredicateIn && qScriptWhereSummaryIsLinear(plan.value)
+}
+
+func qScriptWhereSummaryIsLinear(summary qScriptNumericSumSummary) bool {
+	return summary.linear || summary.flinear
+}
+
+func qScriptWhereConstraintApplyCompare(constraint *qScriptWhereRowConstraint, value qScriptNumericSumSummary, op string, scalar qScriptNumericSumSummary) bool {
+	if constraint == nil || scalar.IsNullAt(0) {
+		return false
+	}
+	start, step, ok := qScriptWhereLinearStartStep(value)
+	if !ok || step <= 0 {
+		return false
+	}
+	target := scalar.FloatAt(0)
+	switch op {
+	case ">":
+		return qScriptWhereConstraintUpdateStart(constraint, int(math.Floor((target-start)/step))+1)
+	case ">=":
+		return qScriptWhereConstraintUpdateStart(constraint, int(math.Ceil((target-start)/step)))
+	case "<":
+		return qScriptWhereConstraintUpdateEnd(constraint, int(math.Ceil((target-start)/step))-1)
+	case "<=":
+		return qScriptWhereConstraintUpdateEnd(constraint, int(math.Floor((target-start)/step)))
+	case "=":
+		pos := (target - start) / step
+		row := int(math.Round(pos))
+		if math.Abs(pos-float64(row)) > 1e-9 {
+			constraint.start, constraint.end, constraint.changed = 1, 0, true
+			return true
+		}
+		if !qScriptWhereConstraintUpdateStart(constraint, row) {
+			return false
+		}
+		return qScriptWhereConstraintUpdateEnd(constraint, row)
+	default:
+		return false
+	}
+}
+
+func qScriptWhereLinearStartStep(value qScriptNumericSumSummary) (float64, float64, bool) {
+	switch {
+	case value.linear:
+		return float64(value.start), float64(value.step), true
+	case value.flinear:
+		return value.fstart, value.fstep, true
+	default:
+		return 0, 0, false
+	}
+}
+
+func qScriptWhereLinearRowForScalar(value, scalar qScriptNumericSumSummary) (int, bool) {
+	if scalar.IsNullAt(0) {
+		return 0, false
+	}
+	start, step, ok := qScriptWhereLinearStartStep(value)
+	if !ok || step == 0 {
+		return 0, false
+	}
+	pos := (scalar.FloatAt(0) - start) / step
+	row := int(math.Round(pos))
+	if math.Abs(pos-float64(row)) > 1e-9 {
+		return 0, false
+	}
+	return row, true
+}
+
+func qScriptWhereConstraintUpdateStart(constraint *qScriptWhereRowConstraint, start int) bool {
+	if start > constraint.start {
+		constraint.start = start
+		constraint.changed = true
+	}
+	return true
+}
+
+func qScriptWhereConstraintUpdateEnd(constraint *qScriptWhereRowConstraint, end int) bool {
+	if end < constraint.end {
+		constraint.end = end
+		constraint.changed = true
+	}
+	return true
+}
+
+func qScriptWhereConstraintExclusionCount(constraint qScriptWhereRowConstraint, first, periodLen int) int {
+	if constraint.exclusionCount == 0 || periodLen <= 0 {
+		return 0
+	}
+	count := 0
+	for i := 0; i < constraint.exclusionCount; i++ {
+		excluded := constraint.exclusions[i]
+		if excluded < first || excluded > constraint.end || (excluded-first)%periodLen != 0 {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 func qScriptWherePredicateAt(plan *qScriptWherePredicatePlan, row int) bool {

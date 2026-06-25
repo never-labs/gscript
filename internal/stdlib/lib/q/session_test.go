@@ -115,7 +115,10 @@ func TestQScriptWhereIndexSumPlanRecognizesCompositePredicates(t *testing.T) {
 	}
 }
 
-func TestQScriptWhereIndexSumPlanPreservesNonPeriodicPredicateSemantics(t *testing.T) {
+func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
 	tests := []struct {
 		src  string
 		want any
@@ -132,11 +135,24 @@ func TestQScriptWhereIndexSumPlanPreservesNonPeriodicPredicateSemantics(t *testi
 			src:  "x:til 8192;v:x+13;idx:where (not ((x mod 11)=3)) and (x within 50 8000) and (x>100);(+/v[idx])+count idx",
 			want: int64(29186815),
 		},
+		{
+			src:  "x:til 8192;v:(x*2)+1;idx:where x>64;(+/v[idx])+count idx",
+			want: int64(67112766),
+		},
 	}
 	for _, tt := range tests {
 		got, err := NewEvalState(nil).Eval(tt.src)
 		if err != nil || got != tt.want {
 			t.Fatalf("Eval(%q) = %#v,%v; want %#v,nil", tt.src, got, err, tt.want)
 		}
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptWhereIndexSumPlan" && stat.Shape == "where-index-reduce/periodic-sum-count" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != uint64(len(tests)) {
+		t.Fatalf("QScriptWhereIndexSumPlan constrained hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
 	}
 }
