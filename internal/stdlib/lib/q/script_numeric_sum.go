@@ -315,6 +315,15 @@ func buildQScriptNumericExprPlan(expr Expr, bindings map[string]qScriptNumericEx
 			return qScriptNumericExprPlan{}, false
 		}
 		return qScriptNumericExprPlan{kind: qScriptNumericExprTil, value: count, nonNegative: true}, true
+	case SafeCall:
+		if x.Func != "til" {
+			return qScriptNumericExprPlan{}, false
+		}
+		count, ok := qScriptNumericLiteralI64(x.Arg)
+		if !ok || count < 0 || count > int64(math.MaxInt) {
+			return qScriptNumericExprPlan{}, false
+		}
+		return qScriptNumericExprPlan{kind: qScriptNumericExprTil, value: count, nonNegative: true}, true
 	case CastExpr:
 		kind, ok := qScriptNumericCastKind(x)
 		if !ok || !qScriptNumericIntegerKind(kind) {

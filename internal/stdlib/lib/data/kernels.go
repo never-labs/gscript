@@ -5400,6 +5400,9 @@ func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (a
 		return nil, 0, true, fmt.Errorf("sum count where compare arrays must be non-nil")
 	}
 	scalar = normalizeScalar(values.Kind(), scalar)
+	if sum, count, ok := f64AffineSumCountWhereCompareSelf(values, op, scalar); ok {
+		return sum, count, true, nil
+	}
 	if sum, count, ok := bulkNumericSumCountWhereMask(values, nil, func(maskSource Array, out []bool) bool {
 		return typedKernels.CompareMask(maskSource, op, scalar, out)
 	}); ok {
@@ -5853,6 +5856,163 @@ func typedNumericSumCountWherePredicate(values Array, pred rowPredicate) (any, i
 }
 
 var errUnsupportedNumericSumCountWhereValues = fmt.Errorf("unsupported sum count where values")
+
+type f64AffineView struct {
+	start float64
+	step  float64
+	len   int
+}
+
+func f64AffineArrayView(array Array) (f64AffineView, bool) {
+	switch a := unwrapAttributedArray(array).(type) {
+	case i64RangeArray:
+		return f64AffineView{start: float64(a.start), step: float64(a.step), len: a.len}, true
+	case f64RangeArray:
+		return f64AffineView{start: a.start, step: a.step, len: a.len}, true
+	case i64ScalarDyadicArray:
+		if source, ok := i64ScalarDyadicAffineRange(a); ok {
+			return f64AffineView{start: float64(source.start), step: float64(source.step), len: source.len}, true
+		}
+	case f64NumericDyadicArray:
+		producer, err := newF64NumericDyadicProducer(a)
+		if err == nil {
+			return f64AffineProducerView(producer)
+		}
+	}
+	return f64AffineView{}, false
+}
+
+func f64AffineProducerView(producer f64NumericProducer) (f64AffineView, bool) {
+	switch p := producer.(type) {
+	case f64I64RangeProducer:
+		return f64AffineView{start: float64(p.values.start), step: float64(p.values.step), len: p.values.len}, true
+	case f64F64RangeProducer:
+		return f64AffineView{start: p.values.start, step: p.values.step, len: p.values.len}, true
+	case f64I64ScalarDyadicProducer:
+		if source, ok := i64ScalarDyadicAffineRange(p.values); ok {
+			return f64AffineView{start: float64(source.start), step: float64(source.step), len: source.len}, true
+		}
+	case f64DyadicProducer:
+		left, leftOK := f64AffineProducerView(p.left)
+		if scalar, rightOK := f64ScalarProducerValue(p.right); leftOK && rightOK {
+			return f64AffineApplyScalar(left, p.op, scalar, false)
+		}
+		right, rightOK := f64AffineProducerView(p.right)
+		if scalar, leftScalarOK := f64ScalarProducerValue(p.left); rightOK && leftScalarOK {
+			return f64AffineApplyScalar(right, p.op, scalar, true)
+		}
+	}
+	return f64AffineView{}, false
+}
+
+func f64ScalarProducerValue(producer f64NumericProducer) (float64, bool) {
+	switch p := producer.(type) {
+	case f64ScalarProducer:
+		return p.value, true
+	case f64BroadcastProducer:
+		return f64ScalarProducerValue(p.source)
+	default:
+		return 0, false
+	}
+}
+
+func f64AffineApplyScalar(view f64AffineView, op string, scalar float64, scalarLeft bool) (f64AffineView, bool) {
+	switch op {
+	case string(OpAdd):
+		view.start += scalar
+	case string(OpSub):
+		if scalarLeft {
+			view.start = scalar - view.start
+			view.step = -view.step
+		} else {
+			view.start -= scalar
+		}
+	case string(OpMul):
+		view.start *= scalar
+		view.step *= scalar
+	case string(OpDiv):
+		if scalarLeft || scalar == 0 {
+			return f64AffineView{}, false
+		}
+		view.start /= scalar
+		view.step /= scalar
+	default:
+		return f64AffineView{}, false
+	}
+	return view, true
+}
+
+func f64AffineSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int64, bool) {
+	if isDenseIntegerArray(values) {
+		return nil, 0, false
+	}
+	view, ok := f64AffineArrayView(values)
+	if !ok || view.len <= 0 || view.step == 0 {
+		return nil, 0, false
+	}
+	target, ok := numeric(scalar)
+	if !ok {
+		return nil, 0, false
+	}
+	start, count, ok := f64AffineCompareSelection(view, op, target)
+	if !ok {
+		return nil, 0, false
+	}
+	if count == 0 {
+		return NullValue, 0, true
+	}
+	return f64AffineRangeSliceSum(view, start, count), int64(count), true
+}
+
+func f64AffineCompareSelection(view f64AffineView, op Op, scalar float64) (int, int, bool) {
+	switch op {
+	case OpGT, OpGE, OpLT, OpLE:
+	default:
+		return 0, 0, false
+	}
+	firstTrue := -1
+	for i := 0; i < view.len; i++ {
+		if f64CompareOp(view.start+float64(i)*view.step, op, scalar) {
+			firstTrue = i
+			break
+		}
+	}
+	if firstTrue < 0 {
+		return 0, 0, true
+	}
+	lastTrue := firstTrue
+	for i := view.len - 1; i >= firstTrue; i-- {
+		if f64CompareOp(view.start+float64(i)*view.step, op, scalar) {
+			lastTrue = i
+			break
+		}
+	}
+	return firstTrue, lastTrue - firstTrue + 1, true
+}
+
+func f64CompareOp(value float64, op Op, scalar float64) bool {
+	switch op {
+	case OpGT:
+		return value > scalar
+	case OpGE:
+		return value >= scalar
+	case OpLT:
+		return value < scalar
+	case OpLE:
+		return value <= scalar
+	default:
+		return false
+	}
+}
+
+func f64AffineRangeSliceSum(view f64AffineView, start, count int) float64 {
+	if count <= 0 {
+		return 0
+	}
+	first := view.start + float64(start)*view.step
+	last := first + float64(count-1)*view.step
+	return float64(count) * (first + last) / 2
+}
 
 func typedWithinRowPredicate(array Array, low, high any, highClosed bool) (rowPredicate, bool, error) {
 	switch a := array.(type) {

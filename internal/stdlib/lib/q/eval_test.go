@@ -2344,6 +2344,95 @@ func TestExecuteEvalPipelineUsesWhereGatherSumCountWithinPredicate(t *testing.T)
 	t.Fatalf("missing within predicate ArrayWhereGatherSumCount hit: %#v", RuntimeKernelExecutionStats())
 }
 
+func TestExecuteEvalPipelineUsesWhereGatherSumCountNumericTypeMatrix(t *testing.T) {
+	tests := []struct {
+		name        string
+		src         string
+		want        any
+		shapePrefix string
+		altKernel   string
+		altPrefix   string
+	}{
+		{
+			name:        "float compare aliases",
+			src:         "x:(til 128)*0.25;idx:where x>16.5;c:count idx;v:x[idx];s:+/v;s+c",
+			want:        1540.25,
+			shapePrefix: "where-index-reduce/sum-count/f64/>/f64/f64",
+		},
+		{
+			name:        "float within",
+			src:         "x:((til 128) mod 16)*0.5;idx:where x within 2.5 5.0;(+/x[idx])+count idx",
+			want:        228.0,
+			shapePrefix: "where-index-reduce/sum-count/f64/within/f64/f64/f64",
+		},
+		{
+			name:        "short null compare",
+			src:         "x:128#0Nh 1h 5h 9h;v:til 128;idx:where x>2h;(+/v[idx])+count idx",
+			want:        int64(4192),
+			shapePrefix: "where-index-reduce/sum-count/i64/>/i16/i64",
+			altKernel:   "ArrayWhereCompareStats",
+			altPrefix:   "compare-to-index-count-sum-stats/>/i16/i16",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+			got, handled, err := ExecuteEvalPipeline(tt.src)
+			if err != nil || !handled || got != tt.want {
+				t.Fatalf("ExecuteEvalPipeline = %#v,%v,%v; want %#v,true,nil", got, handled, err, tt.want)
+			}
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected where gather sum-count fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "ArrayWhereGatherSumCount" && strings.HasPrefix(stat.Shape, tt.shapePrefix) &&
+					stat.Outcome == "hit" && stat.Count > 0 {
+					return
+				}
+				if tt.altKernel != "" && stat.Kernel == tt.altKernel && strings.HasPrefix(stat.Shape, tt.altPrefix) &&
+					stat.Outcome == "hit" && stat.Count > 0 {
+					return
+				}
+			}
+			t.Fatalf("missing ArrayWhereGatherSumCount hit prefix %q: %#v", tt.shapePrefix, RuntimeKernelExecutionStats())
+		})
+	}
+}
+
+func TestEvalScriptWhereIndexPeriodicSumUsesFusedPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	tests := []struct {
+		expr string
+		want any
+	}{
+		{"x:((til 128) mod 16)*0.5;idx:where x within 2.5 5.0;(+/x[idx])+count idx", 228.0},
+		{"x:128#0Nh 1h 5h 9h;v:til 128;idx:where x>2h;(+/v[idx])+count idx", int64(4192)},
+		{"x:8192#0Nh 1h 5h 9h;v:til 8192;idx:where x>2h;(+/v[idx])+count idx", int64(16783360)},
+		{"x:128#0Ni 1i 5i 9i;v:til 128;idx:where x<6i;(+/v[idx])+count idx", int64(6144)},
+		{"x:128#0Ne 1.5e 2.5e 6e;v:til 128;idx:where x>2;(+/v[idx])+count where null x", int64(4160)},
+		{"x:\"e\"$(til 128) mod 32;idx:where x>=8;(+/x[idx])+count idx", 1968.0},
+	}
+	for _, tt := range tests {
+		assertEvalValue(t, tt.expr, tt.want)
+	}
+	hits := uint64(0)
+	whereGatherHits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptWhereIndexSumPlan" && stat.Shape == "where-index-reduce/periodic-sum-count" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+		if stat.Kernel == "ArrayWhereGatherSumCount" && stat.Outcome == "hit" {
+			whereGatherHits += stat.Count
+		}
+	}
+	if hits != 5 || whereGatherHits != 1 {
+		t.Fatalf("where-index periodic hits = %d, where-gather hits = %d; want 5 and 1; stats=%#v", hits, whereGatherHits, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalPipelineSumWhereCompareAvoidsMaskMaterialization(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
