@@ -13,6 +13,7 @@ type qScriptNumericSumPlan struct {
 	sources   []string
 	root      qScriptNumericExprPlan
 	count     *qScriptNumericExprPlan
+	countNull *qScriptNumericExprPlan
 	closed    qScriptNumericSumSummary
 	closedOK  bool
 	closedErr string
@@ -27,6 +28,7 @@ const (
 	qScriptNumericExprName
 	qScriptNumericExprCast
 	qScriptNumericExprBinary
+	qScriptNumericExprPeriod
 )
 
 type qScriptNumericExprPlan struct {
@@ -41,6 +43,11 @@ type qScriptNumericExprPlan struct {
 	hasCast     bool
 	isFloat     bool
 	fvalue      float64
+	period      []int64
+	fperiod     []float64
+	nullPeriod  []bool
+	length      int
+	hasNull     bool
 }
 
 func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSumPlan {
@@ -76,6 +83,7 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 		return nil
 	}
 	var count *qScriptNumericExprPlan
+	var countNull *qScriptNumericExprPlan
 	if terminalPlan.countName != "" {
 		countPlan, ok := bindings[terminalPlan.countName]
 		if !ok {
@@ -88,10 +96,22 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 		}
 		count = &countPlan
 	}
-	if !root.hasCast {
+	if terminalPlan.countNullName != "" {
+		countNullPlan, ok := bindings[terminalPlan.countNullName]
+		if !ok {
+			return nil
+		}
+		sumLen, sumOK := qScriptNumericExprLength(root, bindings)
+		countLen, countOK := qScriptNumericExprLength(countNullPlan, bindings)
+		if !sumOK || !countOK || sumLen != countLen || sumLen < 0 {
+			return nil
+		}
+		countNull = &countNullPlan
+	}
+	if !root.hasCast && !root.hasNull {
 		return nil
 	}
-	plan := &qScriptNumericSumPlan{source: terminal, sources: qScriptNumericSumStatementSources(statements), root: root, count: count}
+	plan := &qScriptNumericSumPlan{source: terminal, sources: qScriptNumericSumStatementSources(statements), root: root, count: count, countNull: countNull}
 	if summary, ok, err := qScriptNumericSummarize(root); ok {
 		plan.closed = summary
 		plan.closedOK = true
@@ -106,13 +126,17 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 }
 
 type qScriptNumericSumTerminalPlan struct {
-	sumName   string
-	countName string
+	sumName       string
+	countName     string
+	countNullName string
 }
 
 func qScriptNumericSumTerminal(src string) (qScriptNumericSumTerminalPlan, bool) {
 	if name, ok := qScriptNumericSumTargetName(src); ok {
 		return qScriptNumericSumTerminalPlan{sumName: name}, true
+	}
+	if plan, ok := qScriptNumericSumTerminalPlusChain(src); ok {
+		return plan, true
 	}
 	expr := compileQEvalExpr(src, 0)
 	binary, ok := expr.(Binary)
@@ -123,13 +147,55 @@ func qScriptNumericSumTerminal(src string) (qScriptNumericSumTerminalPlan, bool)
 		if countName, ok := qScriptNumericCountExprName(binary.Right); ok {
 			return qScriptNumericSumTerminalPlan{sumName: sumName, countName: countName}, true
 		}
+		if countNullName, ok := qScriptNumericCountWhereNullExprName(binary.Right); ok {
+			return qScriptNumericSumTerminalPlan{sumName: sumName, countNullName: countNullName}, true
+		}
 	}
 	if countName, ok := qScriptNumericCountExprName(binary.Left); ok {
 		if sumName, ok := qScriptNumericSumExprName(binary.Right); ok {
 			return qScriptNumericSumTerminalPlan{sumName: sumName, countName: countName}, true
 		}
 	}
+	if countNullName, ok := qScriptNumericCountWhereNullExprName(binary.Left); ok {
+		if sumName, ok := qScriptNumericSumExprName(binary.Right); ok {
+			return qScriptNumericSumTerminalPlan{sumName: sumName, countNullName: countNullName}, true
+		}
+	}
 	return qScriptNumericSumTerminalPlan{}, false
+}
+
+func qScriptNumericSumTerminalPlusChain(src string) (qScriptNumericSumTerminalPlan, bool) {
+	terms := splitTopLevelPlusChain(src)
+	if len(terms) != 2 {
+		return qScriptNumericSumTerminalPlan{}, false
+	}
+	var plan qScriptNumericSumTerminalPlan
+	for _, term := range terms {
+		term = stripEnclosingParens(strings.TrimSpace(term))
+		if name, ok := qScriptNumericSumTargetName(term); ok {
+			if plan.sumName != "" {
+				return qScriptNumericSumTerminalPlan{}, false
+			}
+			plan.sumName = name
+			continue
+		}
+		if name, ok := qScriptNumericCountTargetName(term); ok {
+			if plan.countName != "" || plan.countNullName != "" {
+				return qScriptNumericSumTerminalPlan{}, false
+			}
+			plan.countName = name
+			continue
+		}
+		if name, ok := qScriptNumericCountWhereNullTargetName(term); ok {
+			if plan.countName != "" || plan.countNullName != "" {
+				return qScriptNumericSumTerminalPlan{}, false
+			}
+			plan.countNullName = name
+			continue
+		}
+		return qScriptNumericSumTerminalPlan{}, false
+	}
+	return plan, plan.sumName != "" && (plan.countName != "" || plan.countNullName != "")
 }
 
 func qScriptNumericSumTargetName(src string) (string, bool) {
@@ -142,6 +208,27 @@ func qScriptNumericSumTargetName(src string) (string, bool) {
 	}
 	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
 		name := strings.TrimSpace(src[len("sum "):])
+		if isQAssignmentName(name) {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+func qScriptNumericCountTargetName(src string) (string, bool) {
+	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
+		name := strings.TrimSpace(src[len("count "):])
+		if isQAssignmentName(name) {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+func qScriptNumericCountWhereNullTargetName(src string) (string, bool) {
+	const prefix = "count where null "
+	if strings.HasPrefix(src, prefix) && wordBoundary(src, 0, len("count")) {
+		name := strings.TrimSpace(src[len(prefix):])
 		if isQAssignmentName(name) {
 			return name, true
 		}
@@ -189,9 +276,23 @@ func qScriptNumericCountExprName(expr Expr) (string, bool) {
 	return "", false
 }
 
+func qScriptNumericCountWhereNullExprName(expr Expr) (string, bool) {
+	fused, ok := expr.(FusedCountWhere)
+	if !ok || fused.Kind != fusedCountWhereNull {
+		return "", false
+	}
+	if ident, ok := fused.Left.(Ident); ok {
+		return ident.Name, true
+	}
+	return "", false
+}
+
 func buildQScriptNumericExprPlan(expr Expr, bindings map[string]qScriptNumericExprPlan) (qScriptNumericExprPlan, bool) {
 	switch x := expr.(type) {
 	case Const:
+		if array, ok := x.Value.(data.Array); ok {
+			return qScriptNumericArrayPeriodPlan(array)
+		}
 		return qScriptNumericScalarPlan(x.Value)
 	case Number:
 		value, _, err := parseNumberOrBool(x.Text)
@@ -204,7 +305,7 @@ func buildQScriptNumericExprPlan(expr Expr, bindings map[string]qScriptNumericEx
 		if !ok {
 			return qScriptNumericExprPlan{}, false
 		}
-		return qScriptNumericExprPlan{kind: qScriptNumericExprName, name: x.Name, left: &referenced, nonNegative: referenced.nonNegative, hasCast: referenced.hasCast}, true
+		return qScriptNumericExprPlan{kind: qScriptNumericExprName, name: x.Name, left: &referenced, nonNegative: referenced.nonNegative, hasCast: referenced.hasCast, isFloat: referenced.isFloat, hasNull: referenced.hasNull}, true
 	case Call:
 		if x.Func != "til" {
 			return qScriptNumericExprPlan{}, false
@@ -237,6 +338,22 @@ func buildQScriptNumericExprPlan(expr Expr, bindings map[string]qScriptNumericEx
 }
 
 func buildQScriptNumericBinaryPlan(op string, leftExpr, rightExpr Expr, bindings map[string]qScriptNumericExprPlan) (qScriptNumericExprPlan, bool) {
+	if op == "#" {
+		left, ok := buildQScriptNumericExprPlan(leftExpr, bindings)
+		if !ok || left.kind != qScriptNumericExprScalar || left.isFloat || left.value < 0 || left.value > int64(math.MaxInt) {
+			return qScriptNumericExprPlan{}, false
+		}
+		right, ok := buildQScriptNumericExprPlan(rightExpr, bindings)
+		if !ok {
+			return qScriptNumericExprPlan{}, false
+		}
+		if _, ok := qScriptNumericExprPeriodValues(right); !ok {
+			return qScriptNumericExprPlan{}, false
+		}
+		right.length = int(left.value)
+		right.kind = qScriptNumericExprPeriod
+		return right, true
+	}
 	switch op {
 	case "+", "-", "*", "%", "div", "mod":
 	default:
@@ -273,7 +390,73 @@ func buildQScriptNumericBinaryPlan(op string, leftExpr, rightExpr Expr, bindings
 	}
 	plan.hasCast = left.hasCast || right.hasCast
 	plan.isFloat = left.isFloat || right.isFloat || op == "%"
+	plan.hasNull = left.hasNull || right.hasNull
 	return plan, true
+}
+
+func qScriptNumericArrayPeriodPlan(array data.Array) (qScriptNumericExprPlan, bool) {
+	if array == nil || array.Len() == 0 || array.Len() > qScriptNumericClosedFormMaxPeriod {
+		return qScriptNumericExprPlan{}, false
+	}
+	isFloat := array.Kind() == data.KindF32 || array.Kind() == data.KindF64
+	period := make([]int64, array.Len())
+	fperiod := make([]float64, array.Len())
+	nullPeriod := make([]bool, array.Len())
+	hasNull := false
+	nonNegative := true
+	for row := 0; row < array.Len(); row++ {
+		value, ok := array.At(row)
+		if !ok || data.IsNull(value) {
+			nullPeriod[row] = true
+			hasNull = true
+			continue
+		}
+		switch v := value.(type) {
+		case int:
+			period[row] = int64(v)
+			fperiod[row] = float64(v)
+			nonNegative = nonNegative && v >= 0
+		case int16:
+			period[row] = int64(v)
+			fperiod[row] = float64(v)
+			nonNegative = nonNegative && v >= 0
+		case int32:
+			period[row] = int64(v)
+			fperiod[row] = float64(v)
+			nonNegative = nonNegative && v >= 0
+		case int64:
+			period[row] = v
+			fperiod[row] = float64(v)
+			nonNegative = nonNegative && v >= 0
+		case float32:
+			isFloat = true
+			fperiod[row] = float64(v)
+			nonNegative = nonNegative && v >= 0
+		case float64:
+			isFloat = true
+			fperiod[row] = v
+			nonNegative = nonNegative && v >= 0
+		default:
+			return qScriptNumericExprPlan{}, false
+		}
+	}
+	plan := qScriptNumericExprPlan{kind: qScriptNumericExprPeriod, length: array.Len(), nullPeriod: nullPeriod, hasNull: hasNull, nonNegative: nonNegative, isFloat: isFloat}
+	if isFloat {
+		plan.fperiod = fperiod
+	} else {
+		plan.period = period
+	}
+	return plan, true
+}
+
+func qScriptNumericExprPeriodValues(plan qScriptNumericExprPlan) (int, bool) {
+	if plan.kind != qScriptNumericExprPeriod {
+		return 0, false
+	}
+	if len(plan.period) == 0 && len(plan.fperiod) == 0 {
+		return 0, false
+	}
+	return plan.length, true
 }
 
 func qScriptNumericScalarPlan(value any) (qScriptNumericExprPlan, bool) {
@@ -378,6 +561,8 @@ func qScriptNumericExprLength(plan qScriptNumericExprPlan, bindings map[string]q
 		default:
 			return 0, false
 		}
+	case qScriptNumericExprPeriod:
+		return plan.length, true
 	default:
 		return 0, false
 	}
@@ -395,7 +580,7 @@ func (s *EvalState) evalQScriptNumericSumPlan(plan *qScriptNumericSumPlan) (any,
 		}
 		recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", true, nil)
 		plan.recordDispatch()
-		return plan.closed.Result(plan.countValue()), true, nil
+		return plan.closed.Result(plan.countValue() + plan.countNullValue()), true, nil
 	}
 	if plan.root.isFloat {
 		return nil, false, nil
@@ -428,7 +613,7 @@ func (s *EvalState) evalQScriptNumericSumPlan(plan *qScriptNumericSumPlan) (any,
 	}
 	recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", true, nil)
 	plan.recordDispatch()
-	return sum + plan.countValue(), true, nil
+	return sum + plan.countValue() + plan.countNullValue(), true, nil
 }
 
 func qScriptNumericSumStatementSources(statements []qScriptStatement) []string {
@@ -459,6 +644,17 @@ func (plan *qScriptNumericSumPlan) countValue() int64 {
 		return int64(length)
 	}
 	return 0
+}
+
+func (plan *qScriptNumericSumPlan) countNullValue() int64 {
+	if plan == nil || plan.countNull == nil {
+		return 0
+	}
+	summary, ok, err := qScriptNumericSummarize(*plan.countNull)
+	if !ok || err != nil {
+		return 0
+	}
+	return int64(summary.NullCount())
 }
 
 func qScriptNumericCollectBindings(plan qScriptNumericExprPlan, out map[string]qScriptNumericExprPlan) {
@@ -520,6 +716,14 @@ func qScriptNumericEvalRow(plan qScriptNumericExprPlan, row int, bindings map[st
 		default:
 			return 0, fmt.Errorf("unsupported numeric op %s", plan.op)
 		}
+	case qScriptNumericExprPeriod:
+		if len(plan.nullPeriod) > 0 && plan.nullPeriod[row%len(plan.nullPeriod)] {
+			return 0, nil
+		}
+		if plan.isFloat {
+			return int64(plan.fperiod[row%len(plan.fperiod)]), nil
+		}
+		return plan.period[row%len(plan.period)], nil
 	default:
 		return 0, fmt.Errorf("invalid numeric expression")
 	}
@@ -562,6 +766,12 @@ type qScriptNumericSumSummary struct {
 	fperiod []float64
 	fmin    float64
 	fmax    float64
+	nulls   []bool
+	hasNull bool
+	custom  bool
+	csum    int64
+	fcustom bool
+	fcsum   float64
 }
 
 const qScriptNumericClosedFormMaxPeriod = 1 << 16
@@ -579,6 +789,11 @@ func qScriptNumericSummarize(plan qScriptNumericExprPlan) (qScriptNumericSumSumm
 			return qScriptNumericSumSummary{length: 0, linear: true, min: 0, max: -1}, true, nil
 		}
 		return qScriptNumericSumSummary{length: n, linear: true, start: 0, step: 1, min: 0, max: int64(n - 1)}, true, nil
+	case qScriptNumericExprPeriod:
+		if plan.isFloat {
+			return qScriptNumericFloatPeriodSummaryWithNulls(plan.length, plan.fperiod, plan.nullPeriod), true, nil
+		}
+		return qScriptNumericPeriodSummaryWithNulls(plan.length, plan.period, plan.nullPeriod), true, nil
 	case qScriptNumericExprName:
 		if plan.left == nil {
 			return qScriptNumericSumSummary{}, false, nil
@@ -643,6 +858,9 @@ func qScriptNumericSumSummaryFloatCastCheck(kind data.Kind, summary qScriptNumer
 		n = 1
 	}
 	for row := 0; row < n; row++ {
+		if summary.IsNullAt(row) {
+			continue
+		}
 		value := math.RoundToEven(summary.FloatAt(row))
 		switch kind {
 		case data.KindI16:
@@ -698,7 +916,7 @@ func qScriptNumericCastSummaryF32(summary qScriptNumericSumSummary) qScriptNumer
 		for i, value := range summary.fperiod {
 			period[i] = float64(float32(value))
 		}
-		return qScriptNumericFloatPeriodSummary(summary.length, period)
+		return qScriptNumericFloatPeriodSummaryWithNulls(summary.length, period, summary.nulls)
 	}
 	return out
 }
@@ -723,7 +941,7 @@ func qScriptNumericCastSummaryInteger(summary qScriptNumericSumSummary) (qScript
 		for i, value := range summary.fperiod {
 			period[i] = int64(math.RoundToEven(value))
 		}
-		return qScriptNumericPeriodSummary(summary.length, period), true, nil
+		return qScriptNumericPeriodSummaryWithNulls(summary.length, period, summary.nulls), true, nil
 	}
 	return qScriptNumericSumSummary{}, false, nil
 }
@@ -734,6 +952,9 @@ func qScriptNumericSumSummaryFirstOutOfRangeRow(summary qScriptNumericSumSummary
 		n = 1
 	}
 	for row := 0; row < n; row++ {
+		if summary.IsNullAt(row) {
+			continue
+		}
 		value := summary.At(row)
 		if value < min || value > max {
 			return row + 1
@@ -786,6 +1007,9 @@ func qScriptNumericSummarizeBinary(op string, left, right qScriptNumericSumSumma
 		if left.scalar && right.linear {
 			return qScriptNumericLinearMultiply(right, left.value), true, nil
 		}
+	}
+	if out, ok := qScriptNumericLinearPeriodicReduce(op, left, right, length); ok {
+		return out, true, nil
 	}
 	if out, ok := qScriptNumericPeriodicBinary(op, left, right, length); ok {
 		return out, true, nil
@@ -840,7 +1064,7 @@ func qScriptNumericSummarizeFloatBinary(op string, left, right qScriptNumericSum
 			for i, value := range left.fperiod {
 				period[i] = value / right.fvalue
 			}
-			return qScriptNumericFloatPeriodSummary(length, period), true, nil
+			return qScriptNumericFloatPeriodSummaryWithNulls(length, period, left.nulls), true, nil
 		}
 	}
 	if out, ok := qScriptNumericFloatPeriodicBinary(op, left, right, length); ok {
@@ -870,7 +1094,7 @@ func qScriptNumericSummarizeFloatMod(left qScriptNumericSumSummary, modulus floa
 		for i, value := range left.fperiod {
 			period[i] = math.Mod(value, modulus)
 		}
-		return qScriptNumericFloatPeriodSummary(left.length, period), true, nil
+		return qScriptNumericFloatPeriodSummaryWithNulls(left.length, period, left.nulls), true, nil
 	}
 	return qScriptNumericSumSummary{}, false, nil
 }
@@ -895,7 +1119,7 @@ func qScriptNumericSummarizeMod(left qScriptNumericSumSummary, modulus int64) (q
 		for i, value := range left.period {
 			period[i] = value % modulus
 		}
-		return qScriptNumericPeriodSummary(left.length, period), true, nil
+		return qScriptNumericPeriodSummaryWithNulls(left.length, period, left.nulls), true, nil
 	}
 	return qScriptNumericSumSummary{}, false, nil
 }
@@ -921,7 +1145,7 @@ func qScriptNumericSummarizeDiv(left qScriptNumericSumSummary, divisor int64) (q
 		for i, value := range left.period {
 			period[i] = value / divisor
 		}
-		return qScriptNumericPeriodSummary(left.length, period), true, nil
+		return qScriptNumericPeriodSummaryWithNulls(left.length, period, left.nulls), true, nil
 	}
 	return qScriptNumericSumSummary{}, false, nil
 }
@@ -945,6 +1169,58 @@ func qScriptNumericLinearMultiply(linear qScriptNumericSumSummary, scalar int64)
 	return out
 }
 
+func qScriptNumericLinearPeriodicReduce(op string, left, right qScriptNumericSumSummary, length int) (qScriptNumericSumSummary, bool) {
+	if length < 0 || length > qScriptNumericClosedFormMaxPeriod*1024 {
+		return qScriptNumericSumSummary{}, false
+	}
+	var linear qScriptNumericSumSummary
+	var period qScriptNumericSumSummary
+	linearLeft := false
+	switch {
+	case left.linear && len(right.period) > 0:
+		linear, period, linearLeft = left, right, true
+	case len(left.period) > 0 && right.linear:
+		linear, period, linearLeft = right, left, false
+	default:
+		return qScriptNumericSumSummary{}, false
+	}
+	switch op {
+	case "+", "-", "*":
+	default:
+		return qScriptNumericSumSummary{}, false
+	}
+	p := len(period.period)
+	if p == 0 || p > qScriptNumericClosedFormMaxPeriod {
+		return qScriptNumericSumSummary{}, false
+	}
+	var sum int64
+	for offset, periodValue := range period.period {
+		if period.hasNull && period.nulls[offset%len(period.nulls)] {
+			continue
+		}
+		if offset >= length {
+			break
+		}
+		count := int64((length-1-offset)/p + 1)
+		first := linear.start + int64(offset)*linear.step
+		step := int64(p) * linear.step
+		linearSum := count * (2*first + (count-1)*step) / 2
+		switch op {
+		case "+":
+			sum += linearSum + count*periodValue
+		case "-":
+			if linearLeft {
+				sum += linearSum - count*periodValue
+			} else {
+				sum += count*periodValue - linearSum
+			}
+		case "*":
+			sum += periodValue * linearSum
+		}
+	}
+	return qScriptNumericSumSummary{length: length, custom: true, csum: sum, nulls: period.nulls, hasNull: period.hasNull}, true
+}
+
 func qScriptNumericPeriodicBinary(op string, left, right qScriptNumericSumSummary, length int) (qScriptNumericSumSummary, bool) {
 	leftPeriod, ok := qScriptNumericSumSummaryPeriod(left)
 	if !ok {
@@ -959,10 +1235,14 @@ func qScriptNumericPeriodicBinary(op string, left, right qScriptNumericSumSummar
 		return qScriptNumericSumSummary{}, false
 	}
 	period := make([]int64, periodLen)
+	nulls := qScriptNumericCombineNullPeriods(left, right, periodLen)
 	for i := range period {
+		if len(nulls) > 0 && nulls[i] {
+			continue
+		}
 		period[i] = qScriptNumericApplyBinary(op, leftPeriod[i%len(leftPeriod)], rightPeriod[i%len(rightPeriod)])
 	}
-	return qScriptNumericPeriodSummary(length, period), true
+	return qScriptNumericPeriodSummaryWithNulls(length, period, nulls), true
 }
 
 func qScriptNumericFloatPeriodicBinary(op string, left, right qScriptNumericSumSummary, length int) (qScriptNumericSumSummary, bool) {
@@ -979,10 +1259,34 @@ func qScriptNumericFloatPeriodicBinary(op string, left, right qScriptNumericSumS
 		return qScriptNumericSumSummary{}, false
 	}
 	period := make([]float64, periodLen)
+	nulls := qScriptNumericCombineNullPeriods(left, right, periodLen)
 	for i := range period {
+		if len(nulls) > 0 && nulls[i] {
+			continue
+		}
 		period[i] = qScriptNumericApplyFloatBinary(op, leftPeriod[i%len(leftPeriod)], rightPeriod[i%len(rightPeriod)])
 	}
-	return qScriptNumericFloatPeriodSummary(length, period), true
+	return qScriptNumericFloatPeriodSummaryWithNulls(length, period, nulls), true
+}
+
+func qScriptNumericCombineNullPeriods(left, right qScriptNumericSumSummary, periodLen int) []bool {
+	leftNulls := qScriptNumericSummaryNullPeriod(left)
+	rightNulls := qScriptNumericSummaryNullPeriod(right)
+	if len(leftNulls) == 0 && len(rightNulls) == 0 {
+		return nil
+	}
+	out := make([]bool, periodLen)
+	for i := range out {
+		out[i] = (len(leftNulls) > 0 && leftNulls[i%len(leftNulls)]) || (len(rightNulls) > 0 && rightNulls[i%len(rightNulls)])
+	}
+	return out
+}
+
+func qScriptNumericSummaryNullPeriod(summary qScriptNumericSumSummary) []bool {
+	if !summary.hasNull || len(summary.nulls) == 0 {
+		return nil
+	}
+	return summary.nulls
 }
 
 func qScriptNumericSumSummaryPeriod(summary qScriptNumericSumSummary) ([]int64, bool) {
@@ -1056,18 +1360,33 @@ func qScriptNumericApplyFloatBinary(op string, left, right float64) float64 {
 }
 
 func qScriptNumericPeriodSummary(length int, period []int64) qScriptNumericSumSummary {
-	out := qScriptNumericSumSummary{length: length, period: period}
+	return qScriptNumericPeriodSummaryWithNulls(length, period, nil)
+}
+
+func qScriptNumericPeriodSummaryWithNulls(length int, period []int64, nulls []bool) qScriptNumericSumSummary {
+	out := qScriptNumericSumSummary{length: length, period: period, nulls: qScriptNumericNormalizeNullPeriod(nulls), hasNull: qScriptNumericHasNull(nulls)}
 	if len(period) == 0 {
 		return out
 	}
-	out.min, out.max = period[0], period[0]
-	for _, value := range period[1:] {
+	minSet := false
+	for i, value := range period {
+		if out.hasNull && out.nulls[i%len(out.nulls)] {
+			continue
+		}
+		if !minSet {
+			out.min, out.max = value, value
+			minSet = true
+			continue
+		}
 		if value < out.min {
 			out.min = value
 		}
 		if value > out.max {
 			out.max = value
 		}
+	}
+	if !minSet {
+		out.min, out.max = 0, -1
 	}
 	return out
 }
@@ -1104,12 +1423,24 @@ func qScriptNumericFloatLinearMultiply(linear qScriptNumericSumSummary, scalar f
 }
 
 func qScriptNumericFloatPeriodSummary(length int, period []float64) qScriptNumericSumSummary {
-	out := qScriptNumericSumSummary{length: length, isFloat: true, fperiod: period}
+	return qScriptNumericFloatPeriodSummaryWithNulls(length, period, nil)
+}
+
+func qScriptNumericFloatPeriodSummaryWithNulls(length int, period []float64, nulls []bool) qScriptNumericSumSummary {
+	out := qScriptNumericSumSummary{length: length, isFloat: true, fperiod: period, nulls: qScriptNumericNormalizeNullPeriod(nulls), hasNull: qScriptNumericHasNull(nulls)}
 	if len(period) == 0 {
 		return out
 	}
-	out.fmin, out.fmax = period[0], period[0]
-	for _, value := range period[1:] {
+	minSet := false
+	for i, value := range period {
+		if out.hasNull && out.nulls[i%len(out.nulls)] {
+			continue
+		}
+		if !minSet {
+			out.fmin, out.fmax = value, value
+			minSet = true
+			continue
+		}
 		if value < out.fmin {
 			out.fmin = value
 		}
@@ -1117,7 +1448,26 @@ func qScriptNumericFloatPeriodSummary(length int, period []float64) qScriptNumer
 			out.fmax = value
 		}
 	}
+	if !minSet {
+		out.fmin, out.fmax = 0, -1
+	}
 	return out
+}
+
+func qScriptNumericNormalizeNullPeriod(nulls []bool) []bool {
+	if !qScriptNumericHasNull(nulls) {
+		return nil
+	}
+	return append([]bool(nil), nulls...)
+}
+
+func qScriptNumericHasNull(nulls []bool) bool {
+	for _, isNull := range nulls {
+		if isNull {
+			return true
+		}
+	}
+	return false
 }
 
 func qScriptNumericFloatLinearMinMax(summary qScriptNumericSumSummary) (float64, float64) {
@@ -1150,6 +1500,9 @@ func qScriptNumericGCD(a, b int) int {
 }
 
 func (s qScriptNumericSumSummary) At(row int) int64 {
+	if s.IsNullAt(row) {
+		return 0
+	}
 	switch {
 	case s.scalar:
 		return s.value
@@ -1163,6 +1516,9 @@ func (s qScriptNumericSumSummary) At(row int) int64 {
 }
 
 func (s qScriptNumericSumSummary) FloatAt(row int) float64 {
+	if s.IsNullAt(row) {
+		return 0
+	}
 	if !s.isFloat {
 		return float64(s.At(row))
 	}
@@ -1182,7 +1538,7 @@ func (s qScriptNumericSumSummary) AsFloat() qScriptNumericSumSummary {
 	if s.isFloat {
 		return s
 	}
-	out := qScriptNumericSumSummary{length: s.length, scalar: s.scalar, isFloat: true, fvalue: float64(s.value), fmin: float64(s.min), fmax: float64(s.max)}
+	out := qScriptNumericSumSummary{length: s.length, scalar: s.scalar, isFloat: true, fvalue: float64(s.value), fmin: float64(s.min), fmax: float64(s.max), nulls: s.nulls, hasNull: s.hasNull}
 	if s.linear {
 		out.scalar = false
 		out.flinear = true
@@ -1196,13 +1552,45 @@ func (s qScriptNumericSumSummary) AsFloat() qScriptNumericSumSummary {
 		for i, value := range s.period {
 			out.fperiod[i] = float64(value)
 		}
-		out.fmin, out.fmax = qScriptNumericFloatPeriodSummary(s.length, out.fperiod).fmin, qScriptNumericFloatPeriodSummary(s.length, out.fperiod).fmax
+		periodSummary := qScriptNumericFloatPeriodSummaryWithNulls(s.length, out.fperiod, s.nulls)
+		out.fmin, out.fmax = periodSummary.fmin, periodSummary.fmax
 	}
 	return out
 }
 
+func (s qScriptNumericSumSummary) IsNullAt(row int) bool {
+	return s.hasNull && len(s.nulls) > 0 && s.nulls[row%len(s.nulls)]
+}
+
+func (s qScriptNumericSumSummary) NullCount() int {
+	if !s.hasNull || len(s.nulls) == 0 || s.length <= 0 {
+		return 0
+	}
+	var periodCount int
+	for _, isNull := range s.nulls {
+		if isNull {
+			periodCount++
+		}
+	}
+	cycles := s.length / len(s.nulls)
+	rem := s.length % len(s.nulls)
+	total := cycles * periodCount
+	for i := 0; i < rem; i++ {
+		if s.nulls[i] {
+			total++
+		}
+	}
+	return total
+}
+
 func (s qScriptNumericSumSummary) Sum() int64 {
+	if s.custom {
+		return s.csum
+	}
 	if s.scalar {
+		if s.hasNull {
+			return 0
+		}
 		return s.value
 	}
 	if s.length <= 0 {
@@ -1214,13 +1602,19 @@ func (s qScriptNumericSumSummary) Sum() int64 {
 	}
 	if len(s.period) > 0 {
 		var periodSum int64
-		for _, value := range s.period {
+		for i, value := range s.period {
+			if s.hasNull && s.nulls[i%len(s.nulls)] {
+				continue
+			}
 			periodSum += value
 		}
 		cycles := s.length / len(s.period)
 		rem := s.length % len(s.period)
 		total := int64(cycles) * periodSum
 		for i := 0; i < rem; i++ {
+			if s.hasNull && s.nulls[i%len(s.nulls)] {
+				continue
+			}
 			total += s.period[i]
 		}
 		return total
@@ -1229,10 +1623,16 @@ func (s qScriptNumericSumSummary) Sum() int64 {
 }
 
 func (s qScriptNumericSumSummary) FloatSum() float64 {
+	if s.fcustom {
+		return s.fcsum
+	}
 	if !s.isFloat {
 		return float64(s.Sum())
 	}
 	if s.scalar {
+		if s.hasNull {
+			return 0
+		}
 		return s.fvalue
 	}
 	if s.length <= 0 {
@@ -1244,13 +1644,19 @@ func (s qScriptNumericSumSummary) FloatSum() float64 {
 	}
 	if len(s.fperiod) > 0 {
 		var periodSum float64
-		for _, value := range s.fperiod {
+		for i, value := range s.fperiod {
+			if s.hasNull && s.nulls[i%len(s.nulls)] {
+				continue
+			}
 			periodSum += value
 		}
 		cycles := s.length / len(s.fperiod)
 		rem := s.length % len(s.fperiod)
 		total := float64(cycles) * periodSum
 		for i := 0; i < rem; i++ {
+			if s.hasNull && s.nulls[i%len(s.nulls)] {
+				continue
+			}
 			total += s.fperiod[i]
 		}
 		return total

@@ -5305,6 +5305,37 @@ func TestEvalScriptNumericIntegerDivModSumUsesFusedPlan(t *testing.T) {
 	}
 }
 
+func TestEvalScriptNumericNullablePeriodicSumUsesFusedPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	tests := []struct {
+		expr string
+		want any
+	}{
+		{"x:8#1h 0Nh 3h 9h;y:x+5;(+/y)+count where null y", int64(58)},
+		{"x:8#2i 0Ni 4i 7i;y:x*3;(+/y)+count where null y", int64(80)},
+		{"x:8#1.5e 0Ne 2.5e 6e;y:x+2;(+/y)+count where null x", 34.0},
+		{"x:8#1.5 0Nf 2.5 6.5;y:x%0.5;+/y", 42.0},
+		{"x:til 8;n:8#1 0N 3 4;y:x+n;+/y", int64(38)},
+		{"x:8#1h 0Nh 3h 4h;w:8#2h 3h 0Nh 1h;y:x*w;(+/y)+count where null y", int64(16)},
+		{"y:8#0N 5 7 9;z:y mod 3;(+/z)+count where null z", int64(8)},
+		{"y:8#0N 5 7 9;z:y div 3;(+/z)+count where null z", int64(14)},
+	}
+	for _, tt := range tests {
+		assertEvalValue(t, tt.expr, tt.want)
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != uint64(len(tests)) {
+		t.Fatalf("script nullable periodic sum plan hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalScriptNumericStatsEnvelopeUsesFusedPlan(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
