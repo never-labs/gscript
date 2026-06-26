@@ -5320,6 +5320,33 @@ func TestEvalScriptNumericPlainAffineSumUsesFusedPlan(t *testing.T) {
 	}
 }
 
+func TestEvalScriptNumericPlainQuadraticSumUsesFusedPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	tests := []struct {
+		expr string
+		want int64
+	}{
+		{"x:til 8;y:(x*3)+7;+/y*y", 2828},
+		{"x:til 8;y:100-(x*2);+/y*y", 69360},
+		{"x:til 8;y:x+1;+/y*(y+2)", 276},
+		{"x:til 0;y:(x*3)+7;+/y*y", 0},
+	}
+	for _, tt := range tests {
+		assertEvalValue(t, tt.expr, tt.want)
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != uint64(len(tests)) {
+		t.Fatalf("script numeric quadratic sum plan hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalScriptNumericCastSumUsesFusedPlan(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

@@ -75,9 +75,23 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 		}
 		bindings[stmt.assign] = plan
 	}
-	root, ok := bindings[terminalPlan.sumName]
-	if !ok {
-		return nil
+	var root qScriptNumericExprPlan
+	if terminalPlan.sumExpr != "" {
+		expr := compileQEvalExpr(terminalPlan.sumExpr, 0)
+		if expr == nil {
+			return nil
+		}
+		var ok bool
+		root, ok = buildQScriptNumericExprPlan(expr, bindings)
+		if !ok {
+			return nil
+		}
+	} else {
+		var ok bool
+		root, ok = bindings[terminalPlan.sumName]
+		if !ok {
+			return nil
+		}
 	}
 	if _, ok := qScriptNumericExprLength(root, bindings); !ok {
 		return nil
@@ -130,6 +144,9 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 
 func qScriptNumericPlainClosedAllowed(plan qScriptNumericExprPlan, summary qScriptNumericSumSummary) bool {
 	if qScriptNumericPlainAffineAllowed(plan) && qScriptNumericLinearClosedSumSafe(summary) {
+		return true
+	}
+	if qScriptNumericPlainPolynomialAllowed(plan, 2) && summary.custom && !summary.isFloat && !summary.hasNull {
 		return true
 	}
 	if plan.kind == qScriptNumericExprName && plan.left != nil {
@@ -197,6 +214,51 @@ func qScriptNumericPlainAffineShapePtr(plan *qScriptNumericExprPlan) (bool, bool
 	return qScriptNumericPlainAffineShape(*plan)
 }
 
+func qScriptNumericPlainPolynomialAllowed(plan qScriptNumericExprPlan, maxDegree int) bool {
+	degree, ok := qScriptNumericPlainPolynomialDegree(plan)
+	return ok && degree > 0 && degree <= maxDegree
+}
+
+func qScriptNumericPlainPolynomialDegree(plan qScriptNumericExprPlan) (int, bool) {
+	switch plan.kind {
+	case qScriptNumericExprName:
+		if plan.left == nil {
+			return 0, false
+		}
+		return qScriptNumericPlainPolynomialDegree(*plan.left)
+	case qScriptNumericExprTil:
+		return 1, true
+	case qScriptNumericExprScalar:
+		return 0, !plan.isFloat && !plan.hasNull
+	case qScriptNumericExprBinary:
+		leftDegree, leftOK := qScriptNumericPlainPolynomialDegreePtr(plan.left)
+		rightDegree, rightOK := qScriptNumericPlainPolynomialDegreePtr(plan.right)
+		if !leftOK || !rightOK {
+			return 0, false
+		}
+		switch plan.op {
+		case "+", "-":
+			if leftDegree >= rightDegree {
+				return leftDegree, true
+			}
+			return rightDegree, true
+		case "*":
+			degree := leftDegree + rightDegree
+			if degree <= 2 {
+				return degree, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func qScriptNumericPlainPolynomialDegreePtr(plan *qScriptNumericExprPlan) (int, bool) {
+	if plan == nil {
+		return 0, false
+	}
+	return qScriptNumericPlainPolynomialDegree(*plan)
+}
+
 func qScriptNumericLinearClosedSumSafe(summary qScriptNumericSumSummary) bool {
 	if !summary.linear || summary.isFloat || summary.hasNull || summary.length < 0 {
 		return false
@@ -250,13 +312,14 @@ func qScriptNumericCheckedI64Mul(a, b int64) (int64, bool) {
 
 type qScriptNumericSumTerminalPlan struct {
 	sumName       string
+	sumExpr       string
 	countName     string
 	countNullName string
 }
 
 func qScriptNumericSumTerminal(src string) (qScriptNumericSumTerminalPlan, bool) {
-	if name, ok := qScriptNumericSumTargetName(src); ok {
-		return qScriptNumericSumTerminalPlan{sumName: name}, true
+	if target, ok := qScriptNumericSumTarget(src); ok {
+		return qScriptNumericSumTerminalPlan{sumName: target.name, sumExpr: target.expr}, true
 	}
 	if plan, ok := qScriptNumericSumTerminalPlusChain(src); ok {
 		return plan, true
@@ -295,11 +358,12 @@ func qScriptNumericSumTerminalPlusChain(src string) (qScriptNumericSumTerminalPl
 	var plan qScriptNumericSumTerminalPlan
 	for _, term := range terms {
 		term = stripEnclosingParens(strings.TrimSpace(term))
-		if name, ok := qScriptNumericSumTargetName(term); ok {
-			if plan.sumName != "" {
+		if target, ok := qScriptNumericSumTarget(term); ok {
+			if plan.sumName != "" || plan.sumExpr != "" {
 				return qScriptNumericSumTerminalPlan{}, false
 			}
-			plan.sumName = name
+			plan.sumName = target.name
+			plan.sumExpr = target.expr
 			continue
 		}
 		if name, ok := qScriptNumericCountTargetName(term); ok {
@@ -318,24 +382,40 @@ func qScriptNumericSumTerminalPlusChain(src string) (qScriptNumericSumTerminalPl
 		}
 		return qScriptNumericSumTerminalPlan{}, false
 	}
-	return plan, plan.sumName != "" && (plan.countName != "" || plan.countNullName != "")
+	return plan, (plan.sumName != "" || plan.sumExpr != "") && (plan.countName != "" || plan.countNullName != "")
+}
+
+type qScriptNumericSumTargetPlan struct {
+	name string
+	expr string
+}
+
+func qScriptNumericSumTarget(src string) (qScriptNumericSumTargetPlan, bool) {
+	if strings.HasPrefix(src, "+/") {
+		target := strings.TrimSpace(src[2:])
+		if isQAssignmentName(target) {
+			return qScriptNumericSumTargetPlan{name: target}, true
+		}
+		if compileQEvalExpr(target, 0) != nil {
+			return qScriptNumericSumTargetPlan{expr: target}, true
+		}
+		return qScriptNumericSumTargetPlan{}, false
+	}
+	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
+		target := strings.TrimSpace(src[len("sum "):])
+		if isQAssignmentName(target) {
+			return qScriptNumericSumTargetPlan{name: target}, true
+		}
+	}
+	return qScriptNumericSumTargetPlan{}, false
 }
 
 func qScriptNumericSumTargetName(src string) (string, bool) {
-	if strings.HasPrefix(src, "+/") {
-		name := strings.TrimSpace(src[2:])
-		if isQAssignmentName(name) {
-			return name, true
-		}
+	target, ok := qScriptNumericSumTarget(src)
+	if !ok || target.name == "" {
 		return "", false
 	}
-	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
-		name := strings.TrimSpace(src[len("sum "):])
-		if isQAssignmentName(name) {
-			return name, true
-		}
-	}
-	return "", false
+	return target.name, true
 }
 
 func qScriptNumericCountTargetName(src string) (string, bool) {
@@ -1201,6 +1281,12 @@ func qScriptNumericSummarizeBinary(op string, left, right qScriptNumericSumSumma
 		if left.scalar && right.linear {
 			return qScriptNumericLinearMultiply(right, left.value), true, nil
 		}
+		if left.linear && right.linear {
+			if out, ok := qScriptNumericLinearProductSummary(left, right, length); ok {
+				return out, true, nil
+			}
+			return qScriptNumericSumSummary{}, false, nil
+		}
 	}
 	if out, ok := qScriptNumericLinearPeriodicReduce(op, left, right, length); ok {
 		return out, true, nil
@@ -1379,6 +1465,114 @@ func qScriptNumericLinearMultiply(linear qScriptNumericSumSummary, scalar int64)
 	out.step *= scalar
 	out.min, out.max = qScriptNumericLinearMinMax(out)
 	return out
+}
+
+func qScriptNumericLinearProductSummary(left, right qScriptNumericSumSummary, length int) (qScriptNumericSumSummary, bool) {
+	if length < 0 || left.length != length || right.length != length {
+		return qScriptNumericSumSummary{}, false
+	}
+	if length == 0 {
+		return qScriptNumericSumSummary{length: 0, custom: true}, true
+	}
+	n := int64(length)
+	s1, ok := qScriptNumericRangeIndexSum(n)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	s2, ok := qScriptNumericRangeIndexSquareSum(n)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	ac, ok := qScriptNumericCheckedI64Mul(left.start, right.start)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	ad, ok := qScriptNumericCheckedI64Mul(left.start, right.step)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	bc, ok := qScriptNumericCheckedI64Mul(left.step, right.start)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	bd, ok := qScriptNumericCheckedI64Mul(left.step, right.step)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	linearCoef, ok := qScriptNumericCheckedI64Add(ad, bc)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	constTerm, ok := qScriptNumericCheckedI64Mul(ac, n)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	linearTerm, ok := qScriptNumericCheckedI64Mul(linearCoef, s1)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	quadraticTerm, ok := qScriptNumericCheckedI64Mul(bd, s2)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	total, ok := qScriptNumericCheckedI64Add(constTerm, linearTerm)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	total, ok = qScriptNumericCheckedI64Add(total, quadraticTerm)
+	if !ok {
+		return qScriptNumericSumSummary{}, false
+	}
+	return qScriptNumericSumSummary{length: length, custom: true, csum: total}, true
+}
+
+func qScriptNumericRangeIndexSum(n int64) (int64, bool) {
+	if n <= 0 {
+		return 0, true
+	}
+	a, b := n, n-1
+	if a%2 == 0 {
+		a /= 2
+	} else {
+		b /= 2
+	}
+	return qScriptNumericCheckedI64Mul(a, b)
+}
+
+func qScriptNumericRangeIndexSquareSum(n int64) (int64, bool) {
+	if n <= 0 {
+		return 0, true
+	}
+	twoN, ok := qScriptNumericCheckedI64Mul(2, n)
+	if !ok {
+		return 0, false
+	}
+	c, ok := qScriptNumericCheckedI64Add(twoN, -1)
+	if !ok {
+		return 0, false
+	}
+	a, b := n, n-1
+	switch {
+	case a%2 == 0:
+		a /= 2
+	case b%2 == 0:
+		b /= 2
+	default:
+		c /= 2
+	}
+	switch {
+	case a%3 == 0:
+		a /= 3
+	case b%3 == 0:
+		b /= 3
+	default:
+		c /= 3
+	}
+	ab, ok := qScriptNumericCheckedI64Mul(a, b)
+	if !ok {
+		return 0, false
+	}
+	return qScriptNumericCheckedI64Mul(ab, c)
 }
 
 func qScriptNumericLinearPeriodicReduce(op string, left, right qScriptNumericSumSummary, length int) (qScriptNumericSumSummary, bool) {
