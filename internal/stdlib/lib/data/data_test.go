@@ -1287,6 +1287,47 @@ func TestFilterIndexesUsesTypedInKernelWithoutAttributeIndex(t *testing.T) {
 	assertColumnValues(t, got, "qty", []any{int32(10), int32(20), int32(40)})
 }
 
+func TestTypedFilterIndexArrayHandlesWithinAndIn(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 20, 40})},
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL", "IBM"})},
+	)
+
+	within, handled, err := typedFilterIndexArray(frame, Within{
+		Expr:       ColumnRef{Name: "qty"},
+		Low:        int64(20),
+		High:       int64(30),
+		HighClosed: true,
+	})
+	if err != nil || !handled {
+		t.Fatalf("typedFilterIndexArray within handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := within.Values(), []any{int64(1), int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("typedFilterIndexArray within = %#v, want %#v", got, want)
+	}
+
+	in, handled, err := typedFilterIndexArray(frame, In{
+		Expr:   ColumnRef{Name: "sym"},
+		Values: []any{"AAPL", Symbol("IBM")},
+	})
+	if err != nil || !handled {
+		t.Fatalf("typedFilterIndexArray in handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := in.Values(), []any{int64(0), int64(3), int64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("typedFilterIndexArray in = %#v, want %#v", got, want)
+	}
+
+	got, handled, err := execTypedFilterProject(frame, QueryPlan{
+		Where:  In{Expr: ColumnRef{Name: "sym"}, Values: []any{"AAPL", Symbol("IBM")}},
+		Select: []SelectItem{{Name: "qty", Expr: ColumnRef{Name: "qty"}}},
+		LimitN: -1,
+	})
+	if err != nil || !handled {
+		t.Fatalf("execTypedFilterProject in handled=%v err=%v; want true,nil", handled, err)
+	}
+	assertColumnValues(t, got, "qty", []any{int32(10), int32(20), int32(40)})
+}
+
 func TestFilterIndexesFusesLogicalTypedIndexes(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "active", Data: NewBool([]bool{true, false, true, true, false})},

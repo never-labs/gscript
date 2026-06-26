@@ -10465,6 +10465,34 @@ func typedFilterIndexArray(frame Frame, where Expr) (Array, bool, error) {
 			return intIndexArray{rows: rows}, true, nil
 		}
 		return nil, false, nil
+	case Within:
+		ref, ok := expr.Expr.(ColumnRef)
+		if !ok {
+			return nil, false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		indexes, handled, err := TryTypedWithinIndexesI64(col, expr.Low, expr.High, expr.HighClosed)
+		if err != nil || handled {
+			return indexes, handled, err
+		}
+		return nil, false, nil
+	case In:
+		ref, ok := expr.Expr.(ColumnRef)
+		if !ok {
+			return nil, false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		indexes, handled, err := TryTypedInIndexesI64(col, expr.Values)
+		if err != nil || handled {
+			return indexes, handled, err
+		}
+		return nil, false, nil
 	default:
 		return nil, false, nil
 	}
