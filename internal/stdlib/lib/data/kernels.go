@@ -5729,6 +5729,120 @@ func TryTypedI64IndexExprSumCount(indexes Array, expr I64IndexExpr, includeCount
 	return total, true, nil
 }
 
+func TryTypedI64IndexExprFbySumTotal(indexes Array, expr I64IndexExpr, groups Array) (int64, bool, error) {
+	if indexes == nil || groups == nil {
+		return 0, true, fmt.Errorf("index expression fby sum total expects non-nil indexes and groups")
+	}
+	if indexes.Kind() != KindI64 {
+		return 0, true, fmt.Errorf("index expression indexes kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if !i64IndexExprValid(expr) {
+		return 0, false, nil
+	}
+	var lookup fbyGroupLookupFn
+	var groupCount int
+	var counts []int64
+	if sourceGroups, count, start, sourceLen, tiled, err := fbyTiledSourceGroups(groups); err != nil || tiled {
+		if err != nil {
+			return 0, true, err
+		}
+		groupCount = count
+		counts = bulkI64Get(groupCount)
+		clear(counts)
+		for sourceRow, group := range sourceGroups {
+			row := (int64(sourceRow) - int64(start)) % int64(sourceLen)
+			if row < 0 {
+				row += int64(sourceLen)
+			}
+			if row >= int64(groups.Len()) {
+				continue
+			}
+			counts[group] += 1 + (int64(groups.Len())-1-row)/int64(sourceLen)
+		}
+		lookup = func(row int) (int, error) {
+			if row < 0 || row >= groups.Len() {
+				return 0, fmt.Errorf("fby group row %d out of range", row)
+			}
+			return sourceGroups[(start+row)%sourceLen], nil
+		}
+	} else {
+		var ok bool
+		var err error
+		lookup, groupCount, ok, err = fbyGroupLookup(groups)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		counts = bulkI64Get(groupCount)
+		clear(counts)
+		for row := 0; row < groups.Len(); row++ {
+			group, err := lookup(row)
+			if err != nil {
+				bulkI64Release(counts, true)
+				return 0, true, err
+			}
+			counts[group]++
+		}
+	}
+	sums := bulkI64Get(groupCount)
+	clear(sums)
+	if rows, rowsOwned, ok := tryBulkI64Values(indexes); ok {
+		for _, row := range rows {
+			if row < 0 || row >= int64(groups.Len()) {
+				bulkI64Release(rows, rowsOwned)
+				bulkI64Release(sums, true)
+				bulkI64Release(counts, true)
+				return 0, true, fmt.Errorf("index expression row %d out of range", row)
+			}
+		}
+		eval := i64IndexExprBulkEval{rows: rows}
+		values, err := eval.eval(expr)
+		if err != nil {
+			eval.release()
+			bulkI64Release(rows, rowsOwned)
+			bulkI64Release(sums, true)
+			bulkI64Release(counts, true)
+			return 0, true, err
+		}
+		for i, row := range rows {
+			group, err := lookup(int(row))
+			if err != nil {
+				eval.release()
+				bulkI64Release(rows, rowsOwned)
+				bulkI64Release(sums, true)
+				bulkI64Release(counts, true)
+				return 0, true, err
+			}
+			sums[group] += values[i]
+		}
+		eval.release()
+		bulkI64Release(rows, rowsOwned)
+	} else {
+		if err := forEachTypedI64Index(indexes, groups.Len(), func(row int) error {
+			value, err := evalI64IndexExpr(expr, int64(row))
+			if err != nil {
+				return err
+			}
+			group, err := lookup(row)
+			if err != nil {
+				return err
+			}
+			sums[group] += value
+			return nil
+		}); err != nil {
+			bulkI64Release(sums, true)
+			bulkI64Release(counts, true)
+			return 0, true, err
+		}
+	}
+	var total int64
+	for group, sum := range sums {
+		total += sum * counts[group]
+	}
+	bulkI64Release(sums, true)
+	bulkI64Release(counts, true)
+	return total, true, nil
+}
+
 func i64IndexExprValid(expr I64IndexExpr) bool {
 	switch expr.Op {
 	case I64IndexExprConst, I64IndexExprIndex:

@@ -4534,6 +4534,24 @@ func TestTryTypedI64IndexExprReducers(t *testing.T) {
 	}
 }
 
+func TestTryTypedI64IndexExprFbySumTotal(t *testing.T) {
+	mod8 := testI64IndexExpr(I64IndexExprMod, I64IndexExpr{Op: I64IndexExprIndex}, I64IndexExpr{Op: I64IndexExprConst, Value: 8})
+	px := testI64IndexExpr(I64IndexExprAdd, I64IndexExpr{Op: I64IndexExprConst, Value: 100}, mod8)
+	mod3 := testI64IndexExpr(I64IndexExprMod, I64IndexExpr{Op: I64IndexExprIndex}, I64IndexExpr{Op: I64IndexExprConst, Value: 3})
+	size := testI64IndexExpr(I64IndexExprAdd, I64IndexExpr{Op: I64IndexExprConst, Value: 1}, mod3)
+	notional := testI64IndexExpr(I64IndexExprMul, px, size)
+	groups := NewSymbols([]string{"a", "b", "a", "b", "a", "b", "a", "b"})
+	got, handled, err := TryTypedI64IndexExprFbySumTotal(NewI64([]int64{4, 6, 7}), notional, groups)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedI64IndexExprFbySumTotal handled=%v err=%v; want true,nil", handled, err)
+	}
+	// group a has four rows and selected sum 104*2 + 106*1 = 314;
+	// group b has four rows and selected sum 107*2 = 214.
+	if want := int64(314*4 + 214*4); got != want {
+		t.Fatalf("TryTypedI64IndexExprFbySumTotal = %d, want %d", got, want)
+	}
+}
+
 func testI64IndexExpr(op I64IndexExprOp, left, right I64IndexExpr) I64IndexExpr {
 	return I64IndexExpr{Op: op, Left: &left, Right: &right}
 }

@@ -118,6 +118,31 @@ func TestQScriptWhereIndexSumPlanRecognizesCompositePredicates(t *testing.T) {
 	}
 }
 
+func TestQScriptWhereIndexFbySumPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	src := "px:100+((til 16) mod 8);sym:16#`A`B;idx:where px>=104;vals:(100+(idx mod 8))*(1+(idx mod 3));n:@[16#0;idx;+;vals];s:sum n fby sym;(+/s)+count idx"
+	plan := buildQScriptPlan(src)
+	if plan.whereIndexFbySum == nil {
+		t.Fatalf("where-index fby sum plan missing for %q", src)
+	}
+	session := NewEvalSession(nil)
+	got, err := session.Eval(src)
+	if err != nil || got != int64(12664) {
+		t.Fatalf("EvalSession.Eval = %#v,%v; want 12664,nil", got, err)
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptWhereIndexFbySumPlan" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != 1 {
+		t.Fatalf("QScriptWhereIndexFbySumPlan hits = %d, want 1; stats=%#v", hits, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
