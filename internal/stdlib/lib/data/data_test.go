@@ -4357,6 +4357,50 @@ func TestTryTypedFbySumTotalAndGroupCount(t *testing.T) {
 	}
 }
 
+func TestTryTypedFbySumLazyProductTiledGroups(t *testing.T) {
+	left := NewI64([]int64{10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21})
+	right := NewI64([]int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
+	product, handled, err := TryTypedIntegerDyadic(OpMul, left, right)
+	if err != nil || !handled {
+		t.Fatalf("product dyadic handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := product.(i64DyadicProductArray); !ok {
+		t.Fatalf("product = %T, want i64DyadicProductArray", product)
+	}
+	groups := takeRepeatMust(t, NewSymbols([]string{"a", "b", "a"}), 12)
+	out, handled, err := TryTypedFbySum(product.(Array), groups)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedFbySum lazy product handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := out.(fbyI64TiledBroadcastArray); !ok {
+		t.Fatalf("TryTypedFbySum lazy product = %T, want fbyI64TiledBroadcastArray", out)
+	}
+	total, handled, err := TryTypedNumericSum(out)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedNumericSum fby lazy product handled=%v err=%v; want true,nil", handled, err)
+	}
+	var want int64
+	groupSums := map[string]int64{}
+	groupCounts := map[string]int64{}
+	pattern := []string{"a", "b", "a"}
+	for row := 0; row < 12; row++ {
+		value := int64(10+row) * int64(row+1)
+		key := pattern[row%len(pattern)]
+		groupSums[key] += value
+		groupCounts[key]++
+	}
+	for key, sum := range groupSums {
+		want += sum * groupCounts[key]
+	}
+	if total != want {
+		t.Fatalf("TryTypedFbySum lazy product total = %v, want %d", total, want)
+	}
+	direct, handled, err := TryTypedFbySumTotal(product.(Array), groups)
+	if err != nil || !handled || direct != want {
+		t.Fatalf("TryTypedFbySumTotal lazy product = %v handled=%v err=%v; want %d,true,nil", direct, handled, err, want)
+	}
+}
+
 func TestTryTypedFbySumTotalCachesDenseGroupIDs(t *testing.T) {
 	values := NewI64([]int64{10, 20, 30, 40, 50, 60})
 	groups := NewSymbols([]string{"a", "b", "a", "c", "b", "a"})
