@@ -12136,6 +12136,15 @@ func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs 
 		if i > 0 {
 			return Frame{}, false, nil
 		}
+		if kind := item.keyKind(); kind != "" && kind != KindAny {
+			if col, handled, err := typedGroupedAggregateKeyColumn(item.Name, kind, index.Keys, groupOrder); err != nil || handled {
+				if err != nil {
+					return Frame{}, true, err
+				}
+				cols = append(cols, col)
+				continue
+			}
+		}
 		values := make([]any, len(groupOrder))
 		for row, group := range groupOrder {
 			values[row] = index.Keys[group]
@@ -12143,11 +12152,11 @@ func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs 
 		cols = append(cols, NewColumn(item.Name, values))
 	}
 	for _, agg := range aggs {
-		values := make([]any, len(groupOrder))
+		values := make([]int64, len(groupOrder))
 		for row, group := range groupOrder {
 			values[row] = groupCounts[group]
 		}
-		cols = append(cols, NewColumn(agg.Name, values))
+		cols = append(cols, Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: values}})
 	}
 	out, err := newFrameTrusted(cols...)
 	return out, true, err
