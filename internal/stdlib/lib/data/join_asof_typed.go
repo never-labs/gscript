@@ -2,6 +2,7 @@ package data
 
 import (
 	"sort"
+	"strings"
 	"unsafe"
 )
 
@@ -238,6 +239,54 @@ func windowMatchIndexesTypedFast(left Frame, leftTime Array, leftPartitionCols [
 	}
 }
 
+// windowLastMatchIndexesTypedFast computes the wj1/right-last shape directly.
+// It avoids materializing a per-left-row window list when the caller only
+// needs the last matching right row.
+func windowLastMatchIndexesTypedFast(left Frame, leftTime Array, leftPartitionCols []Symbol, right Frame, rightTime Array, rightPartitionCols []Symbol, opts WindowJoinOptions) ([]int, bool) {
+	leftTimes, ok := asofTimeI64(leftTime)
+	if !ok {
+		return nil, false
+	}
+	rightTimes, ok := asofTimeI64(rightTime)
+	if !ok {
+		return nil, false
+	}
+	bounds := windowI64Bounds{}
+	if opts.HasBounds {
+		low, okLow := windowDeltaI64(leftTime.Kind(), opts.Low)
+		high, okHigh := windowDeltaI64(leftTime.Kind(), opts.High)
+		if !okLow || !okHigh || low > high {
+			return nil, false
+		}
+		bounds = windowI64Bounds{has: true, low: low, high: high}
+	}
+	switch len(leftPartitionCols) {
+	case 0:
+		rows := sortedTimeRows(rightTimes, allIndexes(len(rightTimes)))
+		out := bulkIntGetLen(len(leftTimes))
+		for row, t := range leftTimes {
+			out[row] = windowLastRow(rows, rightTimes, t, bounds)
+		}
+		return out, true
+	case 1:
+		leftPart, okL := left.Column(leftPartitionCols[0])
+		rightPart, okR := right.Column(rightPartitionCols[0])
+		if !okL || !okR {
+			return nil, false
+		}
+		if leftIDs, _, resolved, ok := partitionAlignedRows(left, leftPartitionCols[0], leftPart, right, rightPartitionCols[0], rightPart, rightTimes); ok {
+			out := bulkIntGetLen(len(leftTimes))
+			for row, t := range leftTimes {
+				out[row] = windowLastRow(resolved[leftIDs[row]], rightTimes, t, bounds)
+			}
+			return out, true
+		}
+		return windowLastMatchSinglePartitionTyped(leftPart, rightPart, leftTimes, rightTimes, bounds)
+	default:
+		return nil, false
+	}
+}
+
 type windowI64Bounds struct {
 	has  bool
 	low  int64
@@ -306,6 +355,28 @@ func windowMatchSinglePartitionTyped(leftPart, rightPart Array, leftTimes, right
 	case columnArray[int32]:
 		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[int32]); ok && lk.kind == rk.kind {
 			return windowMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	}
+	return nil, false
+}
+
+func windowLastMatchSinglePartitionTyped(leftPart, rightPart Array, leftTimes, rightTimes []int64, bounds windowI64Bounds) ([]int, bool) {
+	switch lk := unwrapAttributedArray(leftPart).(type) {
+	case columnArray[Symbol]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[Symbol]); ok && lk.kind == rk.kind {
+			return windowLastMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	case columnArray[string]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[string]); ok && lk.kind == rk.kind {
+			return windowLastMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	case columnArray[int64]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[int64]); ok && lk.kind == rk.kind {
+			return windowLastMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	case columnArray[int32]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[int32]); ok && lk.kind == rk.kind {
+			return windowLastMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
 		}
 	}
 	return nil, false
@@ -435,6 +506,18 @@ func windowSliceRows(rows []int, times []int64, t int64, bounds windowI64Bounds)
 	return rows[start:end]
 }
 
+func windowLastRow(rows []int, times []int64, t int64, bounds windowI64Bounds) int {
+	if !bounds.has {
+		return asofSearchRows(rows, times, t)
+	}
+	start := windowSearchRows(rows, times, t+bounds.low, false)
+	end := windowSearchRows(rows, times, t+bounds.high, true)
+	if start >= end {
+		return -1
+	}
+	return rows[end-1]
+}
+
 func asofMatchPartitionedTyped[T comparable](leftKeys []T, leftTimes []int64, rightKeys []T, rightTimes []int64) []int {
 	rowsByKey := typedPartitionRows(rightKeys, rightTimes)
 	out := bulkIntGetLen(len(leftKeys))
@@ -451,4 +534,31 @@ func windowMatchPartitionedTyped[T comparable](leftKeys []T, leftTimes []int64, 
 		out[row] = windowSliceRows(rowsByKey[key], rightTimes, leftTimes[row], bounds)
 	}
 	return out
+}
+
+func windowLastMatchPartitionedTyped[T comparable](leftKeys []T, leftTimes []int64, rightKeys []T, rightTimes []int64, bounds windowI64Bounds) []int {
+	rowsByKey := typedPartitionRows(rightKeys, rightTimes)
+	out := bulkIntGetLen(len(leftKeys))
+	for row, key := range leftKeys {
+		out[row] = windowLastRow(rowsByKey[key], rightTimes, leftTimes[row], bounds)
+	}
+	return out
+}
+
+func windowLastMatchIndexesI64(left Frame, leftTime []int64, leftPartitionColumns []Symbol, rightTime []int64, rightByPartition map[string][]int, partitionKinds []Kind, bounds windowI64Bounds) ([]int, error) {
+	encoder, err := newRowKeyEncoderWithKinds(left, leftPartitionColumns, partitionKinds)
+	if err != nil {
+		return nil, err
+	}
+	rightIndexes := make([]int, left.Len())
+	var b strings.Builder
+	for row := 0; row < left.Len(); row++ {
+		rightIndexes[row] = -1
+		key, err := encoder.keyWithBuilder(row, &b)
+		if err != nil {
+			return nil, err
+		}
+		rightIndexes[row] = windowLastRow(rightByPartition[key], rightTime, leftTime[row], bounds)
+	}
+	return rightIndexes, nil
 }

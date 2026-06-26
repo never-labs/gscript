@@ -12576,6 +12576,73 @@ func (typedKernelRegistry) WindowMatchIndexes(left Frame, leftTime Array, leftPa
 	return rightIndexes, nil
 }
 
+func (typedKernelRegistry) WindowLastMatchIndexes(left Frame, leftTime Array, leftPartitionColumns []Symbol, rightTime Array, rightByPartition map[string][]int, opts WindowJoinOptions, partitionKinds ...[]Kind) ([]int, error) {
+	kinds := optionalPartitionKinds(partitionKinds)
+	if leftTimes, ok := int64ColumnData(leftTime); ok {
+		if rightTimes, ok := int64ColumnData(rightTime); ok {
+			if !opts.HasBounds {
+				return asofMatchIndexesI64(left, leftTimes, leftPartitionColumns, rightTimes, rightByPartition, kinds)
+			}
+			low, okLow := windowDeltaI64(leftTime.Kind(), opts.Low)
+			high, okHigh := windowDeltaI64(leftTime.Kind(), opts.High)
+			if okLow && okHigh && low <= high {
+				return windowLastMatchIndexesI64(left, leftTimes, leftPartitionColumns, rightTimes, rightByPartition, kinds, windowI64Bounds{has: true, low: low, high: high})
+			}
+		}
+	}
+	encoder, err := newRowKeyEncoderWithKinds(left, leftPartitionColumns, kinds)
+	if err != nil {
+		return nil, err
+	}
+	rightIndexes := make([]int, left.Len())
+	var b strings.Builder
+	for row := 0; row < left.Len(); row++ {
+		rightIndexes[row] = -1
+		timeValue, ok := leftTime.At(row)
+		if !ok {
+			return nil, fmt.Errorf("time column row %d out of range", row)
+		}
+		if IsNull(timeValue) {
+			continue
+		}
+		key, err := encoder.keyWithBuilder(row, &b)
+		if err != nil {
+			return nil, err
+		}
+		rows := rightByPartition[key]
+		if len(rows) == 0 {
+			continue
+		}
+		if opts.HasBounds {
+			low, high, err := windowJoinAbsoluteBounds(timeValue, opts.Low, opts.High)
+			if err != nil {
+				return nil, err
+			}
+			start := sort.Search(len(rows), func(i int) bool {
+				rightTimeValue, _ := rightTime.At(rows[i])
+				return compare(rightTimeValue, low) >= 0
+			})
+			end := sort.Search(len(rows), func(i int) bool {
+				rightTimeValue, _ := rightTime.At(rows[i])
+				return compare(rightTimeValue, high) > 0
+			})
+			if start >= end {
+				continue
+			}
+			rightIndexes[row] = rows[end-1]
+			continue
+		}
+		match := sort.Search(len(rows), func(i int) bool {
+			rightTimeValue, _ := rightTime.At(rows[i])
+			return compare(rightTimeValue, timeValue) > 0
+		}) - 1
+		if match >= 0 {
+			rightIndexes[row] = rows[match]
+		}
+	}
+	return rightIndexes, nil
+}
+
 func optionalPartitionKinds(kinds [][]Kind) []Kind {
 	if len(kinds) == 0 {
 		return nil

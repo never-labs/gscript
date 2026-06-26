@@ -6566,7 +6566,7 @@ func RenameColumns(frame Frame, renames map[Symbol]Symbol) (Frame, error) {
 		seen[outName] = struct{}{}
 		cols = append(cols, Column{Name: outName, Data: frame.columns[name]})
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func Distinct(frame Frame, columns ...Symbol) (Frame, error) {
@@ -6749,7 +6749,7 @@ func Ungroup(frame Frame) (Frame, error) {
 	for _, name := range names {
 		cols = append(cols, NewColumn(name, out[name]))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 type nestedRowValue struct {
@@ -7085,7 +7085,7 @@ func (k KeyedFrame) KeyFrame() (Frame, error) {
 		}
 		cols = append(cols, Column{Name: name, Data: col})
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func (k KeyedFrame) LatestFrame() (Frame, error) {
@@ -7511,7 +7511,7 @@ func UnionJoinOnWithOptions(left, right Frame, opts JoinOptions, keys ...JoinKey
 		cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], rightIndexes)})
 		usedNames[outName] = struct{}{}
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func PlusJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
@@ -7613,7 +7613,7 @@ func PlusJoinOnWithOptions(left, right Frame, opts JoinOptions, keys ...JoinKey)
 		cols = append(cols, Column{Name: outName, Data: gatherOptional(right.columns[name], matchedRight)})
 		usedNames[outName] = struct{}{}
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func UnionJoin(left, right Frame) (Frame, error) {
@@ -7675,7 +7675,7 @@ func UnionJoin(left, right Frame) (Frame, error) {
 		}
 		cols = append(cols, col)
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptions, keys ...JoinKey) (Frame, error) {
@@ -8480,6 +8480,42 @@ func WindowJoinOnWithOptions(left, right Frame, opts WindowJoinOptions) (Frame, 
 	for i, key := range partitionKeys {
 		leftPartitionCols[i] = key.Left
 	}
+	if opts.Last {
+		rightIndexes, matched := windowLastMatchIndexesTypedFast(left, leftTime, leftPartitionCols, right, rightTime, rightPartitionCols, opts)
+		if matched {
+			defer bulkIntRelease(rightIndexes)
+		} else {
+			rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
+			if err != nil {
+				return Frame{}, err
+			}
+			rightIndexes, err = typedKernels.WindowLastMatchIndexes(left, leftTime, leftPartitionCols, rightTime, rightByPartition, opts, joinRightKeyKinds(right, partitionKeys))
+			if err != nil {
+				return Frame{}, err
+			}
+		}
+		cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
+		usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+		for _, name := range left.schema.names {
+			cols = append(cols, Column{Name: name, Data: left.columns[name]})
+			usedNames[name] = struct{}{}
+		}
+		rightKeys := make(map[Symbol]struct{}, len(partitionKeys)+1)
+		rightKeys[timeKey.Right] = struct{}{}
+		for _, key := range partitionKeys {
+			rightKeys[key.Right] = struct{}{}
+		}
+		for _, name := range right.schema.names {
+			if _, isJoinKey := rightKeys[name]; isJoinKey {
+				continue
+			}
+			outName := rightJoinColumnName(name, usedNames)
+			cols = append(cols, Column{Name: outName, Data: joinGatherOptional(right.columns[name], rightIndexes)})
+			usedNames[outName] = struct{}{}
+		}
+		return NewFrameAdoptingColumns(cols...)
+	}
+
 	rightIndexes, matched := windowMatchIndexesTypedFast(left, leftTime, leftPartitionCols, right, rightTime, rightPartitionCols, opts)
 	if !matched {
 		rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
@@ -8509,11 +8545,7 @@ func WindowJoinOnWithOptions(left, right Frame, opts WindowJoinOptions) (Frame, 
 			continue
 		}
 		outName := rightJoinColumnName(name, usedNames)
-		if opts.Last {
-			cols = append(cols, Column{Name: outName, Data: gatherLastOptional(right.columns[name], rightIndexes)})
-		} else {
-			cols = append(cols, Column{Name: outName, Data: gatherWindowLists(right.columns[name], rightIndexes)})
-		}
+		cols = append(cols, Column{Name: outName, Data: gatherWindowLists(right.columns[name], rightIndexes)})
 		usedNames[outName] = struct{}{}
 	}
 	return NewFrameAdoptingColumns(cols...)
@@ -11740,7 +11772,7 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 		}
 		cols = append(cols, aggregateOutputColumn(frame, agg, values))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 // execUngroupedAggregates executes whole-table (no-by) aggregates over the
@@ -11953,7 +11985,7 @@ func execGroupedProjection(frame Frame, indexes []int, plan QueryPlan, byItems [
 		}
 		cols = append(cols, NewColumn(item.Name, values))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func selectItemsNeedGroupedRows(items []SelectItem) bool {
