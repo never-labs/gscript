@@ -5424,6 +5424,9 @@ func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (a
 	if sum, count, ok, err := i64RangeSumCountWhereCompareSelf(values, op, scalar); err != nil || ok {
 		return sum, count, ok, err
 	}
+	if sum, count, ok := integerColumnSumCountWhereCompareSelf(values, op, scalar); ok {
+		return sum, count, true, nil
+	}
 	scalar = normalizeScalar(values.Kind(), scalar)
 	if sum, count, ok := f64AffineSumCountWhereCompareSelf(values, op, scalar); ok {
 		return sum, count, true, nil
@@ -5434,6 +5437,89 @@ func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (a
 		return sum, count, true, nil
 	}
 	return TryTypedNumericSumCountWhereCompare(values, values, op, scalar)
+}
+
+func integerColumnSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int64, bool) {
+	source := unwrapAttributedArray(values)
+	target, ok := integerScalarValue(scalar)
+	if !ok {
+		return nil, 0, false
+	}
+	switch a := source.(type) {
+	case columnArray[int8]:
+		return integerSliceSumCountWhereCompareSelf(a.data, op, target)
+	case columnArray[int16]:
+		return integerSliceSumCountWhereCompareSelf(a.data, op, target)
+	case columnArray[int32]:
+		return integerSliceSumCountWhereCompareSelf(a.data, op, target)
+	case columnArray[int64]:
+		return integerSliceSumCountWhereCompareSelf(a.data, op, target)
+	case columnArray[uint8]:
+		return integerUnsignedSliceSumCountWhereCompareSelf(a.data, op, target)
+	case columnArray[uint16]:
+		return integerUnsignedSliceSumCountWhereCompareSelf(a.data, op, target)
+	case columnArray[uint32]:
+		return integerUnsignedSliceSumCountWhereCompareSelf(a.data, op, target)
+	case columnArray[uint64]:
+		return integerUnsignedSliceSumCountWhereCompareSelf(a.data, op, target)
+	default:
+		return nil, 0, false
+	}
+}
+
+func integerSliceSumCountWhereCompareSelf[T signedScalar](values []T, op Op, target int64) (any, int64, bool) {
+	var total int64
+	var count int64
+	for _, raw := range values {
+		value := int64(raw)
+		if boolCompare(op, value == target, compareInt64(value, target)) {
+			total += value
+			count++
+		}
+	}
+	if count == 0 {
+		return NullValue, 0, true
+	}
+	return total, count, true
+}
+
+func integerUnsignedSliceSumCountWhereCompareSelf[T unsignedScalar](values []T, op Op, target int64) (any, int64, bool) {
+	if target < 0 {
+		switch op {
+		case OpGT, OpGE, OpNE:
+			var total int64
+			for _, raw := range values {
+				total += int64(raw)
+			}
+			if len(values) == 0 {
+				return NullValue, 0, true
+			}
+			return total, int64(len(values)), true
+		case OpLT, OpLE, OpEQ:
+			return NullValue, 0, true
+		}
+	}
+	var total int64
+	var count int64
+	targetU := uint64(target)
+	for _, raw := range values {
+		value := uint64(raw)
+		cmp := 0
+		switch {
+		case value < targetU:
+			cmp = -1
+		case value > targetU:
+			cmp = 1
+		}
+		if boolCompare(op, value == targetU, cmp) {
+			total += int64(value)
+			count++
+		}
+	}
+	if count == 0 {
+		return NullValue, 0, true
+	}
+	return total, count, true
 }
 
 func i64RangeSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int64, bool, error) {

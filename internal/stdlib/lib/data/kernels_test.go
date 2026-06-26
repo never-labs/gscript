@@ -2508,6 +2508,32 @@ func TestTypedNumericSumCountWhereCompareSelfUsesIntegerAffineRange(t *testing.T
 	}
 }
 
+func TestTypedNumericSumCountWhereCompareSelfUsesIntegerColumns(t *testing.T) {
+	sum, count, handled, err := TryTypedNumericSumCountWhereCompareSelf(NewI64([]int64{1, 2, 3, 4, 5}), OpGT, int64(2))
+	if err != nil || !handled {
+		t.Fatalf("typed i64 column self where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != int64(12) || count != 3 {
+		t.Fatalf("typed i64 column self where sum-count = sum %v count %d, want 12 3", sum, count)
+	}
+
+	sum, count, handled, err = TryTypedNumericSumCountWhereCompareSelf(NewU16([]uint16{1, 2, 3, 4, 5}), OpGE, int64(4))
+	if err != nil || !handled {
+		t.Fatalf("typed u16 column self where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != int64(9) || count != 2 {
+		t.Fatalf("typed u16 column self where sum-count = sum %v count %d, want 9 2", sum, count)
+	}
+
+	sum, count, handled, err = TryTypedNumericSumCountWhereCompareSelf(NewU16([]uint16{1, 2, 3}), OpGT, int64(-1))
+	if err != nil || !handled {
+		t.Fatalf("typed u16 negative-threshold self where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != int64(6) || count != 3 {
+		t.Fatalf("typed u16 negative-threshold self where sum-count = sum %v count %d, want 6 3", sum, count)
+	}
+}
+
 func TestTypedNumericSumCountWhereCompareConsumesLazyFloatPredicate(t *testing.T) {
 	base := NewI64Range(0, 1, 16)
 	scaled, handled, err := typedKernels.Dyadic(OpMul, base, float64(2))
