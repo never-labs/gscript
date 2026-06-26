@@ -1482,11 +1482,13 @@ func qScriptNumericPeriodSummaryWithNulls(length int, period []int64, nulls []bo
 	if len(period) == 0 {
 		return out
 	}
+	var periodSum int64
 	minSet := false
 	for i, value := range period {
 		if out.hasNull && out.nulls[i%len(out.nulls)] {
 			continue
 		}
+		periodSum += value
 		if !minSet {
 			out.min, out.max = value, value
 			minSet = true
@@ -1501,6 +1503,18 @@ func qScriptNumericPeriodSummaryWithNulls(length int, period []int64, nulls []bo
 	}
 	if !minSet {
 		out.min, out.max = 0, -1
+	}
+	if length > 0 {
+		out.custom = true
+		cycles := length / len(period)
+		rem := length % len(period)
+		out.csum = int64(cycles) * periodSum
+		for i := 0; i < rem; i++ {
+			if out.hasNull && out.nulls[i%len(out.nulls)] {
+				continue
+			}
+			out.csum += period[i]
+		}
 	}
 	return out
 }
@@ -1545,11 +1559,13 @@ func qScriptNumericFloatPeriodSummaryWithNulls(length int, period []float64, nul
 	if len(period) == 0 {
 		return out
 	}
+	var periodSum float64
 	minSet := false
 	for i, value := range period {
 		if out.hasNull && out.nulls[i%len(out.nulls)] {
 			continue
 		}
+		periodSum += value
 		if !minSet {
 			out.fmin, out.fmax = value, value
 			minSet = true
@@ -1564,6 +1580,18 @@ func qScriptNumericFloatPeriodSummaryWithNulls(length int, period []float64, nul
 	}
 	if !minSet {
 		out.fmin, out.fmax = 0, -1
+	}
+	if length > 0 {
+		out.fcustom = true
+		cycles := length / len(period)
+		rem := length % len(period)
+		out.fcsum = float64(cycles) * periodSum
+		for i := 0; i < rem; i++ {
+			if out.hasNull && out.nulls[i%len(out.nulls)] {
+				continue
+			}
+			out.fcsum += period[i]
+		}
 	}
 	return out
 }
