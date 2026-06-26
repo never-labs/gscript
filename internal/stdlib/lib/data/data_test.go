@@ -3249,6 +3249,9 @@ func TestQueryGroupByColumnRefFastPathPreservesTypedKeys(t *testing.T) {
 	if kind, ok := got.Schema().Kind("ts_bucket"); !ok || kind != KindTimestamp {
 		t.Fatalf("ts_bucket kind = %s, ok %v; want %s", kind, ok, KindTimestamp)
 	}
+	if kind, ok := got.Schema().Kind("total_qty"); !ok || kind != KindI64 {
+		t.Fatalf("total_qty kind = %s, ok %v; want %s", kind, ok, KindI64)
+	}
 }
 
 type countingMetadataArray struct {

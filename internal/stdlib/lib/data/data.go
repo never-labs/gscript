@@ -12595,11 +12595,7 @@ func typedGroupedAggregateOutputColumn(frame Frame, acc typedGroupedAggregateAcc
 		}
 		return Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: values}}, nil
 	case "sum":
-		values := make([]float64, len(order))
-		for row, group := range order {
-			values[row] = acc.sum[group]
-		}
-		return sumOutputColumnFromF64(frame, agg, values), nil
+		return sumOutputColumnFromF64Ordered(frame, agg, acc.sum, order), nil
 	case "wavg":
 		return groupedWavgOutputColumnOrdered(agg.Name, acc.sum, acc.weight, acc.count, order), nil
 	case "min", "max":
@@ -12744,11 +12740,7 @@ func buildSimpleGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs [
 			}
 			cols = append(cols, Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: values}})
 		case "sum":
-			values := make([]float64, len(order))
-			for row, group := range order {
-				values[row] = state.sum[group]
-			}
-			cols = append(cols, sumOutputColumnFromF64(frame, agg.Aggregate, values))
+			cols = append(cols, sumOutputColumnFromF64Ordered(frame, agg.Aggregate, state.sum, order))
 		case "avg":
 			values := make([]float64, len(order))
 			for row, group := range order {
@@ -13178,6 +13170,33 @@ func sumOutputColumnFromF64(frame Frame, agg Aggregate, sums []float64) Column {
 		}
 	}
 	return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: sums}}
+}
+
+func sumOutputColumnFromF64Ordered(frame Frame, agg Aggregate, sums []float64, order []int) Column {
+	if order == nil {
+		return sumOutputColumnFromF64(frame, agg, sums)
+	}
+	if sumPreservesIntegerKind(frame, agg) {
+		out := make([]int64, len(order))
+		exact := true
+		for row, group := range order {
+			v := sums[group]
+			n := int64(v)
+			if float64(n) != v {
+				exact = false
+				break
+			}
+			out[row] = n
+		}
+		if exact {
+			return Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: out}}
+		}
+	}
+	out := make([]float64, len(order))
+	for row, group := range order {
+		out[row] = sums[group]
+	}
+	return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: out}}
 }
 
 func groupedWavgOutputColumn(name Symbol, sums, weights []float64, counts []int64) Column {
