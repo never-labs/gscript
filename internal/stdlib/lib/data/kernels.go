@@ -5928,27 +5928,12 @@ func TryTypedI64SelectedExprFbySumTotal(indexes Array, expr I64SelectedExpr, gro
 				return 0, true, fmt.Errorf("index expression row %d out of range", row)
 			}
 		}
-		eval := i64SelectedExprBulkEval{rows: rows}
-		values, err := eval.eval(expr)
-		if err != nil {
-			eval.release()
+		if err := accumulateSelectedExprFbyRows(rows, expr, lookup, sums); err != nil {
 			bulkI64Release(rows, rowsOwned)
 			bulkI64Release(sums, true)
 			bulkI64Release(counts, true)
 			return 0, true, err
 		}
-		for i, row := range rows {
-			group, err := lookup(int(row))
-			if err != nil {
-				eval.release()
-				bulkI64Release(rows, rowsOwned)
-				bulkI64Release(sums, true)
-				bulkI64Release(counts, true)
-				return 0, true, err
-			}
-			sums[group] += values[i]
-		}
-		eval.release()
 		bulkI64Release(rows, rowsOwned)
 	} else if err := forEachTypedI64Index(indexes, groups.Len(), func(row int) error {
 		value, err := evalI64SelectedExpr(expr, int64(row))
@@ -6235,6 +6220,131 @@ func evalI64SelectedExprOperands(expr I64SelectedExpr, row int64) (int64, int64,
 		return 0, 0, err
 	}
 	return left, right, nil
+}
+
+func accumulateSelectedExprFbyRows(rows []int64, expr I64SelectedExpr, lookup fbyGroupLookupFn, sums []int64) error {
+	switch expr.Op {
+	case I64SelectedExprConst:
+		for _, row := range rows {
+			group, err := lookup(int(row))
+			if err != nil {
+				return err
+			}
+			sums[group] += expr.Value
+		}
+		return nil
+	case I64SelectedExprIndex:
+		for _, row := range rows {
+			group, err := lookup(int(row))
+			if err != nil {
+				return err
+			}
+			sums[group] += row
+		}
+		return nil
+	}
+	eval := i64SelectedExprBulkEval{rows: rows}
+	defer eval.release()
+	switch expr.Op {
+	case I64SelectedExprAdd, I64SelectedExprSub, I64SelectedExprMul, I64SelectedExprDiv, I64SelectedExprMod:
+		left, err := eval.eval(*expr.Left)
+		if err != nil {
+			return err
+		}
+		if rightConst, ok := i64SelectedExprConstValue(*expr.Right); ok {
+			switch expr.Op {
+			case I64SelectedExprDiv:
+				if rightConst == 0 && len(rows) > 0 {
+					return fmt.Errorf("selected expression divide by zero")
+				}
+			case I64SelectedExprMod:
+				if rightConst == 0 && len(rows) > 0 {
+					return fmt.Errorf("selected expression modulo by zero")
+				}
+			}
+			for i, row := range rows {
+				group, err := lookup(int(row))
+				if err != nil {
+					return err
+				}
+				value := left[i]
+				switch expr.Op {
+				case I64SelectedExprAdd:
+					value += rightConst
+				case I64SelectedExprSub:
+					value -= rightConst
+				case I64SelectedExprMul:
+					value *= rightConst
+				case I64SelectedExprDiv:
+					value /= rightConst
+				case I64SelectedExprMod:
+					value %= rightConst
+				}
+				sums[group] += value
+			}
+			return nil
+		}
+		right, err := eval.eval(*expr.Right)
+		if err != nil {
+			return err
+		}
+		for i, row := range rows {
+			group, err := lookup(int(row))
+			if err != nil {
+				return err
+			}
+			value := left[i]
+			switch expr.Op {
+			case I64SelectedExprAdd:
+				value += right[i]
+			case I64SelectedExprSub:
+				value -= right[i]
+			case I64SelectedExprMul:
+				value *= right[i]
+			case I64SelectedExprDiv:
+				if right[i] == 0 {
+					return fmt.Errorf("selected expression divide by zero")
+				}
+				value /= right[i]
+			case I64SelectedExprMod:
+				if right[i] == 0 {
+					return fmt.Errorf("selected expression modulo by zero")
+				}
+				value %= right[i]
+			}
+			sums[group] += value
+		}
+		return nil
+	case I64SelectedExprXbar:
+		if expr.Value <= 0 {
+			return fmt.Errorf("selected expression xbar width must be positive")
+		}
+		left, err := eval.eval(*expr.Left)
+		if err != nil {
+			return err
+		}
+		for i, row := range rows {
+			group, err := lookup(int(row))
+			if err != nil {
+				return err
+			}
+			sums[group] += floorInt64(left[i], expr.Value)
+		}
+		return nil
+	default:
+		values, err := eval.eval(expr)
+		if err != nil {
+			return err
+		}
+		for i, row := range rows {
+			group, err := lookup(int(row))
+			if err != nil {
+				return err
+			}
+			sums[group] += values[i]
+		}
+		return nil
+	}
 }
 
 // i64SelectedExprBulkEval evaluates selected-row expressions over a dense
