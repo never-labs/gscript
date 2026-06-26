@@ -958,6 +958,11 @@ func (s *EvalState) evalScriptPlanScalarBody(plan qScriptPlan) (EvalScalarResult
 			return out, handled, err
 		}
 	}
+	if plan.numericMultiSum != nil {
+		if out, handled, err := s.evalQScriptNumericMultiSumPlanScalar(plan.numericMultiSum); err != nil || handled {
+			return out, handled, err
+		}
+	}
 	if plan.whereIndexSum != nil {
 		if out, handled, err := s.evalQScriptWhereIndexSumPlanScalar(plan.whereIndexSum); err != nil || handled {
 			return out, handled, err
@@ -979,6 +984,11 @@ func (s *EvalState) evalScriptPlanScalarBody(plan qScriptPlan) (EvalScalarResult
 func (s *EvalState) evalScriptPlanBody(plan qScriptPlan) (any, error) {
 	if plan.numericSum != nil {
 		if out, handled, err := s.evalQScriptNumericSumPlan(plan.numericSum); err != nil || handled {
+			return out, err
+		}
+	}
+	if plan.numericMultiSum != nil {
+		if out, handled, err := s.evalQScriptNumericMultiSumPlan(plan.numericMultiSum); err != nil || handled {
 			return out, err
 		}
 	}
@@ -1064,6 +1074,7 @@ type qScriptPlan struct {
 	scriptPipeline      *qScriptPipelineDescriptor
 	executable          *qScriptExecutablePlan
 	numericSum          *qScriptNumericSumPlan
+	numericMultiSum     *qScriptNumericMultiSumPlan
 	numericStats        *qScriptNumericStatsPlan
 	whereIndexSum       *qScriptWhereIndexSumPlan
 	whereIndexOnlySum   *qScriptWhereIndexOnlySumPlan
@@ -1356,6 +1367,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 		deferScanCandidates: deferScanCandidates,
 		scriptPipeline:      pipeline,
 		numericSum:          buildQScriptNumericSumPlan(statements),
+		numericMultiSum:     buildQScriptNumericMultiSumPlan(statements),
 		numericStats:        buildQScriptNumericStatsPlan(statements),
 		whereIndexSum:       buildQScriptWhereIndexSumPlan(statements),
 		whereIndexOnlySum:   buildQScriptWhereIndexOnlySumPlan(statements),

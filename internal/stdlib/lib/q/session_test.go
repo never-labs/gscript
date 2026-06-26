@@ -2,6 +2,7 @@ package q
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -378,6 +379,73 @@ func TestQScriptWhereIndexOnlySumPlan(t *testing.T) {
 	if hits != uint64(len(tests)*2) {
 		t.Fatalf("QScriptWhereIndexOnlySumPlan hits = %d, want %d; stats=%#v", hits, len(tests)*2, RuntimeKernelExecutionStats())
 	}
+}
+
+func TestQScriptNumericMultiSumPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	session := NewEvalSession(nil)
+	tests := []struct {
+		src  string
+		want int64
+	}{
+		{
+			src:  "x:til 8192;y:(x*3)+7;z:y-(x*2);+/z",
+			want: qArithmeticSeriesSumI64(7, 1, 8192),
+		},
+		{
+			src:  "x:til 8192;y:(x*2)+1;(+/y)+(+/y mod 3)",
+			want: qNumericMultiSumModuloWant(8192, 2, 1, 3),
+		},
+		{
+			src:  "x:til 8192;y:(x*5)+11;(+/y)+(+/y mod 7)+(+/x)",
+			want: qNumericMultiSumModuloWant(8192, 5, 11, 7) + qArithmeticSeriesSumI64(0, 1, 8192),
+		},
+	}
+	for _, tt := range tests {
+		plan := buildQScriptPlan(tt.src)
+		if strings.Count(tt.src, "+/") > 1 {
+			if plan.numericMultiSum == nil {
+				t.Fatalf("numeric multi-sum plan missing for %q", tt.src)
+			}
+		} else if plan.numericSum == nil {
+			t.Fatalf("numeric sum plan missing for %q", tt.src)
+		}
+		for i := 0; i < 2; i++ {
+			got, err := session.Eval(tt.src)
+			if err != nil || got != tt.want {
+				t.Fatalf("EvalSession.Eval #%d %q = %#v,%v; want %d,nil", i, tt.src, got, err, tt.want)
+			}
+		}
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericMultiSumPlan" && stat.Shape == "multi-vector-reduce/int-expr-sum" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	wantHits := uint64((len(tests) - 1) * 2)
+	if hits != wantHits {
+		t.Fatalf("QScriptNumericMultiSumPlan hits = %d, want %d; stats=%#v", hits, wantHits, RuntimeKernelExecutionStats())
+	}
+}
+
+func qNumericMultiSumModuloWant(rows int, mul, add, mod int64) int64 {
+	var sum int64
+	for i := int64(0); i < int64(rows); i++ {
+		y := i*mul + add
+		sum += y + qTestPositiveMod(y, mod)
+	}
+	return sum
+}
+
+func qTestPositiveMod(value, mod int64) int64 {
+	out := value % mod
+	if out < 0 {
+		out += mod
+	}
+	return out
 }
 
 func qWhereIndexOnlySumModuloBandWant(rows int) int64 {

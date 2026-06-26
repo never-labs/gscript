@@ -593,7 +593,7 @@ func buildQScriptNumericBinaryPlan(op string, leftExpr, rightExpr Expr, bindings
 		return qScriptNumericExprPlan{}, false
 	}
 	if op == "mod" {
-		if right.kind != qScriptNumericExprScalar || right.value <= 0 || !left.nonNegative {
+		if right.kind != qScriptNumericExprScalar || right.value <= 0 {
 			return qScriptNumericExprPlan{}, false
 		}
 	}
@@ -1307,6 +1307,9 @@ func qScriptNumericSummarizeBinary(op string, left, right qScriptNumericSumSumma
 		return qScriptNumericSumSummary{length: -1, scalar: true, value: value, min: value, max: value}, true, nil
 	}
 	if op == "+" || op == "-" {
+		if left.linear && right.linear {
+			return qScriptNumericLinearLinear(op, left, right, length), true, nil
+		}
 		if left.linear && right.scalar {
 			return qScriptNumericLinearScalar(op, left, right.value), true, nil
 		}
@@ -1426,27 +1429,68 @@ func qScriptNumericSummarizeFloatMod(left qScriptNumericSumSummary, modulus floa
 
 func qScriptNumericSummarizeMod(left qScriptNumericSumSummary, modulus int64) (qScriptNumericSumSummary, bool, error) {
 	if left.scalar {
-		value := left.value % modulus
+		value := qScriptNumericPositiveMod(left.value, modulus)
 		return qScriptNumericSumSummary{length: -1, scalar: true, value: value, min: value, max: value}, true, nil
 	}
-	if left.linear && left.start == 0 && left.step == 1 {
-		if modulus > qScriptNumericClosedFormMaxPeriod {
+	if left.linear {
+		periodLen := qScriptNumericLinearModPeriodLen(left.step, modulus)
+		if periodLen <= 0 || periodLen > qScriptNumericClosedFormMaxPeriod {
 			return qScriptNumericSumSummary{}, false, nil
 		}
-		period := make([]int64, int(modulus))
+		period := make([]int64, periodLen)
 		for i := range period {
-			period[i] = int64(i)
+			period[i] = qScriptNumericPositiveMod(left.start+int64(i)*left.step, modulus)
 		}
 		return qScriptNumericPeriodSummary(left.length, period), true, nil
 	}
 	if len(left.period) > 0 {
 		period := make([]int64, len(left.period))
 		for i, value := range left.period {
-			period[i] = value % modulus
+			period[i] = qScriptNumericPositiveMod(value, modulus)
 		}
 		return qScriptNumericPeriodSummaryWithNulls(left.length, period, left.nulls), true, nil
 	}
 	return qScriptNumericSumSummary{}, false, nil
+}
+
+func qScriptNumericLinearModPeriodLen(step, modulus int64) int {
+	if modulus <= 0 {
+		return 0
+	}
+	g := qScriptNumericGCD64(qScriptNumericAbs64(step), modulus)
+	if g <= 0 {
+		return 0
+	}
+	period := modulus / g
+	if period > int64(math.MaxInt) {
+		return 0
+	}
+	return int(period)
+}
+
+func qScriptNumericPositiveMod(value, modulus int64) int64 {
+	out := value % modulus
+	if out < 0 {
+		out += modulus
+	}
+	return out
+}
+
+func qScriptNumericAbs64(value int64) int64 {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func qScriptNumericGCD64(a, b int64) int64 {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	if a < 0 {
+		return -a
+	}
+	return a
 }
 
 func qScriptNumericSummarizeDiv(left qScriptNumericSumSummary, divisor int64) (qScriptNumericSumSummary, bool, error) {
@@ -1508,6 +1552,19 @@ func qScriptNumericLinearMultiply(linear qScriptNumericSumSummary, scalar int64)
 	out := linear
 	out.start *= scalar
 	out.step *= scalar
+	out.min, out.max = qScriptNumericLinearMinMax(out)
+	return out
+}
+
+func qScriptNumericLinearLinear(op string, left, right qScriptNumericSumSummary, length int) qScriptNumericSumSummary {
+	out := qScriptNumericSumSummary{length: length, linear: true}
+	if op == "+" {
+		out.start = left.start + right.start
+		out.step = left.step + right.step
+	} else {
+		out.start = left.start - right.start
+		out.step = left.step - right.step
+	}
 	out.min, out.max = qScriptNumericLinearMinMax(out)
 	return out
 }
