@@ -1,6 +1,9 @@
 package q
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 // TestEvalSessionPlannedMatchesEval pins the planned-handle contract: a
 // pinned handle executes the same cached plan chain as EvalSession.Eval for
@@ -176,6 +179,64 @@ func qScriptWhereIndexFbySumNullAwareWant(rows int) int64 {
 		total += sum * groupCounts[group]
 	}
 	return total + nullCount
+}
+
+func TestQScriptWhereIndexWindowPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	src := "px:100+((til 64) mod 50);sz:1+((til 64) mod 32);idx:where (px>=120) and (sz>=10);vals:(100+(idx mod 50))*(1+(idx mod 32));v:@[64#0;idx;+;vals];(+/16 msum v)+(+/16 mavg v)+count idx"
+	plan := buildQScriptPlan(src)
+	if plan.whereIndexWindow == nil {
+		t.Fatalf("where-index window plan missing for %q", src)
+	}
+	session := NewEvalSession(nil)
+	got, err := session.Eval(src)
+	want := qScriptWhereIndexWindowWant(64)
+	if err != nil {
+		t.Fatalf("EvalSession.Eval returned error: %v", err)
+	}
+	value, ok := got.(float64)
+	if !ok || math.Abs(value-want) > 1e-9 {
+		t.Fatalf("EvalSession.Eval = %#v; want %.17g", got, want)
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptWhereIndexWindowPlan" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != 1 {
+		t.Fatalf("QScriptWhereIndexWindowPlan hits = %d, want 1; stats=%#v", hits, RuntimeKernelExecutionStats())
+	}
+}
+
+func qScriptWhereIndexWindowWant(rows int) float64 {
+	values := make([]int64, rows)
+	var selected int64
+	for row := 0; row < rows; row++ {
+		px := int64(100 + row%50)
+		sz := int64(1 + row%32)
+		if px >= 120 && sz >= 10 {
+			values[row] = px * sz
+			selected++
+		}
+	}
+	var msumTotal int64
+	var mavgTotal float64
+	for row := range values {
+		start := row - 15
+		if start < 0 {
+			start = 0
+		}
+		var window int64
+		for j := start; j <= row; j++ {
+			window += values[j]
+		}
+		msumTotal += window
+		mavgTotal += float64(window) / float64(row-start+1)
+	}
+	return float64(msumTotal) + mavgTotal + float64(selected)
 }
 
 func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T) {

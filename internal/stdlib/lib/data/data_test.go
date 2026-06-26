@@ -4568,6 +4568,20 @@ func TestTryTypedI64SelectedExprFbySumTotalGather(t *testing.T) {
 	}
 }
 
+func TestTryTypedI64IndexExprSparseZeroMovingSumAvg(t *testing.T) {
+	value := I64IndexExpr{Op: I64IndexExprMul, Left: &I64IndexExpr{Op: I64IndexExprIndex}, Right: &I64IndexExpr{Op: I64IndexExprConst, Value: 10}}
+	msum, mavg, handled, err := TryTypedI64IndexExprSparseZeroMovingSumAvg(NewI64([]int64{1, 4}), value, 6, 3)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedI64IndexExprSparseZeroMovingSumAvg handled=%v err=%v; want true,nil", handled, err)
+	}
+	if msum != 110 {
+		t.Fatalf("sparse moving msum = %d, want 110", msum)
+	}
+	if want := 115.0 / 3.0; math.Abs(mavg-want) > 1e-12 {
+		t.Fatalf("sparse moving mavg = %.17g, want %.17g", mavg, want)
+	}
+}
+
 func testI64IndexExpr(op I64IndexExprOp, left, right I64IndexExpr) I64IndexExpr {
 	return I64IndexExpr{Op: op, Left: &left, Right: &right}
 }

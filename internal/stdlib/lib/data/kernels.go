@@ -5969,6 +5969,158 @@ func TryTypedI64SelectedExprFbySumTotal(indexes Array, expr I64SelectedExpr, gro
 	return total, true, nil
 }
 
+func TryTypedI64SelectedExprSparseZeroMovingSumAvg(indexes Array, expr I64SelectedExpr, length int, width int) (int64, float64, bool, error) {
+	if indexes == nil {
+		return 0, 0, true, fmt.Errorf("sparse moving window indexes must be non-nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return 0, 0, true, fmt.Errorf("sparse moving window indexes kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if length < 0 {
+		return 0, 0, true, fmt.Errorf("sparse moving window length must be non-negative")
+	}
+	if width <= 0 {
+		return 0, 0, true, fmt.Errorf("sparse moving window width must be positive")
+	}
+	if !i64SelectedExprValid(expr) {
+		return 0, 0, false, nil
+	}
+	recip := movingAvgReciprocalPrefix(length, width)
+	var msum int64
+	var mavg float64
+	accumulate := func(row int64) error {
+		if row < 0 || row >= int64(length) {
+			return fmt.Errorf("sparse moving window index %d out of range", row)
+		}
+		value, err := evalI64SelectedExpr(expr, row)
+		if err != nil {
+			return err
+		}
+		count := length - int(row)
+		if count > width {
+			count = width
+		}
+		msum += value * int64(count)
+		mavg += float64(value) * movingAvgSparseContribution(int(row), count, width, recip)
+		return nil
+	}
+	if rows, owned, ok := tryBulkI64Values(indexes); ok {
+		for _, row := range rows {
+			if err := accumulate(row); err != nil {
+				bulkI64Release(rows, owned)
+				return 0, 0, true, err
+			}
+		}
+		bulkI64Release(rows, owned)
+		return msum, mavg, true, nil
+	}
+	if err := forEachTypedI64Index(indexes, length, func(row int) error {
+		return accumulate(int64(row))
+	}); err != nil {
+		return 0, 0, true, err
+	}
+	return msum, mavg, true, nil
+}
+
+func TryTypedI64IndexExprSparseZeroMovingSumAvg(indexes Array, expr I64IndexExpr, length int, width int) (int64, float64, bool, error) {
+	if indexes == nil {
+		return 0, 0, true, fmt.Errorf("sparse moving window indexes must be non-nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return 0, 0, true, fmt.Errorf("sparse moving window indexes kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if length < 0 {
+		return 0, 0, true, fmt.Errorf("sparse moving window length must be non-negative")
+	}
+	if width <= 0 {
+		return 0, 0, true, fmt.Errorf("sparse moving window width must be positive")
+	}
+	if !i64IndexExprValid(expr) {
+		return 0, 0, false, nil
+	}
+	recip := movingAvgReciprocalPrefix(length, width)
+	var msum int64
+	var mavg float64
+	accumulate := func(row int64, value int64) error {
+		if row < 0 || row >= int64(length) {
+			return fmt.Errorf("sparse moving window index %d out of range", row)
+		}
+		count := length - int(row)
+		if count > width {
+			count = width
+		}
+		msum += value * int64(count)
+		mavg += float64(value) * movingAvgSparseContribution(int(row), count, width, recip)
+		return nil
+	}
+	if rows, rowsOwned, ok := tryBulkI64Values(indexes); ok {
+		for _, row := range rows {
+			if row < 0 || row >= int64(length) {
+				bulkI64Release(rows, rowsOwned)
+				return 0, 0, true, fmt.Errorf("sparse moving window index %d out of range", row)
+			}
+		}
+		eval := i64IndexExprBulkEval{rows: rows}
+		values, err := eval.eval(expr)
+		if err != nil {
+			eval.release()
+			bulkI64Release(rows, rowsOwned)
+			return 0, 0, true, err
+		}
+		for i, row := range rows {
+			if err := accumulate(row, values[i]); err != nil {
+				eval.release()
+				bulkI64Release(rows, rowsOwned)
+				return 0, 0, true, err
+			}
+		}
+		eval.release()
+		bulkI64Release(rows, rowsOwned)
+		return msum, mavg, true, nil
+	}
+	if err := forEachTypedI64Index(indexes, length, func(row int) error {
+		value, err := evalI64IndexExpr(expr, int64(row))
+		if err != nil {
+			return err
+		}
+		return accumulate(int64(row), value)
+	}); err != nil {
+		return 0, 0, true, err
+	}
+	return msum, mavg, true, nil
+}
+
+func movingAvgReciprocalPrefix(length int, width int) []float64 {
+	n := width
+	if length < n {
+		n = length
+	}
+	prefix := make([]float64, n+1)
+	for i := 0; i < n; i++ {
+		prefix[i+1] = prefix[i] + 1/float64(i+1)
+	}
+	return prefix
+}
+
+func movingAvgSparseContribution(row int, count int, width int, recip []float64) float64 {
+	if count <= 0 {
+		return 0
+	}
+	end := row + count - 1
+	if row >= width {
+		return float64(count) / float64(width)
+	}
+	prefixEnd := end
+	if prefixEnd >= width {
+		prefixEnd = width - 1
+	}
+	total := recip[prefixEnd+1] - recip[row]
+	if end >= width {
+		total += float64(end-width+1) / float64(width)
+	}
+	return total
+}
+
 func i64SelectedExprValid(expr I64SelectedExpr) bool {
 	switch expr.Op {
 	case I64SelectedExprConst, I64SelectedExprIndex:
