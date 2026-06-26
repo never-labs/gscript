@@ -460,6 +460,27 @@ func (s *EvalState) evalQScriptWhereIndexSumPlan(plan *qScriptWhereIndexSumPlan)
 	return int64(sum) + count, true, nil
 }
 
+func (s *EvalState) evalQScriptWhereIndexSumPlanScalar(plan *qScriptWhereIndexSumPlan) (EvalScalarResult, bool, error) {
+	if plan == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	sum, count, isFloat, ok := qScriptWhereIndexSum(plan)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	recordRuntimeKernelProbe("QScriptWhereIndexSumPlan", "where-index-reduce/periodic-sum-count", true, nil)
+	for _, source := range plan.sources {
+		recordQEvalDispatch(source, EvalDispatchScriptNumericSum)
+	}
+	if plan.countNull != nil {
+		count = int64(plan.countNull.NullCount())
+	}
+	if isFloat {
+		return evalScalarFloat(sum + float64(count)), true, nil
+	}
+	return evalScalarInt(int64(sum) + count), true, nil
+}
+
 func qScriptWhereIndexSum(plan *qScriptWhereIndexSumPlan) (float64, int64, bool, bool) {
 	length := plan.value.length
 	periodLen, ok := qScriptWhereIndexPeriodLen(plan)

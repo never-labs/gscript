@@ -958,6 +958,16 @@ func (s *EvalState) evalScriptPlanScalarBody(plan qScriptPlan) (EvalScalarResult
 			return out, handled, err
 		}
 	}
+	if plan.whereIndexSum != nil {
+		if out, handled, err := s.evalQScriptWhereIndexSumPlanScalar(plan.whereIndexSum); err != nil || handled {
+			return out, handled, err
+		}
+	}
+	if plan.whereIndexOnlySum != nil {
+		if out, handled, err := s.evalQScriptWhereIndexOnlySumPlanScalar(plan.whereIndexOnlySum); err != nil || handled {
+			return out, handled, err
+		}
+	}
 	if plan.countWhere != nil {
 		if out, handled, err := s.evalQScriptCountWherePlanScalar(plan.countWhere); err != nil || handled {
 			return out, handled, err
@@ -979,6 +989,11 @@ func (s *EvalState) evalScriptPlanBody(plan qScriptPlan) (any, error) {
 	}
 	if plan.whereIndexSum != nil {
 		if out, handled, err := s.evalQScriptWhereIndexSumPlan(plan.whereIndexSum); err != nil || handled {
+			return out, err
+		}
+	}
+	if plan.whereIndexOnlySum != nil {
+		if out, handled, err := s.evalQScriptWhereIndexOnlySumPlan(plan.whereIndexOnlySum); err != nil || handled {
 			return out, err
 		}
 	}
@@ -1051,6 +1066,7 @@ type qScriptPlan struct {
 	numericSum          *qScriptNumericSumPlan
 	numericStats        *qScriptNumericStatsPlan
 	whereIndexSum       *qScriptWhereIndexSumPlan
+	whereIndexOnlySum   *qScriptWhereIndexOnlySumPlan
 	whereIndexFbySum    *qScriptWhereIndexFbySumPlan
 	whereIndexWindow    *qScriptWhereIndexWindowPlan
 	countWhere          *qScriptCountWherePlan
@@ -1342,6 +1358,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 		numericSum:          buildQScriptNumericSumPlan(statements),
 		numericStats:        buildQScriptNumericStatsPlan(statements),
 		whereIndexSum:       buildQScriptWhereIndexSumPlan(statements),
+		whereIndexOnlySum:   buildQScriptWhereIndexOnlySumPlan(statements),
 		whereIndexFbySum:    buildQScriptWhereIndexFbySumPlan(statements),
 		whereIndexWindow:    buildQScriptWhereIndexWindowPlan(statements),
 		countWhere:          buildQScriptCountWherePlan(statements),

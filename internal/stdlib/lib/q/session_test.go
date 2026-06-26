@@ -334,3 +334,69 @@ func TestQScriptCountWherePlanClosesPeriodicPredicates(t *testing.T) {
 		t.Fatalf("QScriptCountWherePlan hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
 	}
 }
+
+func TestQScriptWhereIndexOnlySumPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	session := NewEvalSession(nil)
+	tests := []struct {
+		src  string
+		want int64
+	}{
+		{
+			src:  "x:til 8192;idx:where x>=128;+/idx",
+			want: qArithmeticSeriesSumI64(128, 1, 8192-128),
+		},
+		{
+			src:  "x:til 8192;idx:where x>=4096;sum idx",
+			want: qArithmeticSeriesSumI64(4096, 1, 8192-4096),
+		},
+		{
+			src:  "x:til 8192;m:x mod 10;idx:where (m>=3) and m<8;+/idx",
+			want: qWhereIndexOnlySumModuloBandWant(8192),
+		},
+		{
+			src:  "x:til 8192;idx:where ((x mod 3)=1) and (x>64) and (not (x in 70 73 76));+/idx",
+			want: qWhereIndexOnlySumConstrainedWant(8192),
+		},
+	}
+	for _, tt := range tests {
+		for i := 0; i < 2; i++ {
+			got, err := session.Eval(tt.src)
+			if err != nil || got != tt.want {
+				t.Fatalf("EvalSession.Eval #%d %q = %#v,%v; want %d,nil", i, tt.src, got, err, tt.want)
+			}
+		}
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptWhereIndexOnlySumPlan" && stat.Shape == "where-index-reduce/sum" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != uint64(len(tests)*2) {
+		t.Fatalf("QScriptWhereIndexOnlySumPlan hits = %d, want %d; stats=%#v", hits, len(tests)*2, RuntimeKernelExecutionStats())
+	}
+}
+
+func qWhereIndexOnlySumModuloBandWant(rows int) int64 {
+	var sum int64
+	for i := 0; i < rows; i++ {
+		m := i % 10
+		if m >= 3 && m < 8 {
+			sum += int64(i)
+		}
+	}
+	return sum
+}
+
+func qWhereIndexOnlySumConstrainedWant(rows int) int64 {
+	var sum int64
+	for i := 0; i < rows; i++ {
+		if i%3 == 1 && i > 64 && i != 70 && i != 73 && i != 76 {
+			sum += int64(i)
+		}
+	}
+	return sum
+}
