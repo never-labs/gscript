@@ -11783,10 +11783,9 @@ func execUngroupedAggregates(frame Frame, indexes []int, plan QueryPlan) (Frame,
 	}
 	cols := make([]Column, 0, len(plan.Aggregates))
 	for i, agg := range plan.Aggregates {
-		values := []any{aggregateResult(states[i])}
-		cols = append(cols, aggregateOutputColumn(frame, agg, values))
+		cols = append(cols, aggregateStateOutputColumn(frame, agg, states[i]))
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func execGroupedFilteredWhere(frame Frame, plan QueryPlan) (Frame, bool, error) {
@@ -13158,6 +13157,46 @@ func aggregateOutputColumn(frame Frame, agg Aggregate, values []any) Column {
 		}
 	}
 	return NewColumn(agg.Name, values)
+}
+
+func aggregateStateOutputColumn(frame Frame, agg Aggregate, state aggregateState) Column {
+	switch agg.Func {
+	case "count":
+		return Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: []int64{state.count}}}
+	case "sum":
+		return sumOutputColumnFromF64(frame, agg, []float64{state.sum})
+	case "avg":
+		value := float64(0)
+		if state.count > 0 {
+			value = state.sum / float64(state.count)
+		}
+		return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: []float64{value}}}
+	case "var", "dev":
+		value := float64(0)
+		if state.count > 0 {
+			mean := state.sum / float64(state.count)
+			value = state.sumsq/float64(state.count) - mean*mean
+			if agg.Func == "dev" {
+				value = math.Sqrt(value)
+			}
+		}
+		return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: []float64{value}}}
+	case "med":
+		value := aggregateResult(state)
+		if IsNull(value) {
+			return Column{Name: agg.Name, Data: newNullBitmapF64([]float64{0}, []uint64{1})}
+		}
+		n, ok := numeric(value)
+		if ok {
+			return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: []float64{n}}}
+		}
+	case "wavg":
+		if state.count == 0 || state.weight == 0 {
+			return Column{Name: agg.Name, Data: newNullBitmapF64([]float64{0}, []uint64{1})}
+		}
+		return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: []float64{state.sum / state.weight}}}
+	}
+	return aggregateOutputColumn(frame, agg, []any{aggregateResult(state)})
 }
 
 // sumOutputColumnFromF64 converts accumulated f64 group sums into the output
