@@ -4401,6 +4401,54 @@ func TestTryTypedFbySumLazyProductTiledGroups(t *testing.T) {
 	}
 }
 
+func TestTryTypedFbySumLazyProductModuloPeriod(t *testing.T) {
+	n := NewI64Range(0, 1, 24)
+	leftMod, handled, err := TryTypedIntegerDyadic(OpMod, n, int64(5))
+	if err != nil || !handled {
+		t.Fatalf("left mod handled=%v err=%v; want true,nil", handled, err)
+	}
+	left, handled, err := TryTypedIntegerDyadic(OpAdd, leftMod, int64(100))
+	if err != nil || !handled {
+		t.Fatalf("left add handled=%v err=%v; want true,nil", handled, err)
+	}
+	rightMod, handled, err := TryTypedIntegerDyadic(OpMod, n, int64(3))
+	if err != nil || !handled {
+		t.Fatalf("right mod handled=%v err=%v; want true,nil", handled, err)
+	}
+	right, handled, err := TryTypedIntegerDyadic(OpAdd, rightMod, int64(1))
+	if err != nil || !handled {
+		t.Fatalf("right add handled=%v err=%v; want true,nil", handled, err)
+	}
+	product, handled, err := TryTypedIntegerDyadic(OpMul, left, right)
+	if err != nil || !handled {
+		t.Fatalf("product handled=%v err=%v; want true,nil", handled, err)
+	}
+	groups := takeRepeatMust(t, NewSymbols([]string{"a", "b"}), 24)
+	out, handled, err := TryTypedFbySum(product.(Array), groups)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedFbySum periodic product handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := out.(fbyI64TiledBroadcastArray); !ok {
+		t.Fatalf("TryTypedFbySum periodic product = %T, want fbyI64TiledBroadcastArray", out)
+	}
+	total, handled, err := TryTypedFbySumTotal(product.(Array), groups)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedFbySumTotal periodic product handled=%v err=%v; want true,nil", handled, err)
+	}
+	var sums [2]int64
+	var counts [2]int64
+	for row := 0; row < 24; row++ {
+		group := row % 2
+		value := int64(100+row%5) * int64(1+row%3)
+		sums[group] += value
+		counts[group]++
+	}
+	want := sums[0]*counts[0] + sums[1]*counts[1]
+	if total != want {
+		t.Fatalf("TryTypedFbySumTotal periodic product = %v, want %d", total, want)
+	}
+}
+
 func TestTryTypedFbySumTotalCachesDenseGroupIDs(t *testing.T) {
 	values := NewI64([]int64{10, 20, 30, 40, 50, 60})
 	groups := NewSymbols([]string{"a", "b", "a", "c", "b", "a"})

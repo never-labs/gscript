@@ -9769,6 +9769,20 @@ func fbySumI64DyadicProductTiled(values i64DyadicProductArray, groups Array) (fb
 	}
 	sums := make([]int64, groupCount)
 	counts := make([]int64, groupCount)
+	if period, ok := fbyI64DyadicProductTiledPeriod(values, sourceLen); ok && period > 0 && period <= 65536 && period < int64(values.Len()) {
+		for residue := int64(0); residue < period; residue++ {
+			hits := int64(1 + (int64(values.Len())-1-residue)/period)
+			row := int(residue)
+			group := sourceGroups[(start+row)%sourceLen]
+			value, ok, err := values.i64At(row)
+			if err != nil || !ok {
+				return fbyI64TiledBroadcastArray{}, ok, err
+			}
+			sums[group] += value * hits
+			counts[group] += hits
+		}
+		return fbyI64TiledBroadcastArray{sourceGroups: sourceGroups, sums: sums, counts: counts, start: start, sourceLen: sourceLen, len: values.Len()}, true, nil
+	}
 	for row := 0; row < values.Len(); row++ {
 		group := sourceGroups[(start+row)%sourceLen]
 		value, ok, err := values.i64At(row)
@@ -9779,6 +9793,74 @@ func fbySumI64DyadicProductTiled(values i64DyadicProductArray, groups Array) (fb
 		counts[group]++
 	}
 	return fbyI64TiledBroadcastArray{sourceGroups: sourceGroups, sums: sums, counts: counts, start: start, sourceLen: sourceLen, len: values.Len()}, true, nil
+}
+
+func fbyI64DyadicProductTiledPeriod(values i64DyadicProductArray, groupSourceLen int) (int64, bool) {
+	leftPeriod, ok := fbyI64DyadicProductOperandPeriod(values.left, values.Len())
+	if !ok {
+		return 0, false
+	}
+	rightPeriod, ok := fbyI64DyadicProductOperandPeriod(values.right, values.Len())
+	if !ok {
+		return 0, false
+	}
+	period, ok := lcmInt64(leftPeriod, rightPeriod)
+	if !ok {
+		return 0, false
+	}
+	return lcmInt64(period, int64(groupSourceLen))
+}
+
+func fbyI64DyadicProductOperandPeriod(array Array, length int) (int64, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return fbyI64DyadicProductOperandPeriod(a.array, length)
+	case i64ScalarDyadicArray:
+		return i64ScalarDyadicCyclePeriod(a, length)
+	case i64DyadicProductArray:
+		return fbyI64DyadicProductTiledPeriod(a, 1)
+	case tiledArray:
+		if a.Len() != length || a.source.Len() <= 0 {
+			return 0, false
+		}
+		return int64(a.source.Len()), true
+	default:
+		if array.Len() == 1 {
+			return 1, true
+		}
+		return arrayCyclePeriod(array)
+	}
+}
+
+func i64ScalarDyadicCyclePeriod(array i64ScalarDyadicArray, length int) (int64, bool) {
+	if array.Len() != length {
+		return 0, false
+	}
+	switch array.op {
+	case OpAdd, OpSub, OpMul:
+		return fbyI64DyadicProductOperandPeriod(array.source, length)
+	case OpMod:
+		if array.scalarLeft || array.scalar <= 0 {
+			return 0, false
+		}
+		var source i64RangeArray
+		sourceOK := false
+		switch s := array.source.(type) {
+		case i64RangeArray:
+			source, sourceOK = s, true
+		case i64ScalarDyadicArray:
+			source, sourceOK = i64ScalarDyadicAffineRange(s)
+		}
+		if sourceOK {
+			period := array.scalar / gcdInt64(source.step, array.scalar)
+			if period > 0 {
+				return period, true
+			}
+		}
+		return fbyI64DyadicProductOperandPeriod(array.source, length)
+	default:
+		return 0, false
+	}
 }
 
 func fbySumFloatTiled[T floatScalar](values []T, groups Array) (Array, bool, error) {
