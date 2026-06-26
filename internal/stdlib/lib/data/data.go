@@ -12716,17 +12716,18 @@ func simpleGroupedAggregateNumericValue(agg aggregateInput, row int) (float64, b
 func buildSimpleGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []simpleGroupedAggregate, index ArrayIndex, order []int) (Frame, error) {
 	cols := make([]Column, 0, len(byInputs)+len(aggs))
 	for _, item := range byInputs {
+		if kind := item.keyKind(); kind != "" && kind != KindAny {
+			if col, ok, err := typedGroupedAggregateKeyColumn(item.Name, kind, index.Keys, order); err != nil || ok {
+				if err != nil {
+					return Frame{}, err
+				}
+				cols = append(cols, col)
+				continue
+			}
+		}
 		values := make([]any, len(order))
 		for row, group := range order {
 			values[row] = index.Keys[group]
-		}
-		if kind := item.keyKind(); kind != "" && kind != KindAny {
-			col, err := columnWithKind(item.Name, kind, values)
-			if err != nil {
-				return Frame{}, err
-			}
-			cols = append(cols, col)
-			continue
 		}
 		cols = append(cols, NewColumn(item.Name, values))
 	}
