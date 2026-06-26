@@ -616,6 +616,8 @@ var (
 	qSQLAlignedPlanOrder               []string
 	qSQLAlignedMutationCache           = make(map[string]*stdq.MutationPlan)
 	qSQLAlignedMutationOrder           []string
+	qSQLJoinFastPathCache              = make(map[string]data.JoinOptions)
+	qSQLJoinFastPathOrder              []string
 	qSQLKernelCache                    = make(map[string]*data.QueryKernel)
 	qSQLKernelOrder                    []string
 	qSQLKernelUnsupported              = make(map[string]string)
@@ -2692,7 +2694,7 @@ func qRunSQLScoped(name string, args qSQLArgsResult) (Value, error) {
 			qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
 			return NilValue(), fmt.Errorf("%s: %w", name, err)
 		}
-		if out, ok, err := qTryRunSQLJoinFastPath(args.frameValue, frame, tmpl, joins); err != nil {
+		if out, ok, err := qTryRunSQLJoinFastPath(args.source, args.frameValue, frame, tmpl, joins); err != nil {
 			qRecordFallbackReason(qFallbackJoinErr, qKernelReasonJoinUnavailable, err.Error())
 			return NilValue(), fmt.Errorf("%s: join: %w", name, err)
 		} else if ok {
@@ -2892,7 +2894,7 @@ func qSQLAndWhere(left, right data.Expr) data.Expr {
 	return data.Logical{Op: "and", Left: left, Right: right}
 }
 
-func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplate, joins []*stdq.JoinPlan) (data.Frame, bool, error) {
+func qTryRunSQLJoinFastPath(src string, sources Value, left data.Frame, tmpl qSQLPlanTemplate, joins []*stdq.JoinPlan) (data.Frame, bool, error) {
 	if tmpl.op != stdq.SelectQuery || len(joins) != 1 || len(tmpl.hiddenCols) > 0 {
 		return data.Frame{}, false, nil
 	}
@@ -2916,15 +2918,20 @@ func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplat
 	if right.hasKeyed {
 		return data.Frame{}, false, nil
 	}
-	opts, ok := qJoinDirectSelectPruneOptions(left, right.frame, join, plan)
+	cacheKey := qJoinFastPathCacheKey(src, left, right.frame)
+	opts, ok := qJoinFastPathCacheLookup(cacheKey)
 	if !ok {
-		opts, ok = qJoinPruneOptions(left, right.frame, join, plan, true)
-	}
-	if !ok {
-		return data.Frame{}, false, nil
-	}
-	if !qJoinOutputMatchesSelect(left, right.frame, join, opts, plan.Select) {
-		return data.Frame{}, false, nil
+		opts, ok = qJoinDirectSelectPruneOptions(left, right.frame, join, plan)
+		if !ok {
+			opts, ok = qJoinPruneOptions(left, right.frame, join, plan, true)
+		}
+		if !ok {
+			return data.Frame{}, false, nil
+		}
+		if !qJoinOutputMatchesSelect(left, right.frame, join, opts, plan.Select) {
+			return data.Frame{}, false, nil
+		}
+		qJoinFastPathCacheStore(cacheKey, opts)
 	}
 	if join.Kind == "left" {
 		out, err := data.LeftJoinOnWithOptions(left, right.frame, opts, join.Keys...)
@@ -2932,6 +2939,43 @@ func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplat
 	}
 	out, err := data.InnerJoinOnWithOptions(left, right.frame, opts, join.Keys...)
 	return out, true, err
+}
+
+func qJoinFastPathCacheKey(src string, left, right data.Frame) string {
+	return data.QueryAlignedPlanCacheKey(src+"\x00join_fast_path\x00"+right.SchemaFingerprint(), left)
+}
+
+func qJoinFastPathCacheLookup(key string) (data.JoinOptions, bool) {
+	qSQLAlignedPlanCacheMu.Lock()
+	opts, ok := qSQLJoinFastPathCache[key]
+	qSQLAlignedPlanCacheMu.Unlock()
+	if !ok {
+		return data.JoinOptions{}, false
+	}
+	return opts, true
+}
+
+func qJoinFastPathCacheStore(key string, opts data.JoinOptions) {
+	qSQLAlignedPlanCacheMu.Lock()
+	if _, ok := qSQLJoinFastPathCache[key]; !ok {
+		qSQLJoinFastPathOrder = append(qSQLJoinFastPathOrder, key)
+	}
+	qSQLJoinFastPathCache[key] = qCloneJoinOptions(opts)
+	for len(qSQLJoinFastPathOrder) > qSQLPlanCacheLimit {
+		evict := qSQLJoinFastPathOrder[0]
+		qSQLJoinFastPathOrder = qSQLJoinFastPathOrder[1:]
+		delete(qSQLJoinFastPathCache, evict)
+	}
+	qSQLAlignedPlanCacheMu.Unlock()
+}
+
+func qCloneJoinOptions(opts data.JoinOptions) data.JoinOptions {
+	return data.JoinOptions{
+		LeftColumns:  append([]data.Symbol(nil), opts.LeftColumns...),
+		RightColumns: append([]data.Symbol(nil), opts.RightColumns...),
+		OrderBy:      append([]data.JoinOrderSpec(nil), opts.OrderBy...),
+		LimitN:       opts.LimitN,
+	}
 }
 
 func qRunSQLPlan(src string, plan data.QueryPlan, frame data.Frame) (data.Frame, error) {
@@ -7491,6 +7535,8 @@ func qClearCaches() {
 	qSQLAlignedPlanOrder = nil
 	qSQLAlignedMutationCache = make(map[string]*stdq.MutationPlan)
 	qSQLAlignedMutationOrder = nil
+	qSQLJoinFastPathCache = make(map[string]data.JoinOptions)
+	qSQLJoinFastPathOrder = nil
 	qSQLKernelCache = make(map[string]*data.QueryKernel)
 	qSQLKernelOrder = nil
 	qSQLKernelUnsupported = make(map[string]string)
