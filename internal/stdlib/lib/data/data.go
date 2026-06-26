@@ -9853,51 +9853,92 @@ func windowListAggregateRows(fn string, wl windowListArray) (Array, bool, error)
 		return columnArray[int64]{kind: KindI64, data: out}, true, nil
 	}
 	n := wl.source.Len()
-	values := make([]float64, n)
-	if ok, err := TryExportF64Copy(wl.source, values); !ok || err != nil {
-		ints := make([]int64, n)
-		if ok, err := TryExportI64Copy(wl.source, ints); !ok || err != nil {
-			return nil, false, nil
-		}
-		for i, v := range ints {
-			values[i] = float64(v)
-		}
+	if values, owned, ok := tryBulkF64Values(wl.source); ok {
+		defer bulkF64Release(values, owned)
+		out, err := windowListAggregateF64Rows(fn, wl.windows, values, n)
+		return out, true, err
 	}
-	sums := make([]float64, len(wl.windows))
+	if values, owned, ok := tryBulkI64Values(wl.source); ok {
+		defer bulkI64Release(values, owned)
+		out, err := windowListAggregateI64Rows(fn, wl.windows, values, n)
+		return out, true, err
+	}
+	return nil, false, nil
+}
+
+func windowListAggregateF64Rows(fn string, windows [][]int, values []float64, sourceLen int) (Array, error) {
+	sums := make([]float64, len(windows))
 	hasEmpty := false
-	for i, rows := range wl.windows {
+	for i, rows := range windows {
 		if len(rows) == 0 {
 			hasEmpty = true
 			continue
 		}
 		var sum float64
 		for _, row := range rows {
-			if row < 0 || row >= n {
-				return nil, true, fmt.Errorf("window list row %d out of range", row)
+			if row < 0 || row >= sourceLen {
+				return nil, fmt.Errorf("window list row %d out of range", row)
 			}
 			sum += values[row]
 		}
 		sums[i] = sum
 	}
 	if fn == "sum" {
-		return columnArray[float64]{kind: KindF64, data: sums}, true, nil
+		return columnArray[float64]{kind: KindF64, data: sums}, nil
 	}
 	// avg: empty windows are null, matching the boxed count==0 path.
 	if !hasEmpty {
-		for i, rows := range wl.windows {
+		for i, rows := range windows {
 			sums[i] /= float64(len(rows))
 		}
-		return columnArray[float64]{kind: KindF64, data: sums}, true, nil
+		return columnArray[float64]{kind: KindF64, data: sums}, nil
 	}
-	out := make([]any, len(wl.windows))
-	for i, rows := range wl.windows {
+	out := make([]any, len(windows))
+	for i, rows := range windows {
 		if len(rows) == 0 {
 			out[i] = NullValue
 			continue
 		}
 		out[i] = sums[i] / float64(len(rows))
 	}
-	return InferArray(out), true, nil
+	return InferArray(out), nil
+}
+
+func windowListAggregateI64Rows(fn string, windows [][]int, values []int64, sourceLen int) (Array, error) {
+	sums := make([]float64, len(windows))
+	hasEmpty := false
+	for i, rows := range windows {
+		if len(rows) == 0 {
+			hasEmpty = true
+			continue
+		}
+		var sum int64
+		for _, row := range rows {
+			if row < 0 || row >= sourceLen {
+				return nil, fmt.Errorf("window list row %d out of range", row)
+			}
+			sum += values[row]
+		}
+		sums[i] = float64(sum)
+	}
+	if fn == "sum" {
+		return columnArray[float64]{kind: KindF64, data: sums}, nil
+	}
+	if !hasEmpty {
+		for i, rows := range windows {
+			sums[i] /= float64(len(rows))
+		}
+		return columnArray[float64]{kind: KindF64, data: sums}, nil
+	}
+	out := make([]any, len(windows))
+	for i, rows := range windows {
+		if len(rows) == 0 {
+			out[i] = NullValue
+			continue
+		}
+		out[i] = sums[i] / float64(len(rows))
+	}
+	return InferArray(out), nil
 }
 
 func (e ListAggregateExpr) evalValue(v any) (any, error) {
