@@ -508,6 +508,16 @@ func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, err
 			// instead of erroring (see arrayReadIndexValue).
 			return data.NullValue, true, nil
 		}
+		if x.Kind() == data.KindI64 {
+			value, handled, err := data.TryTypedScalarIndexI64(x, row)
+			recordQTypedRuntimeKernelReason("ArrayScalarIndex", shape, handled, err, RuntimeFallbackUnsupportedType)
+			if err != nil {
+				return nil, true, err
+			}
+			if handled {
+				return value, true, nil
+			}
+		}
 		value, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
 			kernel:         "ArrayScalarIndex",
 			shape:          shape,

@@ -60,6 +60,46 @@ func TestTryTypedScalarIndexReportsRuntimeErrors(t *testing.T) {
 	}
 }
 
+func TestTryTypedScalarIndexI64CoversNoBoxingCarriers(t *testing.T) {
+	gathered, err := Gather(NewI64Range(10, 2, 8), []int{3, 1, 4})
+	if err != nil {
+		t.Fatalf("Gather: %v", err)
+	}
+	tiled, handled, err := TryTypedRotate(NewI64([]int64{4, 5, 6}), -1)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedRotate: %v,%v", handled, err)
+	}
+
+	tests := []struct {
+		name  string
+		array Array
+		row   int
+		want  int64
+	}{
+		{name: "i64 column", array: NewI64([]int64{10, 20, 30}), row: 1, want: 20},
+		{name: "i64 range", array: NewI64Range(10, 3, 5), row: 4, want: 22},
+		{name: "attributed range", array: WithArrayAttribute(NewI64Range(0, 2, 4), ArrayAttributeSorted), row: 3, want: 6},
+		{name: "gathered range", array: gathered, row: 0, want: 16},
+		{name: "tiled i64", array: tiled, row: 0, want: 6},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok, err := TryTypedScalarIndexI64(tt.array, tt.row)
+			if err != nil || !ok || got != tt.want {
+				t.Fatalf("TryTypedScalarIndexI64(%s,row=%d) = %d,%v,%v; want %d,true,nil", tt.array.Kind(), tt.row, got, ok, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestTryTypedScalarIndexI64FallsBackForNullPreservingCarriers(t *testing.T) {
+	shifted := shiftedArray{source: NewI64([]int64{1, 2, 3}), offset: 1}
+	got, ok, err := TryTypedScalarIndexI64(shifted, 2)
+	if err != nil || ok || got != 0 {
+		t.Fatalf("shifted fallback = %d,%v,%v; want 0,false,nil", got, ok, err)
+	}
+}
+
 func scalarIndexTestEqual(got, want any) bool {
 	gotArray, gotIsArray := got.(Array)
 	wantArray, wantIsArray := want.(Array)

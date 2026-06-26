@@ -1176,9 +1176,10 @@ const (
 )
 
 type qScriptExecutablePlan struct {
-	kind      qScriptExecutableKind
-	statement qScriptStatement
-	pipeline  EvalPipelineExecutablePlan
+	kind         qScriptExecutableKind
+	statement    qScriptStatement
+	uncachedWarm bool
+	pipeline     EvalPipelineExecutablePlan
 }
 
 func (s *EvalState) qScriptPlan(src string) qScriptPlan {
@@ -1408,7 +1409,11 @@ func buildQScriptExecutablePlan(plan qScriptPlan) *qScriptExecutablePlan {
 	if stmt.bindingPlan.kind == qScriptBindingInvalid && stmt.fastPlan.kind == qEvalFastInvalid && stmt.valueExpr == nil {
 		return nil
 	}
-	return &qScriptExecutablePlan{kind: qScriptExecutableSingleStatement, statement: stmt}
+	return &qScriptExecutablePlan{
+		kind:         qScriptExecutableSingleStatement,
+		statement:    stmt,
+		uncachedWarm: stmt.fastPlan.constState == qEvalConstNot,
+	}
 }
 
 func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any, bool, error) {
@@ -1417,9 +1422,9 @@ func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any,
 	}
 	switch plan.kind {
 	case qScriptExecutableSingleStatement:
-		if s.oneShot {
-			stmt := &plan.statement
-			out, err := s.evalCachedOrString(stmt.src, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
+		if s.oneShot || plan.uncachedWarm {
+			stmtPtr := &plan.statement
+			out, err := s.evalCachedOrStringUncached(stmtPtr.src, stmtPtr.valueExpr, &stmtPtr.bindingPlan, &stmtPtr.fastPlan)
 			return out, true, err
 		}
 		stmt := plan.statement
@@ -1442,7 +1447,13 @@ func cloneQScriptPlan(plan qScriptPlan) qScriptPlan {
 		scriptPipeline:      cloneQScriptPipelineDescriptor(plan.scriptPipeline),
 		executable:          cloneQScriptExecutablePlan(plan.executable),
 		numericSum:          plan.numericSum,
+		numericMultiSum:     plan.numericMultiSum,
 		numericStats:        plan.numericStats,
+		whereIndexSum:       plan.whereIndexSum,
+		whereIndexOnlySum:   plan.whereIndexOnlySum,
+		whereIndexFbySum:    plan.whereIndexFbySum,
+		whereIndexWindow:    plan.whereIndexWindow,
+		countWhere:          plan.countWhere,
 		fastPipelineSources: append([]string(nil), plan.fastPipelineSources...),
 	}
 	if len(plan.statements) > 0 {
@@ -2169,7 +2180,7 @@ func buildQEvalFastPlanRoutes(src string, statementLevel bool) qEvalFastPlan {
 		return qEvalFastPlan{}
 	}
 	if scalar, ok := buildScalarApplyIndexPlan(src); ok {
-		return qEvalFastPlan{kind: qEvalFastScalarApplyIndex, scalarIndex: scalar}
+		return qEvalFastPlan{kind: qEvalFastScalarApplyIndex, scalarIndex: scalar, constState: qEvalConstNot}
 	}
 	if name, sym, ok := buildNamePostfixSymbolPlan(src); ok {
 		return qEvalFastPlan{kind: qEvalFastNamePostfixSymbol, postfixName: name, postfixSymbol: sym}

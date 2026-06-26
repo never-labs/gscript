@@ -190,6 +190,91 @@ func TryTypedScalarIndex(array Array, row int) (any, bool, error) {
 	}
 }
 
+// TryTypedScalarIndexI64 reads one int64 row without boxing through any.
+// It mirrors the i64-capable subset of TryTypedScalarIndex for q/JIT scalar
+// hot paths that immediately return a scalar.
+func TryTypedScalarIndexI64(array Array, row int) (int64, bool, error) {
+	if array == nil {
+		return 0, false, nil
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedScalarIndexI64(a.array, row)
+	case columnArray[int64]:
+		return scalarIndexI64FromSlice(a.data, row)
+	case indexedArray:
+		index, ok, err := i64IndexArrayAt(a.indexes, row)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return TryTypedScalarIndexI64(a.source, index)
+	case i64RangeArray:
+		if row < 0 || row >= a.len {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return a.start + int64(row)*a.step, true, nil
+	case i64RunningSumArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return value, true, nil
+	case i64ProductArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return value, true, nil
+	case i64SegmentArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return value, true, nil
+	case i64PeriodicIndexArray:
+		value, ok := a.i64At(row)
+		if !ok {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return value, true, nil
+	case i64BucketArray:
+		value, ok, err := a.i64At(row)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return value, true, nil
+	case i64XrankArray:
+		value, ok, err := a.i64At(row)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return value, true, nil
+	case tiledArray:
+		if row < 0 || row >= a.len || a.source.Len() == 0 {
+			return 0, true, scalarIndexOutOfRange(row)
+		}
+		return TryTypedScalarIndexI64(a.source, (a.start+row)%a.source.Len())
+	default:
+		return 0, false, nil
+	}
+}
+
+func scalarIndexI64FromSlice(data []int64, row int) (int64, bool, error) {
+	if row < 0 || row >= len(data) {
+		return 0, true, scalarIndexOutOfRange(row)
+	}
+	return data[row], true, nil
+}
+
 func scalarIndexFromSlice[T any](values []T, row int) (any, bool, error) {
 	if row < 0 || row >= len(values) {
 		return nil, true, scalarIndexOutOfRange(row)
