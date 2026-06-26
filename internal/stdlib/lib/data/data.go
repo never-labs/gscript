@@ -12601,15 +12601,7 @@ func typedGroupedAggregateOutputColumn(frame Frame, acc typedGroupedAggregateAcc
 		}
 		return sumOutputColumnFromF64(frame, agg, values), nil
 	case "wavg":
-		sums := make([]float64, len(order))
-		weights := make([]float64, len(order))
-		counts := make([]int64, len(order))
-		for row, group := range order {
-			sums[row] = acc.sum[group]
-			weights[row] = acc.weight[group]
-			counts[row] = acc.count[group]
-		}
-		return groupedWavgOutputColumn(agg.Name, sums, weights, counts), nil
+		return groupedWavgOutputColumnOrdered(agg.Name, acc.sum, acc.weight, acc.count, order), nil
 	case "min", "max":
 		values := make([]any, len(order))
 		for row, group := range order {
@@ -13189,27 +13181,31 @@ func sumOutputColumnFromF64(frame Frame, agg Aggregate, sums []float64) Column {
 }
 
 func groupedWavgOutputColumn(name Symbol, sums, weights []float64, counts []int64) Column {
-	values := make([]float64, len(sums))
-	hasNull := false
-	for i := range sums {
-		if counts[i] == 0 || weights[i] == 0 {
-			hasNull = true
+	return groupedWavgOutputColumnOrdered(name, sums, weights, counts, nil)
+}
+
+func groupedWavgOutputColumnOrdered(name Symbol, sums, weights []float64, counts []int64, order []int) Column {
+	rows := len(sums)
+	if order != nil {
+		rows = len(order)
+	}
+	values := make([]float64, rows)
+	var nulls []uint64
+	for row := 0; row < rows; row++ {
+		group := row
+		if order != nil {
+			group = order[row]
+		}
+		if counts[group] == 0 || weights[group] == 0 {
+			if nulls == nil {
+				nulls = newNullBitmap(rows)
+			}
+			nulls[row>>6] |= uint64(1) << uint(row&63)
 			continue
 		}
-		values[i] = sums[i] / weights[i]
+		values[row] = sums[group] / weights[group]
 	}
-	if !hasNull {
-		return Column{Name: name, Data: columnArray[float64]{kind: KindF64, data: values}}
-	}
-	out := make([]any, len(sums))
-	for i, value := range values {
-		if counts[i] == 0 || weights[i] == 0 {
-			out[i] = NullValue
-			continue
-		}
-		out[i] = value
-	}
-	return NewColumn(name, out)
+	return Column{Name: name, Data: newNullBitmapF64(values, nulls)}
 }
 
 func groupByItems(plan QueryPlan) []SelectItem {

@@ -3180,6 +3180,35 @@ func TestQueryGroupByExtendedAggregates(t *testing.T) {
 	assertColumnValues(t, got, "wavg_price", []any{23.333333333333332, 10.0})
 }
 
+func TestQueryGroupByWavgZeroWeightUsesTypedNullBitmap(t *testing.T) {
+	frame := mustFrame(t,
+		NewColumn("sym", []any{Symbol("a"), Symbol("a"), Symbol("b"), Symbol("b")}),
+		NewColumn("price", []any{10.0, 30.0, 20.0, 40.0}),
+		NewColumn("size", []any{1, 3, 0, 0}),
+	)
+
+	got, err := From(frame).
+		GroupBy("sym").
+		WAvg("size", "price", "wavg_price").
+		OrderByColumn("sym", Asc).
+		Exec()
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	assertColumnValues(t, got, "wavg_price", []any{25.0, NullValue})
+	col, ok := got.Column("wavg_price")
+	if !ok {
+		t.Fatal("missing wavg_price column")
+	}
+	if col.Kind() != KindF64 {
+		t.Fatalf("wavg_price kind = %s, want %s", col.Kind(), KindF64)
+	}
+	if _, ok := asNullBitmapCarrier(col); !ok {
+		t.Fatalf("wavg_price column = %T, want null-bitmap carrier", col)
+	}
+}
+
 func TestQueryGroupByColumnRefFastPathPreservesTypedKeys(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("channel", []any{int32(2), int32(1), int32(2), int32(1), int32(2)}),

@@ -493,30 +493,7 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 		case "wavg":
 			prods := slots[plan.slot].sums
 			weights := slots[plan.wslot].sums
-			hasNull := false
-			values := make([]float64, groups)
-			for g := 0; g < groups; g++ {
-				if count[g] == 0 || weights[g] == 0 {
-					// Matches aggregateResult: zero participating weight is a
-					// null result, not a division.
-					hasNull = true
-					continue
-				}
-				values[g] = prods[g] / weights[g]
-			}
-			if hasNull {
-				boxed := make([]any, groups)
-				for g := 0; g < groups; g++ {
-					if count[g] == 0 || weights[g] == 0 {
-						boxed[g] = NullValue
-						continue
-					}
-					boxed[g] = values[g]
-				}
-				cols = append(cols, NewColumn(plan.name, boxed))
-			} else {
-				cols = append(cols, Column{Name: plan.name, Data: columnArray[float64]{kind: KindF64, data: values}})
-			}
+			cols = append(cols, groupedWavgOutputColumn(plan.name, prods[:groups], weights[:groups], count[:groups]))
 		}
 	}
 	bulkI64Release(count, true)
