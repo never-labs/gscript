@@ -96,7 +96,7 @@ func describeQueryKernelFilterCarrier(namespace string, frame Frame, plan QueryP
 	if pipeline.FilterFamily == "" {
 		return stage, nil
 	}
-	_, handled, err := typedFilterIndexArray(frame, plan.Where)
+	handled, err := typedFilterIndexArraySupported(frame, plan.Where)
 	if err != nil || !handled {
 		return stage, err
 	}

@@ -1350,6 +1350,102 @@ func TestTypedFilterIndexArrayLogicalAndPreservesI64Carrier(t *testing.T) {
 	}
 }
 
+func TestTypedFilterIndexArraySupportedMatchesCarrierShapes(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 20, 40})},
+		Column{Name: "px", Data: NewF64([]float64{90, 100, 110, 120, 130})},
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "NVDA", "AAPL", "IBM"})},
+	)
+
+	cases := []struct {
+		name  string
+		where Expr
+	}{
+		{
+			name:  "compare",
+			where: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(20)}},
+		},
+		{
+			name:  "within",
+			where: Within{Expr: ColumnRef{Name: "qty"}, Low: int64(20), High: int64(30), HighClosed: true},
+		},
+		{
+			name:  "in",
+			where: In{Expr: ColumnRef{Name: "sym"}, Values: []any{"AAPL", Symbol("IBM")}},
+		},
+		{
+			name: "and",
+			where: Logical{
+				Op:    "and",
+				Left:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+				Right: Binary{Op: OpLE, Left: ColumnRef{Name: "px"}, Right: Literal{Value: 120.0}},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			supported, err := typedFilterIndexArraySupported(frame, tc.where)
+			if err != nil || !supported {
+				t.Fatalf("typedFilterIndexArraySupported handled=%v err=%v; want true,nil", supported, err)
+			}
+			if _, handled, err := typedFilterIndexArray(frame, tc.where); err != nil || !handled {
+				t.Fatalf("typedFilterIndexArray handled=%v err=%v; want true,nil", handled, err)
+			}
+		})
+	}
+}
+
+func TestTypedFilterIndexArraySupportedRejectsUnsupportedShapes(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30})},
+		Column{Name: "px", Data: NewF64([]float64{90, 100, 110})},
+	)
+
+	supported, err := typedFilterIndexArraySupported(frame, Logical{
+		Op:    "or",
+		Left:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+		Right: Binary{Op: OpLE, Left: ColumnRef{Name: "px"}, Right: Literal{Value: 100.0}},
+	})
+	if err != nil || supported {
+		t.Fatalf("or support handled=%v err=%v; want false,nil", supported, err)
+	}
+
+	supported, err = typedFilterIndexArraySupported(frame, Binary{
+		Op:    OpAdd,
+		Left:  ColumnRef{Name: "qty"},
+		Right: Literal{Value: int32(1)},
+	})
+	if err != nil || supported {
+		t.Fatalf("non-comparison support handled=%v err=%v; want false,nil", supported, err)
+	}
+
+	supported, err = typedFilterIndexArraySupported(frame, Binary{
+		Op:    OpEQ,
+		Left:  ColumnRef{Name: "missing"},
+		Right: Literal{Value: int32(1)},
+	})
+	if err == nil || !supported {
+		t.Fatalf("unknown column support handled=%v err=%v; want true,error", supported, err)
+	}
+}
+
+func TestTypedFilterIndexArraySupportedDoesNotScanRows(t *testing.T) {
+	frame, err := NewFrameAdoptingColumns(Column{Name: "qty", Data: noScanArray{kind: KindI32, len: 3}})
+	if err != nil {
+		t.Fatalf("NewFrameAdoptingColumns returned error: %v", err)
+	}
+
+	supported, err := typedFilterIndexArraySupported(frame, Binary{
+		Op:    OpGE,
+		Left:  ColumnRef{Name: "qty"},
+		Right: Literal{Value: int32(2)},
+	})
+	if err != nil || supported {
+		t.Fatalf("typedFilterIndexArraySupported handled=%v err=%v; want false,nil", supported, err)
+	}
+}
+
 func TestFilterIndexesFusesLogicalTypedIndexes(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "active", Data: NewBool([]bool{true, false, true, true, false})},
@@ -7824,6 +7920,27 @@ func mustFrame(t testing.TB, cols ...Column) Frame {
 		t.Fatalf("NewFrame returned error: %v", err)
 	}
 	return frame
+}
+
+type noScanArray struct {
+	kind Kind
+	len  int
+}
+
+func (a noScanArray) Kind() Kind { return a.kind }
+
+func (a noScanArray) Len() int { return a.len }
+
+func (a noScanArray) At(row int) (any, bool) {
+	panic("noScanArray.At called")
+}
+
+func (a noScanArray) Values() []any {
+	panic("noScanArray.Values called")
+}
+
+func (a noScanArray) Gather(indexes []int) Array {
+	panic("noScanArray.Gather called")
 }
 
 func mustColumn(t testing.TB, frame Frame, name Symbol) Array {

@@ -10498,6 +10498,227 @@ func typedFilterIndexArray(frame Frame, where Expr) (Array, bool, error) {
 	}
 }
 
+func typedFilterIndexArraySupported(frame Frame, where Expr) (bool, error) {
+	switch expr := where.(type) {
+	case nil:
+		return true, nil
+	case Binary:
+		if !isComparisonOp(expr.Op) {
+			return false, nil
+		}
+		ref, op, literal, ok := binaryColumnLiteral(expr)
+		if !ok {
+			return false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		return typedCompareIndexArraySupported(col, op, normalizeScalar(col.Kind(), literal.Value)), nil
+	case Logical:
+		if expr.Op != "and" {
+			return false, nil
+		}
+		left, err := typedFilterIndexArraySupported(frame, expr.Left)
+		if err != nil || !left {
+			return left, err
+		}
+		return typedFilterIndexArraySupported(frame, expr.Right)
+	case Within:
+		ref, ok := expr.Expr.(ColumnRef)
+		if !ok {
+			return false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		return typedWithinIndexArraySupported(col, normalizeScalar(col.Kind(), expr.Low), normalizeScalar(col.Kind(), expr.High)), nil
+	case In:
+		ref, ok := expr.Expr.(ColumnRef)
+		if !ok {
+			return false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		return typedInIndexArraySupported(col, expr.Values), nil
+	default:
+		return false, nil
+	}
+}
+
+func typedCompareIndexArraySupported(array Array, op Op, value any) bool {
+	if IsNull(value) {
+		return false
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return typedCompareIndexArraySupported(a.array, op, value)
+	case tiledArray:
+		return typedCompareIndexArraySupported(a.source, op, normalizeScalar(a.source.Kind(), value))
+	case indexedArray:
+		return typedCompareIndexArraySupported(a.source, op, normalizeScalar(a.source.Kind(), value))
+	default:
+		return typedCompareKnownArraySupported(array, value)
+	}
+}
+
+func typedCompareKnownArraySupported(array Array, value any) bool {
+	switch array.(type) {
+	case encodedArray,
+		i64RangeArray, i64SegmentArray, i64ScalarDyadicArray,
+		columnArray[bool],
+		columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
+		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
+		columnArray[float32], columnArray[float64],
+		columnArray[string], columnArray[Symbol],
+		columnArray[Month], columnArray[Date], columnArray[DateTime],
+		columnArray[Timespan], columnArray[Minute], columnArray[Second], columnArray[Time], columnArray[Timestamp]:
+		return typedCompareValueSupported(array.Kind(), value)
+	default:
+		return false
+	}
+}
+
+func typedCompareValueSupported(kind Kind, value any) bool {
+	switch kind {
+	case KindBool:
+		_, ok := value.(bool)
+		return ok
+	case KindI8:
+		_, ok := value.(int8)
+		return ok
+	case KindI16:
+		_, ok := value.(int16)
+		return ok
+	case KindI32:
+		_, ok := value.(int32)
+		return ok
+	case KindI64:
+		_, ok := coerceInt64Exact(value)
+		return ok
+	case KindU8:
+		_, ok := value.(uint8)
+		return ok
+	case KindU16:
+		_, ok := value.(uint16)
+		return ok
+	case KindU32:
+		_, ok := value.(uint32)
+		return ok
+	case KindU64:
+		_, ok := value.(uint64)
+		return ok
+	case KindF32:
+		_, ok := value.(float32)
+		return ok
+	case KindF64:
+		_, ok := numeric(value)
+		return ok
+	case KindString:
+		_, ok := coerceComparableString(value)
+		return ok
+	case KindSymbol:
+		_, ok := coerceComparableSymbol(value)
+		return ok
+	case KindMonth:
+		_, ok := value.(Month)
+		return ok
+	case KindDate:
+		_, ok := value.(Date)
+		return ok
+	case KindDateTime:
+		_, ok := value.(DateTime)
+		return ok
+	case KindTimespan:
+		_, ok := value.(Timespan)
+		return ok
+	case KindMinute:
+		_, ok := value.(Minute)
+		return ok
+	case KindSecond:
+		_, ok := value.(Second)
+		return ok
+	case KindTime:
+		_, ok := value.(Time)
+		return ok
+	case KindTimestamp:
+		_, ok := value.(Timestamp)
+		return ok
+	default:
+		return false
+	}
+}
+
+func typedWithinIndexArraySupported(array Array, low, high any) bool {
+	if IsNull(low) || IsNull(high) {
+		return true
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return typedWithinIndexArraySupported(a.array, low, high)
+	case tiledArray:
+		return typedWithinIndexArraySupported(a.source, normalizeScalar(a.source.Kind(), low), normalizeScalar(a.source.Kind(), high))
+	case indexedArray:
+		return typedWithinIndexArraySupported(a.source, normalizeScalar(a.source.Kind(), low), normalizeScalar(a.source.Kind(), high))
+	default:
+		return typedWithinKnownArraySupported(array, low, high)
+	}
+}
+
+func typedWithinKnownArraySupported(array Array, low, high any) bool {
+	switch array.(type) {
+	case i64RangeArray,
+		columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
+		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
+		columnArray[float32], columnArray[float64],
+		columnArray[string], columnArray[Symbol],
+		columnArray[Month], columnArray[Date], columnArray[DateTime],
+		columnArray[Timespan], columnArray[Minute], columnArray[Second], columnArray[Time], columnArray[Timestamp]:
+		return qTypedWithinPredicateKind(array.Kind()) &&
+			typedCompareValueSupported(array.Kind(), low) &&
+			typedCompareValueSupported(array.Kind(), high)
+	default:
+		return false
+	}
+}
+
+func typedInIndexArraySupported(array Array, values []any) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		if _, ok := arrayIndexForBorrowed(a, ArrayAttributeUnique); ok {
+			return true
+		}
+		if _, ok := arrayIndexForBorrowed(a, ArrayAttributeGrouped); ok {
+			return true
+		}
+		return typedInIndexArraySupported(a.array, values)
+	case tiledArray:
+		if a.source.Len() == 0 || a.len == 0 {
+			return true
+		}
+		return typedInIndexArraySupported(a.source, values)
+	case encodedArray:
+		_, ok := typedInPredicate(a.kind, values)
+		return ok
+	default:
+		if _, ok := typedInPredicate(array.Kind(), values); ok {
+			switch unwrapAttributedArray(array).(type) {
+			case columnArray[bool],
+				columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
+				columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
+				columnArray[string], columnArray[Symbol],
+				columnArray[Month], columnArray[Date], columnArray[DateTime],
+				columnArray[Timespan], columnArray[Minute], columnArray[Second], columnArray[Time], columnArray[Timestamp]:
+				return true
+			}
+		}
+		return false
+	}
+}
+
 func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 	switch expr := where.(type) {
 	case nil:
