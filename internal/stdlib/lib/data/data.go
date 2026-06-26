@@ -2,7 +2,6 @@
 package data
 
 import (
-	"container/heap"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -13501,70 +13500,25 @@ type orderTopKItem struct {
 	seq int
 }
 
-type orderTopKHeap struct {
-	items []orderTopKItem
-	spec  boundOrderSpec
-}
-
-type orderTopKMultiHeap struct {
-	items []orderTopKItem
-	specs []boundOrderSpec
-}
-
-func (h orderTopKHeap) Len() int { return len(h.items) }
-
-func (h orderTopKHeap) Less(i, j int) bool {
-	return orderTopKBefore(h.spec, h.items[j], h.items[i])
-}
-
-func (h orderTopKHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
-
-func (h *orderTopKHeap) Push(x any) {
-	h.items = append(h.items, x.(orderTopKItem))
-}
-
-func (h *orderTopKHeap) Pop() any {
-	old := h.items
-	n := len(old)
-	item := old[n-1]
-	h.items = old[:n-1]
-	return item
-}
-
-func (h orderTopKMultiHeap) Len() int { return len(h.items) }
-
-func (h orderTopKMultiHeap) Less(i, j int) bool {
-	return orderTopKBeforeMulti(h.specs, h.items[j], h.items[i])
-}
-
-func (h orderTopKMultiHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
-
-func (h *orderTopKMultiHeap) Push(x any) {
-	h.items = append(h.items, x.(orderTopKItem))
-}
-
-func (h *orderTopKMultiHeap) Pop() any {
-	old := h.items
-	n := len(old)
-	item := old[n-1]
-	h.items = old[:n-1]
-	return item
-}
-
 func topKOrderIndexes(indexes []int, spec boundOrderSpec, limit int) []int {
-	h := &orderTopKHeap{items: make([]orderTopKItem, 0, limit), spec: spec}
+	items := make([]orderTopKItem, 0, limit)
 	for seq, row := range indexes {
 		item := orderTopKItem{row: row, seq: seq}
-		if h.Len() < limit {
-			heap.Push(h, item)
+		if len(items) < limit {
+			items = append(items, item)
+			orderTopKHeapSiftUp(items, len(items)-1, func(left, right orderTopKItem) bool {
+				return orderTopKBefore(spec, left, right)
+			})
 			continue
 		}
-		if orderTopKBefore(spec, item, h.items[0]) {
-			h.items[0] = item
-			heap.Fix(h, 0)
+		if orderTopKBefore(spec, item, items[0]) {
+			items[0] = item
+			orderTopKHeapSiftDown(items, 0, func(left, right orderTopKItem) bool {
+				return orderTopKBefore(spec, left, right)
+			})
 		}
 	}
-	outItems := append([]orderTopKItem(nil), h.items...)
+	outItems := append([]orderTopKItem(nil), items...)
 	sort.SliceStable(outItems, func(i, j int) bool {
 		return orderTopKBefore(spec, outItems[i], outItems[j])
 	})
@@ -13576,19 +13530,24 @@ func topKOrderIndexes(indexes []int, spec boundOrderSpec, limit int) []int {
 }
 
 func topKOrderIndexesMulti(indexes []int, specs []boundOrderSpec, limit int) []int {
-	h := &orderTopKMultiHeap{items: make([]orderTopKItem, 0, limit), specs: specs}
+	items := make([]orderTopKItem, 0, limit)
 	for seq, row := range indexes {
 		item := orderTopKItem{row: row, seq: seq}
-		if h.Len() < limit {
-			heap.Push(h, item)
+		if len(items) < limit {
+			items = append(items, item)
+			orderTopKHeapSiftUp(items, len(items)-1, func(left, right orderTopKItem) bool {
+				return orderTopKBeforeMulti(specs, left, right)
+			})
 			continue
 		}
-		if orderTopKBeforeMulti(specs, item, h.items[0]) {
-			h.items[0] = item
-			heap.Fix(h, 0)
+		if orderTopKBeforeMulti(specs, item, items[0]) {
+			items[0] = item
+			orderTopKHeapSiftDown(items, 0, func(left, right orderTopKItem) bool {
+				return orderTopKBeforeMulti(specs, left, right)
+			})
 		}
 	}
-	outItems := append([]orderTopKItem(nil), h.items...)
+	outItems := append([]orderTopKItem(nil), items...)
 	sort.SliceStable(outItems, func(i, j int) bool {
 		return orderTopKBeforeMulti(specs, outItems[i], outItems[j])
 	})
@@ -13597,6 +13556,40 @@ func topKOrderIndexesMulti(indexes []int, specs []boundOrderSpec, limit int) []i
 		out[i] = item.row
 	}
 	return out
+}
+
+func orderTopKHeapSiftUp(items []orderTopKItem, child int, before func(orderTopKItem, orderTopKItem) bool) {
+	for child > 0 {
+		parent := (child - 1) / 2
+		if !orderTopKHeapLess(items, child, parent, before) {
+			return
+		}
+		items[parent], items[child] = items[child], items[parent]
+		child = parent
+	}
+}
+
+func orderTopKHeapSiftDown(items []orderTopKItem, parent int, before func(orderTopKItem, orderTopKItem) bool) {
+	for {
+		left := 2*parent + 1
+		if left >= len(items) {
+			return
+		}
+		child := left
+		right := left + 1
+		if right < len(items) && orderTopKHeapLess(items, right, left, before) {
+			child = right
+		}
+		if !orderTopKHeapLess(items, child, parent, before) {
+			return
+		}
+		items[parent], items[child] = items[child], items[parent]
+		parent = child
+	}
+}
+
+func orderTopKHeapLess(items []orderTopKItem, left, right int, before func(orderTopKItem, orderTopKItem) bool) bool {
+	return before(items[right], items[left])
 }
 
 func orderTopKBefore(spec boundOrderSpec, left, right orderTopKItem) bool {
