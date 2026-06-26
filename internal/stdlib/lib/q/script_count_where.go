@@ -138,6 +138,25 @@ func (s *EvalState) evalQScriptCountWherePlan(plan *qScriptCountWherePlan) (any,
 	return total, true, nil
 }
 
+func (s *EvalState) evalQScriptCountWherePlanScalar(plan *qScriptCountWherePlan) (EvalScalarResult, bool, error) {
+	if plan == nil || len(plan.counts) == 0 {
+		return EvalScalarResult{}, false, nil
+	}
+	var total int64
+	for _, term := range plan.counts {
+		count, ok := qScriptCountWhereClosedCount(term.predicate, term.length)
+		if !ok {
+			return EvalScalarResult{}, false, nil
+		}
+		total += count
+	}
+	recordRuntimeKernelProbe("QScriptCountWherePlan", "count-where/periodic", true, nil)
+	for _, source := range plan.sources {
+		recordQEvalDispatch(source, EvalDispatchScriptCountWhere)
+	}
+	return evalScalarInt(total), true, nil
+}
+
 func qScriptCountWhereClosedCount(predicate *qScriptWherePredicatePlan, length int) (int64, bool) {
 	if predicate == nil || length <= 0 {
 		return 0, false

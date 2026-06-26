@@ -946,6 +946,26 @@ func (s *EvalState) evalScriptPlan(plan qScriptPlan) (any, error) {
 	return out, err
 }
 
+func (s *EvalState) evalScriptPlanScalar(plan qScriptPlan) (EvalScalarResult, bool, error) {
+	s.scriptDepth++
+	defer func() { s.scriptDepth-- }()
+	return s.evalScriptPlanScalarBody(plan)
+}
+
+func (s *EvalState) evalScriptPlanScalarBody(plan qScriptPlan) (EvalScalarResult, bool, error) {
+	if plan.numericSum != nil {
+		if out, handled, err := s.evalQScriptNumericSumPlanScalar(plan.numericSum); err != nil || handled {
+			return out, handled, err
+		}
+	}
+	if plan.countWhere != nil {
+		if out, handled, err := s.evalQScriptCountWherePlanScalar(plan.countWhere); err != nil || handled {
+			return out, handled, err
+		}
+	}
+	return EvalScalarResult{}, false, nil
+}
+
 func (s *EvalState) evalScriptPlanBody(plan qScriptPlan) (any, error) {
 	if plan.numericSum != nil {
 		if out, handled, err := s.evalQScriptNumericSumPlan(plan.numericSum); err != nil || handled {

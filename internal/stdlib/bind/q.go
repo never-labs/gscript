@@ -1298,6 +1298,13 @@ func qSessionValue() *Table {
 		scope := PushValueScope()
 		defer func() { scope.Release(v) }()
 		mu.Lock()
+		if scalar, ok, err := session.EvalScalar(src.Str()); err != nil {
+			mu.Unlock()
+			return NilValue(), fmt.Errorf("q session: %w", err)
+		} else if ok {
+			mu.Unlock()
+			return qEvalScalarResultToValue(scalar), nil
+		}
 		out, err := session.Eval(src.Str())
 		mu.Unlock()
 		if err != nil {
@@ -1331,6 +1338,13 @@ func qSessionValue() *Table {
 			scope := PushValueScope()
 			defer func() { scope.Release(v) }()
 			mu.Lock()
+			if scalar, ok, err := planned.EvalScalar(); err != nil {
+				mu.Unlock()
+				return NilValue(), fmt.Errorf("q session: %w", err)
+			} else if ok {
+				mu.Unlock()
+				return qEvalScalarResultToValue(scalar), nil
+			}
 			out, err := planned.Eval()
 			mu.Unlock()
 			if err != nil {
@@ -1361,6 +1375,17 @@ func qSessionValue() *Table {
 		FastArg1: plannedEvalValue,
 	}))
 	return t
+}
+
+func qEvalScalarResultToValue(result stdq.EvalScalarResult) Value {
+	switch result.Kind {
+	case stdq.EvalScalarInt:
+		return IntValue(result.I64)
+	case stdq.EvalScalarFloat:
+		return FloatValue(result.F64)
+	default:
+		return NilValue()
+	}
 }
 
 func qEvalCacheStoreLocked(src string, value any) {

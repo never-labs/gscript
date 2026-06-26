@@ -850,6 +850,51 @@ func (s *EvalState) evalQScriptNumericSumPlan(plan *qScriptNumericSumPlan) (any,
 	return sum + plan.countValue() + plan.countNullValue(), true, nil
 }
 
+func (s *EvalState) evalQScriptNumericSumPlanScalar(plan *qScriptNumericSumPlan) (EvalScalarResult, bool, error) {
+	if plan == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	if plan.closedOK {
+		if plan.closedErr != "" {
+			err := fmt.Errorf("%s", plan.closedErr)
+			recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", false, err)
+			return EvalScalarResult{}, true, err
+		}
+		recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", true, nil)
+		plan.recordDispatch()
+		return plan.closed.ScalarResult(plan.countValue() + plan.countNullValue()), true, nil
+	}
+	if plan.root.isFloat {
+		return EvalScalarResult{}, false, nil
+	}
+	bindings := make(map[string]qScriptNumericExprPlan, 8)
+	qScriptNumericCollectBindings(plan.root, bindings)
+	length, ok := qScriptNumericExprLength(plan.root, bindings)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	if length < 0 {
+		value, err := qScriptNumericEvalRow(plan.root, 0, bindings)
+		if err != nil {
+			return EvalScalarResult{}, true, err
+		}
+		recordQEvalDispatch(plan.source, EvalDispatchScriptNumericSum)
+		return evalScalarInt(value), true, nil
+	}
+	var sum int64
+	for row := 0; row < length; row++ {
+		value, err := qScriptNumericEvalRow(plan.root, row, bindings)
+		if err != nil {
+			recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", false, err)
+			return EvalScalarResult{}, true, err
+		}
+		sum += value
+	}
+	recordRuntimeKernelProbe("QScriptNumericSumPlan", "vector-reduce/int-cast-expr-sum", true, nil)
+	plan.recordDispatch()
+	return evalScalarInt(sum + plan.countValue() + plan.countNullValue()), true, nil
+}
+
 func qScriptNumericSumStatementSources(statements []qScriptStatement) []string {
 	sources := make([]string, 0, len(statements))
 	for _, stmt := range statements {
@@ -2105,4 +2150,11 @@ func (s qScriptNumericSumSummary) Result(count int64) any {
 		return s.FloatSum() + float64(count)
 	}
 	return s.Sum() + count
+}
+
+func (s qScriptNumericSumSummary) ScalarResult(count int64) EvalScalarResult {
+	if s.isFloat {
+		return evalScalarFloat(s.FloatSum() + float64(count))
+	}
+	return evalScalarInt(s.Sum() + count)
 }

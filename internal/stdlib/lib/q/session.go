@@ -49,6 +49,16 @@ func (s *EvalSession) Eval(source string) (any, error) {
 	return s.evalPlanEntry(s.plan(source))
 }
 
+// EvalScalar evaluates source through scalar-only hot paths when possible.
+// ok=false means callers should use Eval for the generic result path.
+func (s *EvalSession) EvalScalar(source string) (EvalScalarResult, bool, error) {
+	if s == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	source = strings.TrimSpace(source)
+	return s.evalPlanEntryScalar(s.plan(source))
+}
+
 // evalPlanEntry executes one resolved plan entry through the normal script-plan
 // dispatcher. Plan entries are source-derived and state-independent; all
 // session state binds at execution time, so re-executing a pinned entry is
@@ -58,6 +68,13 @@ func (s *EvalSession) evalPlanEntry(entry *evalSessionPlan) (any, error) {
 		return nil, nil
 	}
 	return s.state.evalScriptPlan(entry.script)
+}
+
+func (s *EvalSession) evalPlanEntryScalar(entry *evalSessionPlan) (EvalScalarResult, bool, error) {
+	if entry == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	return s.state.evalScriptPlanScalar(entry.script)
 }
 
 // EvalSessionPlanned pins one source's cached plan entry so warm callers can
@@ -92,6 +109,15 @@ func (p *EvalSessionPlanned) Eval() (any, error) {
 		return nil, fmt.Errorf("q: planned session eval handle is empty")
 	}
 	return p.session.evalPlanEntry(p.entry)
+}
+
+// EvalScalar executes the pinned plan through scalar-only hot paths. ok=false
+// means the caller should use Eval for the generic result path.
+func (p *EvalSessionPlanned) EvalScalar() (EvalScalarResult, bool, error) {
+	if p == nil || p.session == nil || p.entry == nil {
+		return EvalScalarResult{}, false, fmt.Errorf("q: planned session eval handle is empty")
+	}
+	return p.session.evalPlanEntryScalar(p.entry)
 }
 
 func (s *EvalSession) plan(source string) *evalSessionPlan {
