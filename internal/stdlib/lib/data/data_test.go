@@ -1328,6 +1328,28 @@ func TestTypedFilterIndexArrayHandlesWithinAndIn(t *testing.T) {
 	assertColumnValues(t, got, "qty", []any{int32(10), int32(20), int32(40)})
 }
 
+func TestTypedFilterIndexArrayLogicalAndPreservesI64Carrier(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 40, 50})},
+		Column{Name: "px", Data: NewF64([]float64{90, 100, 110, 120, 130})},
+	)
+
+	indexes, handled, err := typedFilterIndexArray(frame, Logical{
+		Op:    "and",
+		Left:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+		Right: Binary{Op: OpLE, Left: ColumnRef{Name: "px"}, Right: Literal{Value: 120.0}},
+	})
+	if err != nil || !handled {
+		t.Fatalf("typedFilterIndexArray and handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := indexes.(i64RangeArray); !ok {
+		t.Fatalf("typedFilterIndexArray and carrier = %T, want i64RangeArray", indexes)
+	}
+	if got, want := indexes.Values(), []any{int64(1), int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("typedFilterIndexArray and = %#v, want %#v", got, want)
+	}
+}
+
 func TestFilterIndexesFusesLogicalTypedIndexes(t *testing.T) {
 	frame := mustFrame(t,
 		Column{Name: "active", Data: NewBool([]bool{true, false, true, true, false})},

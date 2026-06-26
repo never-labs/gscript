@@ -10462,7 +10462,7 @@ func typedFilterIndexArray(frame Frame, where Expr) (Array, bool, error) {
 			return nil, true, err
 		}
 		if handled {
-			return intIndexArray{rows: rows}, true, nil
+			return intIndexesToI64Array(rows), true, nil
 		}
 		return nil, false, nil
 	case Within:
