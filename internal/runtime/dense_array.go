@@ -1228,6 +1228,50 @@ func (a *DenseArray) filterKnownCount(mask *DenseArray, count int) (*DenseArray,
 	}
 }
 
+func denseArrayBoolRows(mask []bool, count int) []int {
+	rows := make([]int, 0, count)
+	for i, keep := range mask {
+		if keep {
+			rows = append(rows, i)
+		}
+	}
+	return rows
+}
+
+func (a *DenseArray) filterRows(rows []int) (*DenseArray, error) {
+	if a == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		out := make([]float64, len(rows))
+		for i, row := range rows {
+			out[i] = a.f64[row]
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, nil
+	case DenseArrayI64:
+		out := make([]int64, len(rows))
+		for i, row := range rows {
+			out[i] = a.i64[row]
+		}
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
+	case DenseArrayBool:
+		out := make([]bool, len(rows))
+		for i, row := range rows {
+			out[i] = a.bools[row]
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	case DenseArrayString:
+		out := make([]string, len(rows))
+		for i, row := range rows {
+			out[i] = a.strings[row]
+		}
+		return &DenseArray{dtype: DenseArrayString, strings: out}, nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
 func (a *DenseArray) Gather(indices *DenseArray) (*DenseArray, error) {
 	if a == nil || indices == nil {
 		recordRuntimePrimitiveError(RuntimePrimitiveDenseArrayGather)

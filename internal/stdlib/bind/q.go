@@ -9319,7 +9319,13 @@ func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*S
 	if s == nil || mask == nil || len(selects) == 0 {
 		return nil, qQueryKernelReasonUnsupported, "query native kernel requires source, mask, and select items"
 	}
-	filtered, err := s.Filter(mask)
+	source := s
+	if projected, ok, reason := qNativeSelectDependencySoA(s, selects); ok {
+		source = projected
+	} else if reason != "" {
+		source = s
+	}
+	filtered, err := source.Filter(mask)
 	if err != nil {
 		return nil, qKernelReasonUnsupported, "query native kernel filter failed: " + err.Error()
 	}
@@ -9341,6 +9347,86 @@ func qSimpleSelectRowsNativeSoA(s *SoA, mask *DenseArray, selects []qSelect) (*S
 		return nil, qQueryKernelReasonSelect, "query native kernel projection failed: " + err.Error()
 	}
 	return out, "", ""
+}
+
+func qNativeSelectDependencySoA(s *SoA, selects []qSelect) (*SoA, bool, string) {
+	names, ok, reason := qNativeSelectDependencyNames(selects)
+	if !ok {
+		return nil, false, reason
+	}
+	if len(names) == 0 {
+		return nil, false, ""
+	}
+	if len(names) == len(s.ColumnNames()) {
+		return s, true, ""
+	}
+	cols := make(map[string]*DenseArray, len(names))
+	for _, name := range names {
+		col, ok := s.Column(name)
+		if !ok {
+			return nil, false, fmt.Sprintf("select expression requires missing column %q", name)
+		}
+		cols[name] = col
+	}
+	out, err := NewSoA(cols)
+	if err != nil {
+		return nil, false, err.Error()
+	}
+	return out, true, ""
+}
+
+func qNativeSelectDependencyNames(selects []qSelect) ([]string, bool, string) {
+	seen := make(map[string]struct{}, len(selects))
+	for _, sel := range selects {
+		if ok, reason := qNativeExprDependencies(sel.Expr, seen); !ok {
+			return nil, false, fmt.Sprintf("select expression %q is not supported by q query native dependency analysis: %s", sel.Name, reason)
+		}
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names, true, ""
+}
+
+func qNativeExprDependencies(expr Value, seen map[string]struct{}) (bool, string) {
+	if expr.IsString() {
+		seen[expr.Str()] = struct{}{}
+		return true, ""
+	}
+	if expr.IsNumber() || expr.IsBool() {
+		return true, ""
+	}
+	if !expr.IsTable() {
+		return false, fmt.Sprintf("expression type %s is not native-kernel supported", expr.TypeName())
+	}
+	tbl := expr.Table()
+	opValue := tbl.RawGetString("op")
+	if opValue.IsNil() {
+		opValue = tbl.RawGetInt(1)
+	}
+	if !opValue.IsString() {
+		return false, "expression table must start with an operator"
+	}
+	if _, ok := qNativeDenseArrayBinaryOp(opValue.Str()); !ok {
+		return false, fmt.Sprintf("operator %q is not native-kernel supported", opValue.Str())
+	}
+	left := tbl.RawGetString("left")
+	if left.IsNil() {
+		left = tbl.RawGetInt(2)
+	}
+	right := tbl.RawGetString("right")
+	if right.IsNil() {
+		right = tbl.RawGetInt(3)
+	}
+	if ok, reason := qNativeExprDependencies(left, seen); !ok {
+		return false, "left operand: " + reason
+	}
+	if ok, reason := qNativeExprDependencies(right, seen); !ok {
+		return false, "right operand: " + reason
+	}
+	return true, ""
 }
 
 func qEvalNativeExpr(s *SoA, expr Value) (*DenseArray, bool) {

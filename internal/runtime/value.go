@@ -1023,9 +1023,19 @@ func (v Value) NativeFrameFilterProject(mask *DenseArray, names []string) (Value
 		return NilValue(), true, err
 	}
 	cols := make(map[string]*DenseArray, len(names))
+	count := denseArrayBoolCount(mask.bools)
+	var rows []int
+	if len(projectedCols) > 1 && count > 0 && count < mask.Len() {
+		rows = denseArrayBoolRows(mask.bools, count)
+	}
 	for i, name := range names {
 		col := projectedCols[i]
-		filtered, err := col.Filter(mask)
+		var filtered *DenseArray
+		if rows != nil {
+			filtered, err = col.filterRows(rows)
+		} else {
+			filtered, err = col.filterKnownCount(mask, count)
+		}
 		if err != nil {
 			return NilValue(), true, err
 		}

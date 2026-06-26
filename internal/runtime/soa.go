@@ -449,9 +449,19 @@ func (s *SoA) Filter(mask *DenseArray) (*SoA, error) {
 		return nil, ErrDenseArrayLength
 	}
 	count := denseArrayBoolCount(mask.bools)
+	var rows []int
+	if len(s.columns) > 1 && count > 0 && count < s.length {
+		rows = denseArrayBoolRows(mask.bools, count)
+	}
 	cols := make(map[string]*DenseArray, len(s.columns))
 	for _, name := range s.names {
-		col, err := s.columns[name].filterKnownCount(mask, count)
+		var col *DenseArray
+		var err error
+		if rows != nil {
+			col, err = s.columns[name].filterRows(rows)
+		} else {
+			col, err = s.columns[name].filterKnownCount(mask, count)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("soa column %q: %w", name, err)
 		}
