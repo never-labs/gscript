@@ -4756,6 +4756,20 @@ func TryTypedI64Indexes(indexes Array) ([]int, bool, error) {
 			}
 		}
 		return out, true, nil
+	case i64PeriodicIndexArray:
+		out := make([]int, idx.Len())
+		for i := range out {
+			value, ok := idx.i64At(i)
+			if !ok {
+				return nil, true, fmt.Errorf("index vector row %d is out of range", i)
+			}
+			n, err := checkedI64Index(value)
+			if err != nil {
+				return nil, true, err
+			}
+			out[i] = n
+		}
+		return out, true, nil
 	case intIndexArray:
 		return idx.rows, true, nil
 	case i64Int32IndexArray:

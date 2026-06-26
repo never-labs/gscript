@@ -119,7 +119,7 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 	if !plan.closedOK && !root.hasCast && !root.hasNull {
 		return nil
 	}
-	if plan.closedOK && !root.hasCast && !root.hasNull && !qScriptNumericPlainClosedAllowed(root) {
+	if plan.closedOK && !root.hasCast && !root.hasNull && !qScriptNumericPlainClosedAllowed(root, plan.closed) {
 		return nil
 	}
 	if plan.closedErr == "" && !plan.closedOK && root.isFloat {
@@ -128,9 +128,12 @@ func buildQScriptNumericSumPlan(statements []qScriptStatement) *qScriptNumericSu
 	return plan
 }
 
-func qScriptNumericPlainClosedAllowed(plan qScriptNumericExprPlan) bool {
+func qScriptNumericPlainClosedAllowed(plan qScriptNumericExprPlan, summary qScriptNumericSumSummary) bool {
+	if qScriptNumericPlainAffineAllowed(plan) && qScriptNumericLinearClosedSumSafe(summary) {
+		return true
+	}
 	if plan.kind == qScriptNumericExprName && plan.left != nil {
-		return qScriptNumericPlainClosedAllowed(*plan.left)
+		return qScriptNumericPlainClosedAllowed(*plan.left, summary)
 	}
 	if plan.kind != qScriptNumericExprBinary {
 		return false
@@ -138,14 +141,111 @@ func qScriptNumericPlainClosedAllowed(plan qScriptNumericExprPlan) bool {
 	if plan.op == "mod" || plan.op == "%" {
 		return plan.isFloat
 	}
-	return qScriptNumericPlainClosedAllowedPtr(plan.left) || qScriptNumericPlainClosedAllowedPtr(plan.right)
+	return qScriptNumericPlainClosedAllowedPtr(plan.left, summary) || qScriptNumericPlainClosedAllowedPtr(plan.right, summary)
 }
 
-func qScriptNumericPlainClosedAllowedPtr(plan *qScriptNumericExprPlan) bool {
+func qScriptNumericPlainClosedAllowedPtr(plan *qScriptNumericExprPlan, summary qScriptNumericSumSummary) bool {
 	if plan == nil {
 		return false
 	}
-	return qScriptNumericPlainClosedAllowed(*plan)
+	return qScriptNumericPlainClosedAllowed(*plan, summary)
+}
+
+func qScriptNumericPlainAffineAllowed(plan qScriptNumericExprPlan) bool {
+	ok, vector := qScriptNumericPlainAffineShape(plan)
+	return ok && vector
+}
+
+func qScriptNumericPlainAffineShape(plan qScriptNumericExprPlan) (ok bool, vector bool) {
+	switch plan.kind {
+	case qScriptNumericExprName:
+		if plan.left == nil {
+			return false, false
+		}
+		return qScriptNumericPlainAffineShape(*plan.left)
+	case qScriptNumericExprTil:
+		return true, true
+	case qScriptNumericExprScalar:
+		return !plan.isFloat && !plan.hasNull, false
+	case qScriptNumericExprBinary:
+		leftOK, leftVector := qScriptNumericPlainAffineShapePtr(plan.left)
+		rightOK, rightVector := qScriptNumericPlainAffineShapePtr(plan.right)
+		if !leftOK || !rightOK {
+			return false, false
+		}
+		switch plan.op {
+		case "+", "-":
+			return true, leftVector || rightVector
+		case "*":
+			leftScalar := plan.left != nil && plan.left.kind == qScriptNumericExprScalar && !plan.left.isFloat && !plan.left.hasNull
+			rightScalar := plan.right != nil && plan.right.kind == qScriptNumericExprScalar && !plan.right.isFloat && !plan.right.hasNull
+			if leftScalar && rightVector {
+				return true, true
+			}
+			if rightScalar && leftVector {
+				return true, true
+			}
+		}
+	}
+	return false, false
+}
+
+func qScriptNumericPlainAffineShapePtr(plan *qScriptNumericExprPlan) (bool, bool) {
+	if plan == nil {
+		return false, false
+	}
+	return qScriptNumericPlainAffineShape(*plan)
+}
+
+func qScriptNumericLinearClosedSumSafe(summary qScriptNumericSumSummary) bool {
+	if !summary.linear || summary.isFloat || summary.hasNull || summary.length < 0 {
+		return false
+	}
+	if summary.length == 0 {
+		return true
+	}
+	n := int64(summary.length)
+	twoStart, ok := qScriptNumericCheckedI64Mul(2, summary.start)
+	if !ok {
+		return false
+	}
+	steps, ok := qScriptNumericCheckedI64Mul(n-1, summary.step)
+	if !ok {
+		return false
+	}
+	term, ok := qScriptNumericCheckedI64Add(twoStart, steps)
+	if !ok {
+		return false
+	}
+	prod, ok := qScriptNumericCheckedI64Mul(n, term)
+	if !ok {
+		return false
+	}
+	return prod%2 == 0
+}
+
+func qScriptNumericCheckedI64Add(a, b int64) (int64, bool) {
+	if b > 0 && a > math.MaxInt64-b {
+		return 0, false
+	}
+	if b < 0 && a < math.MinInt64-b {
+		return 0, false
+	}
+	return a + b, true
+}
+
+func qScriptNumericCheckedI64Mul(a, b int64) (int64, bool) {
+	if a == 0 || b == 0 {
+		return 0, true
+	}
+	if (a == math.MinInt64 && b == -1) || (b == math.MinInt64 && a == -1) {
+		return 0, false
+	}
+	out := a * b
+	if out/b != a {
+		return 0, false
+	}
+	return out, true
 }
 
 type qScriptNumericSumTerminalPlan struct {

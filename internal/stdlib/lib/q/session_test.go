@@ -301,22 +301,36 @@ func TestQScriptCountWherePlanClosesPeriodicPredicates(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
-	src := "x:((til 8192) mod 8)*0.25;n:8192#0N 3 6 9;c1:count where x=1.25;c2:count where x<>0.5;c3:count where null n;c4:count where n=0N;c1+c2+c3+c4"
-	plan := buildQScriptPlan(src)
-	if plan.countWhere == nil {
-		t.Fatalf("count-where plan missing for %q", src)
+	tests := []struct {
+		src  string
+		want int64
+	}{
+		{
+			src:  "x:((til 8192) mod 8)*0.25;n:8192#0N 3 6 9;c1:count where x=1.25;c2:count where x<>0.5;c3:count where null n;c4:count where n=0N;c1+c2+c3+c4",
+			want: 12288,
+		},
+		{
+			src:  "x:til 8192;idx:where x>=4096;count idx",
+			want: 4096,
+		},
 	}
-	got, err := NewEvalState(nil).Eval(src)
-	if err != nil || got != int64(12288) {
-		t.Fatalf("Eval(%q) = %#v,%v; want 12288,nil", src, got, err)
-	}
-	seen := false
-	for _, stat := range RuntimeKernelExecutionStats() {
-		if stat.Kernel == "QScriptCountWherePlan" && stat.Shape == "count-where/periodic" && stat.Outcome == "hit" {
-			seen = true
+	for _, tc := range tests {
+		plan := buildQScriptPlan(tc.src)
+		if plan.countWhere == nil {
+			t.Fatalf("count-where plan missing for %q", tc.src)
+		}
+		got, err := NewEvalState(nil).Eval(tc.src)
+		if err != nil || got != tc.want {
+			t.Fatalf("Eval(%q) = %#v,%v; want %d,nil", tc.src, got, err, tc.want)
 		}
 	}
-	if !seen {
-		t.Fatalf("missing QScriptCountWherePlan hit: %#v", RuntimeKernelExecutionStats())
+	hits := 0
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptCountWherePlan" && stat.Shape == "count-where/periodic" && stat.Outcome == "hit" {
+			hits += int(stat.Count)
+		}
+	}
+	if hits != len(tests) {
+		t.Fatalf("QScriptCountWherePlan hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
 	}
 }

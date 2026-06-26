@@ -3947,6 +3947,28 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if !ok || value != int64(12) {
 		t.Fatalf("TryTypedNumericSumByI64Indexes = %v, %v; want 12, true", value, ok)
 	}
+	mod, handled, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 20), int64(5))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedIntegerDyadic modulo handled=%v err=%v; want true,nil", handled, err)
+	}
+	mask, handled, err := TryTypedDyadic(OpNE, mod, int64(2))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedDyadic modulo != scalar handled=%v err=%v; want true,nil", handled, err)
+	}
+	periodicIndexes, handled, err := TryTypedWhereMaskI64(mask.(Array))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWhereMaskI64 periodic handled=%v err=%v; want true,nil", handled, err)
+	}
+	if _, ok := periodicIndexes.(i64PeriodicIndexArray); !ok {
+		t.Fatalf("TryTypedWhereMaskI64 periodic indexes = %T, want i64PeriodicIndexArray", periodicIndexes)
+	}
+	value, ok, err = TryTypedNumericSumByI64Indexes(NewI64Range(0, 1, 20), periodicIndexes)
+	if err != nil {
+		t.Fatalf("TryTypedNumericSumByI64Indexes periodic returned error: %v", err)
+	}
+	if !ok || value != int64(152) {
+		t.Fatalf("TryTypedNumericSumByI64Indexes periodic = %v, %v; want 152, true", value, ok)
+	}
 	value, ok, err = TryTypedNumericSumWhereMask(NewI64Range(0, 1, 8), NewBool([]bool{false, true, false, true, false, true, false, false}))
 	if err != nil {
 		t.Fatalf("TryTypedNumericSumWhereMask returned error: %v", err)

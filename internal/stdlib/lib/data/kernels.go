@@ -7750,6 +7750,24 @@ func forEachTypedI64Index(indexes Array, limit int, fn func(row int) error) erro
 			}
 		}
 		return nil
+	case i64PeriodicIndexArray:
+		for i := 0; i < idx.Len(); i++ {
+			value, ok := idx.i64At(i)
+			if !ok {
+				return fmt.Errorf("index vector row %d is out of range", i)
+			}
+			row, err := checkedI64Index(value)
+			if err != nil {
+				return err
+			}
+			if row >= limit {
+				return fmt.Errorf("index %d out of bounds for length %d", row, limit)
+			}
+			if err := fn(row); err != nil {
+				return err
+			}
+		}
+		return nil
 	case columnArray[int64]:
 		for _, value := range idx.data {
 			row, err := checkedI64Index(value)

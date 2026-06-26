@@ -29,6 +29,10 @@ func buildQScriptCountWherePlan(statements []qScriptStatement) *qScriptCountWher
 			countBindings[stmt.assign] = qScriptCountWhereTerm{name: stmt.assign, predicate: predicate, length: length}
 			continue
 		}
+		if predicate, length, ok := qScriptWhereIndexCountPredicate(stmt.rhs, numericBindings); ok {
+			countBindings[stmt.assign] = qScriptCountWhereTerm{name: stmt.assign, predicate: predicate, length: length}
+			continue
+		}
 		expr := compileQEvalExpr(stmt.rhs, 0)
 		if expr == nil {
 			return nil
@@ -68,10 +72,33 @@ func qScriptCountWherePredicate(src string, bindings map[string]qScriptNumericEx
 	return predicate, length, true
 }
 
+func qScriptWhereIndexCountPredicate(src string, bindings map[string]qScriptNumericExprPlan) (*qScriptWherePredicatePlan, int, bool) {
+	src = strings.TrimSpace(src)
+	if !strings.HasPrefix(src, "where ") {
+		return nil, 0, false
+	}
+	predicateSrc := strings.TrimSpace(src[len("where "):])
+	predicate, ok := qScriptWhereIndexPredicatePlan(predicateSrc, bindings, nil)
+	if !ok {
+		return nil, 0, false
+	}
+	length := qScriptWherePredicateLength(predicate)
+	if length <= 0 {
+		return nil, 0, false
+	}
+	return predicate, length, true
+}
+
 func qScriptCountWhereTerminalTerms(src string, bindings map[string]qScriptCountWhereTerm) []qScriptCountWhereTerm {
 	src = strings.TrimSpace(src)
 	if term, ok := bindings[src]; ok && qScriptPipelineSimpleName(src) {
 		return []qScriptCountWhereTerm{term}
+	}
+	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
+		name := strings.TrimSpace(src[len("count "):])
+		if term, ok := bindings[name]; ok && qScriptPipelineSimpleName(name) {
+			return []qScriptCountWhereTerm{term}
+		}
 	}
 	parts := qScriptPipelinePlusTerms(src)
 	if len(parts) < 2 {
@@ -80,6 +107,9 @@ func qScriptCountWhereTerminalTerms(src string, bindings map[string]qScriptCount
 	terms := make([]qScriptCountWhereTerm, 0, len(parts))
 	for _, part := range parts {
 		name := strings.TrimSpace(part)
+		if strings.HasPrefix(name, "count ") && wordBoundary(name, 0, len("count")) {
+			name = strings.TrimSpace(name[len("count "):])
+		}
 		term, ok := bindings[name]
 		if !ok || !qScriptPipelineSimpleName(name) {
 			return nil
@@ -120,6 +150,9 @@ func qScriptCountWhereClosedCount(predicate *qScriptWherePredicatePlan, length i
 		return 0, false
 	}
 	periodLen := qScriptWherePredicateResidualPeriodLen(predicate)
+	if periodLen == 0 && constraint.exclusionCount == 0 {
+		return int64(constraint.end - constraint.start + 1), true
+	}
 	if periodLen == 0 && (constraint.changed || constraint.exclusionCount > 0) {
 		periodLen = 1
 	}

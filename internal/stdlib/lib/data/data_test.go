@@ -328,6 +328,13 @@ func TestTryTypedWhereMaskI64UsesLazyModuloCompare(t *testing.T) {
 	if _, ok := notIndexes.(i64PeriodicIndexArray); !ok {
 		t.Fatalf("mod not-equal where returned %T, want lazy i64PeriodicIndexArray", notIndexes)
 	}
+	rows, handled, err := TryTypedI64Indexes(notIndexes)
+	if err != nil || !handled {
+		t.Fatalf("periodic TryTypedI64Indexes handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := rows, []int{0, 1, 3, 4, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 18, 19}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("periodic TryTypedI64Indexes = %#v, want %#v", got, want)
+	}
 }
 
 func TestTryTypedWhereMaskI64UsesLazyModuloLogicalMask(t *testing.T) {

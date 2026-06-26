@@ -5282,14 +5282,41 @@ func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
 	assertEvalValue(t, "x:til 8;y:(x*3)+7;+/y", int64(140))
-	counts := map[string]uint64{}
+	seen := false
 	for _, stat := range RuntimeKernelExecutionStats() {
-		if stat.Kernel == "ArrayDyadicArithmetic" && stat.Outcome == "hit" {
-			counts[stat.Kernel] += stat.Count
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "hit" {
+			seen = true
 		}
 	}
-	if counts["ArrayDyadicArithmetic"] != 2 {
-		t.Fatalf("ArrayDyadicArithmetic hits = %d, want 2; stats=%#v", counts["ArrayDyadicArithmetic"], RuntimeKernelExecutionStats())
+	if !seen {
+		t.Fatalf("missing script numeric affine sum plan hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalScriptNumericPlainAffineSumUsesFusedPlan(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	tests := []struct {
+		expr string
+		want int64
+	}{
+		{"x:til 8;y:7+(3*x);+/y", 140},
+		{"x:til 8;y:100-(x*2);+/y", 744},
+		{"x:til 0;y:(x*3)+7;+/y", 0},
+		{"x:til 8;y:(x*-3)-7;+/y", -140},
+	}
+	for _, tt := range tests {
+		assertEvalValue(t, tt.expr, tt.want)
+	}
+	hits := uint64(0)
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "QScriptNumericSumPlan" && stat.Shape == "vector-reduce/int-cast-expr-sum" && stat.Outcome == "hit" {
+			hits += stat.Count
+		}
+	}
+	if hits != uint64(len(tests)) {
+		t.Fatalf("script numeric affine sum plan hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
 	}
 }
 
