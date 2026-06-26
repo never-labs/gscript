@@ -5421,6 +5421,9 @@ func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (a
 	if values == nil {
 		return nil, 0, true, fmt.Errorf("sum count where compare arrays must be non-nil")
 	}
+	if sum, count, ok, err := i64RangeSumCountWhereCompareSelf(values, op, scalar); err != nil || ok {
+		return sum, count, ok, err
+	}
 	scalar = normalizeScalar(values.Kind(), scalar)
 	if sum, count, ok := f64AffineSumCountWhereCompareSelf(values, op, scalar); ok {
 		return sum, count, true, nil
@@ -5431,6 +5434,115 @@ func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (a
 		return sum, count, true, nil
 	}
 	return TryTypedNumericSumCountWhereCompare(values, values, op, scalar)
+}
+
+func i64RangeSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int64, bool, error) {
+	source := unwrapAttributedArray(values)
+	var predicate i64RangeArray
+	switch a := source.(type) {
+	case i64RangeArray:
+		predicate = a
+	case i64ScalarDyadicArray:
+		rng, ok := i64ScalarDyadicAffineRange(a)
+		if !ok {
+			return nil, 0, false, nil
+		}
+		predicate = rng
+	default:
+		return nil, 0, false, nil
+	}
+	target, ok := integerScalarValue(scalar)
+	if !ok {
+		return nil, 0, false, nil
+	}
+	start, count, ok := i64RangeCompareSelection(predicate, op, target)
+	if !ok {
+		return nil, 0, false, nil
+	}
+	if count == 0 {
+		return NullValue, 0, true, nil
+	}
+	selected := i64RangeArray{
+		start: predicate.start + int64(start)*predicate.step,
+		step:  predicate.step,
+		len:   count,
+	}
+	return i64RangeSum(selected), int64(count), true, nil
+}
+
+func i64RangeCompareSelection(values i64RangeArray, op Op, target int64) (start, count int, ok bool) {
+	if values.len <= 0 {
+		return 0, 0, true
+	}
+	if values.step == 0 {
+		keep := boolCompare(op, values.start == target, compareInt64(values.start, target))
+		if keep {
+			return 0, values.len, true
+		}
+		return 0, 0, true
+	}
+	if !i64RangeIsMonotonic(values) {
+		return 0, 0, false
+	}
+	switch op {
+	case OpGT, OpGE:
+		if values.step > 0 {
+			first, ok := i64RangeFirstCompare(values, op, target)
+			if !ok {
+				return 0, 0, false
+			}
+			return first, values.len - first, true
+		}
+		stopOp := OpLE
+		if op == OpGE {
+			stopOp = OpLT
+		}
+		firstFalse, ok := i64RangeFirstCompare(values, stopOp, target)
+		if !ok {
+			return 0, 0, false
+		}
+		return 0, firstFalse, true
+	case OpLT, OpLE:
+		if values.step > 0 {
+			stopOp := OpGE
+			if op == OpLE {
+				stopOp = OpGT
+			}
+			firstFalse, ok := i64RangeFirstCompare(values, stopOp, target)
+			if !ok {
+				return 0, 0, false
+			}
+			return 0, firstFalse, true
+		}
+		first, ok := i64RangeFirstCompare(values, op, target)
+		if !ok {
+			return 0, 0, false
+		}
+		return first, values.len - first, true
+	default:
+		return 0, 0, false
+	}
+}
+
+func i64RangeFirstCompare(values i64RangeArray, op Op, target int64) (int, bool) {
+	lo, hi := 0, values.len
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		offset, ok := checkedI64Mul(int64(mid), values.step)
+		if !ok {
+			return 0, false
+		}
+		value, ok := checkedI64Add(values.start, offset)
+		if !ok {
+			return 0, false
+		}
+		if boolCompare(op, value == target, compareInt64(value, target)) {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	return lo, true
 }
 
 // TryTypedNumericSumCountWhereWithinSelf is the predicate==values form of

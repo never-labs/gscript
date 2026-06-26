@@ -2189,9 +2189,7 @@ func (s *EvalState) evalQPipelineSumWhereCompareMask(plan *qPipelinePlan, values
 	if plan.compareOp == "" {
 		return nil, false, nil
 	}
-	if _, _, _, ok := data.I64RangeView(values); ok {
-		return nil, false, nil
-	}
+	selfPredicate := strings.TrimSpace(plan.leftExpr) == strings.TrimSpace(plan.valueExpr)
 	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, true, err
@@ -2200,13 +2198,30 @@ func (s *EvalState) evalQPipelineSumWhereCompareMask(plan *qPipelinePlan, values
 	if err != nil {
 		return nil, true, err
 	}
-	selfPredicate := strings.TrimSpace(plan.leftExpr) == strings.TrimSpace(plan.valueExpr)
+	if selfPredicate {
+		dataOp, ok := qDataCompareOpString(plan.compareOp)
+		if ok {
+			shape := "where-reduce/sum-count/" + string(values.Kind()) + "/" + plan.compareOp + "/" + string(values.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+			sum, _, handled, err := data.TryTypedNumericSumCountWhereCompareSelf(values, dataOp, right)
+			sum, _, handled, err = qTypedRuntimeResult2Reason("ArrayWhereGatherSumCount", shape, RuntimeFallbackUnsupportedType, sum, int64(0), handled, err)
+			if err != nil || handled {
+				return sum, handled, err
+			}
+		}
+	}
+	if !selfPredicate {
+		if _, _, _, ok := data.I64RangeView(values); ok {
+			return nil, false, nil
+		}
+	}
 	runtimePlan, ok, err := qTypedWhereGatherSumCountDescriptorFor(values, left, right, plan.compareOp, "where-reduce/sum-count", selfPredicate)
 	if err != nil || !ok {
 		return nil, ok, err
 	}
-	if _, _, _, ok := data.I64RangeView(runtimePlan.predicate); ok {
-		return nil, false, nil
+	if !runtimePlan.selfPredicate {
+		if _, _, _, ok := data.I64RangeView(runtimePlan.predicate); ok {
+			return nil, false, nil
+		}
 	}
 	sum, _, handled, err := evalQTypedWhereGatherSumCount(runtimePlan)
 	return sum, handled, err

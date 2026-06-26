@@ -2474,6 +2474,40 @@ func TestTypedNumericSumCountWhereCompareConsumesLazyIntegerPredicate(t *testing
 	}
 }
 
+func TestTypedNumericSumCountWhereCompareSelfUsesIntegerAffineRange(t *testing.T) {
+	sum, count, handled, err := TryTypedNumericSumCountWhereCompareSelf(NewI64Range(0, 1, 16), OpGT, int64(8))
+	if err != nil || !handled {
+		t.Fatalf("typed range self where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != int64(84) || count != 7 {
+		t.Fatalf("typed range self where sum-count = sum %v count %d, want 84 7", sum, count)
+	}
+
+	sum, count, handled, err = TryTypedNumericSumCountWhereCompareSelf(NewI64Range(0, 1, 16), OpLE, int64(3))
+	if err != nil || !handled {
+		t.Fatalf("typed range self reversed where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != int64(6) || count != 4 {
+		t.Fatalf("typed range self reversed where sum-count = sum %v count %d, want 6 4", sum, count)
+	}
+
+	scaled, handled, err := TryTypedIntegerDyadic(OpMul, NewI64Range(0, 1, 16), int64(3))
+	if err != nil || !handled {
+		t.Fatalf("typed affine multiply handled=%v err=%v", handled, err)
+	}
+	affine, handled, err := TryTypedIntegerDyadic(OpAdd, scaled, int64(7))
+	if err != nil || !handled {
+		t.Fatalf("typed affine add handled=%v err=%v", handled, err)
+	}
+	sum, count, handled, err = TryTypedNumericSumCountWhereCompareSelf(affine.(Array), OpGT, int64(25))
+	if err != nil || !handled {
+		t.Fatalf("typed affine self where sum-count handled=%v err=%v", handled, err)
+	}
+	if sum != int64(360) || count != 9 {
+		t.Fatalf("typed affine self where sum-count = sum %v count %d, want 360 9", sum, count)
+	}
+}
+
 func TestTypedNumericSumCountWhereCompareConsumesLazyFloatPredicate(t *testing.T) {
 	base := NewI64Range(0, 1, 16)
 	scaled, handled, err := typedKernels.Dyadic(OpMul, base, float64(2))
