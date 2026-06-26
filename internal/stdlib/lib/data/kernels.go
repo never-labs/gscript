@@ -33,6 +33,28 @@ type I64IndexExpr struct {
 	Right *I64IndexExpr
 }
 
+type I64SelectedExprOp uint8
+
+const (
+	I64SelectedExprConst I64SelectedExprOp = iota
+	I64SelectedExprIndex
+	I64SelectedExprGather
+	I64SelectedExprAdd
+	I64SelectedExprSub
+	I64SelectedExprMul
+	I64SelectedExprDiv
+	I64SelectedExprMod
+	I64SelectedExprXbar
+)
+
+type I64SelectedExpr struct {
+	Op     I64SelectedExprOp
+	Value  int64
+	Source Array
+	Left   *I64SelectedExpr
+	Right  *I64SelectedExpr
+}
+
 type I64IndexExprReducerKind uint8
 
 const (
@@ -5816,23 +5838,21 @@ func TryTypedI64IndexExprFbySumTotal(indexes Array, expr I64IndexExpr, groups Ar
 		}
 		eval.release()
 		bulkI64Release(rows, rowsOwned)
-	} else {
-		if err := forEachTypedI64Index(indexes, groups.Len(), func(row int) error {
-			value, err := evalI64IndexExpr(expr, int64(row))
-			if err != nil {
-				return err
-			}
-			group, err := lookup(row)
-			if err != nil {
-				return err
-			}
-			sums[group] += value
-			return nil
-		}); err != nil {
-			bulkI64Release(sums, true)
-			bulkI64Release(counts, true)
-			return 0, true, err
+	} else if err := forEachTypedI64Index(indexes, groups.Len(), func(row int) error {
+		value, err := evalI64IndexExpr(expr, int64(row))
+		if err != nil {
+			return err
 		}
+		group, err := lookup(row)
+		if err != nil {
+			return err
+		}
+		sums[group] += value
+		return nil
+	}); err != nil {
+		bulkI64Release(sums, true)
+		bulkI64Release(counts, true)
+		return 0, true, err
 	}
 	var total int64
 	for group, sum := range sums {
@@ -5841,6 +5861,207 @@ func TryTypedI64IndexExprFbySumTotal(indexes Array, expr I64IndexExpr, groups Ar
 	bulkI64Release(sums, true)
 	bulkI64Release(counts, true)
 	return total, true, nil
+}
+
+func TryTypedI64SelectedExprFbySumTotal(indexes Array, expr I64SelectedExpr, groups Array) (int64, bool, error) {
+	if indexes == nil || groups == nil {
+		return 0, true, fmt.Errorf("index expression fby sum total expects non-nil indexes and groups")
+	}
+	if indexes.Kind() != KindI64 {
+		return 0, true, fmt.Errorf("index expression indexes kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if !i64SelectedExprValid(expr) {
+		return 0, false, nil
+	}
+	var lookup fbyGroupLookupFn
+	var groupCount int
+	var counts []int64
+	if sourceGroups, count, start, sourceLen, tiled, err := fbyTiledSourceGroups(groups); err != nil || tiled {
+		if err != nil {
+			return 0, true, err
+		}
+		groupCount = count
+		counts = bulkI64Get(groupCount)
+		clear(counts)
+		for sourceRow, group := range sourceGroups {
+			row := (int64(sourceRow) - int64(start)) % int64(sourceLen)
+			if row < 0 {
+				row += int64(sourceLen)
+			}
+			if row >= int64(groups.Len()) {
+				continue
+			}
+			counts[group] += 1 + (int64(groups.Len())-1-row)/int64(sourceLen)
+		}
+		lookup = func(row int) (int, error) {
+			if row < 0 || row >= groups.Len() {
+				return 0, fmt.Errorf("fby group row %d out of range", row)
+			}
+			return sourceGroups[(start+row)%sourceLen], nil
+		}
+	} else {
+		var ok bool
+		var err error
+		lookup, groupCount, ok, err = fbyGroupLookup(groups)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		counts = bulkI64Get(groupCount)
+		clear(counts)
+		for row := 0; row < groups.Len(); row++ {
+			group, err := lookup(row)
+			if err != nil {
+				bulkI64Release(counts, true)
+				return 0, true, err
+			}
+			counts[group]++
+		}
+	}
+	sums := bulkI64Get(groupCount)
+	clear(sums)
+	if rows, rowsOwned, ok := tryBulkI64Values(indexes); ok {
+		for _, row := range rows {
+			if row < 0 || row >= int64(groups.Len()) {
+				bulkI64Release(rows, rowsOwned)
+				bulkI64Release(sums, true)
+				bulkI64Release(counts, true)
+				return 0, true, fmt.Errorf("index expression row %d out of range", row)
+			}
+			value, err := evalI64SelectedExpr(expr, row)
+			if err != nil {
+				bulkI64Release(rows, rowsOwned)
+				bulkI64Release(sums, true)
+				bulkI64Release(counts, true)
+				return 0, true, err
+			}
+			group, err := lookup(int(row))
+			if err != nil {
+				bulkI64Release(rows, rowsOwned)
+				bulkI64Release(sums, true)
+				bulkI64Release(counts, true)
+				return 0, true, err
+			}
+			sums[group] += value
+		}
+		bulkI64Release(rows, rowsOwned)
+	} else if err := forEachTypedI64Index(indexes, groups.Len(), func(row int) error {
+		value, err := evalI64SelectedExpr(expr, int64(row))
+		if err != nil {
+			return err
+		}
+		group, err := lookup(row)
+		if err != nil {
+			return err
+		}
+		sums[group] += value
+		return nil
+	}); err != nil {
+		bulkI64Release(sums, true)
+		bulkI64Release(counts, true)
+		return 0, true, err
+	}
+	var total int64
+	for group, sum := range sums {
+		total += sum * counts[group]
+	}
+	bulkI64Release(sums, true)
+	bulkI64Release(counts, true)
+	return total, true, nil
+}
+
+func i64SelectedExprValid(expr I64SelectedExpr) bool {
+	switch expr.Op {
+	case I64SelectedExprConst, I64SelectedExprIndex:
+		return true
+	case I64SelectedExprGather:
+		return expr.Source != nil && isDenseIntegerArray(expr.Source)
+	case I64SelectedExprAdd, I64SelectedExprSub, I64SelectedExprMul, I64SelectedExprDiv, I64SelectedExprMod:
+		return expr.Left != nil && expr.Right != nil && i64SelectedExprValid(*expr.Left) && i64SelectedExprValid(*expr.Right)
+	case I64SelectedExprXbar:
+		return expr.Value > 0 && expr.Left != nil && i64SelectedExprValid(*expr.Left)
+	default:
+		return false
+	}
+}
+
+func evalI64SelectedExpr(expr I64SelectedExpr, row int64) (int64, error) {
+	switch expr.Op {
+	case I64SelectedExprConst:
+		return expr.Value, nil
+	case I64SelectedExprIndex:
+		return row, nil
+	case I64SelectedExprGather:
+		if row < 0 || row >= int64(expr.Source.Len()) {
+			return 0, fmt.Errorf("selected expression gather row %d out of range", row)
+		}
+		value, ok, err := integerArrayAt(expr.Source, int(row))
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			return 0, fmt.Errorf("selected expression gather row %d is null", row)
+		}
+		return value, nil
+	case I64SelectedExprAdd:
+		left, right, err := evalI64SelectedExprOperands(expr, row)
+		if err != nil {
+			return 0, err
+		}
+		return left + right, nil
+	case I64SelectedExprSub:
+		left, right, err := evalI64SelectedExprOperands(expr, row)
+		if err != nil {
+			return 0, err
+		}
+		return left - right, nil
+	case I64SelectedExprMul:
+		left, right, err := evalI64SelectedExprOperands(expr, row)
+		if err != nil {
+			return 0, err
+		}
+		return left * right, nil
+	case I64SelectedExprDiv:
+		left, right, err := evalI64SelectedExprOperands(expr, row)
+		if err != nil {
+			return 0, err
+		}
+		if right == 0 {
+			return 0, fmt.Errorf("selected expression divide by zero")
+		}
+		return left / right, nil
+	case I64SelectedExprMod:
+		left, right, err := evalI64SelectedExprOperands(expr, row)
+		if err != nil {
+			return 0, err
+		}
+		if right == 0 {
+			return 0, fmt.Errorf("selected expression modulo by zero")
+		}
+		return left % right, nil
+	case I64SelectedExprXbar:
+		value, err := evalI64SelectedExpr(*expr.Left, row)
+		if err != nil {
+			return 0, err
+		}
+		if expr.Value <= 0 {
+			return 0, fmt.Errorf("selected expression xbar width must be positive")
+		}
+		return floorInt64(value, expr.Value), nil
+	default:
+		return 0, fmt.Errorf("unsupported selected expression op %d", expr.Op)
+	}
+}
+
+func evalI64SelectedExprOperands(expr I64SelectedExpr, row int64) (int64, int64, error) {
+	left, err := evalI64SelectedExpr(*expr.Left, row)
+	if err != nil {
+		return 0, 0, err
+	}
+	right, err := evalI64SelectedExpr(*expr.Right, row)
+	if err != nil {
+		return 0, 0, err
+	}
+	return left, right, nil
 }
 
 func i64IndexExprValid(expr I64IndexExpr) bool {

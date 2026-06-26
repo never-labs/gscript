@@ -122,15 +122,29 @@ func TestQScriptWhereIndexFbySumPlan(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 
-	src := "px:100+((til 16) mod 8);sym:16#`A`B;idx:where px>=104;vals:(100+(idx mod 8))*(1+(idx mod 3));n:@[16#0;idx;+;vals];s:sum n fby sym;(+/s)+count idx"
-	plan := buildQScriptPlan(src)
-	if plan.whereIndexFbySum == nil {
-		t.Fatalf("where-index fby sum plan missing for %q", src)
-	}
 	session := NewEvalSession(nil)
-	got, err := session.Eval(src)
-	if err != nil || got != int64(12664) {
-		t.Fatalf("EvalSession.Eval = %#v,%v; want 12664,nil", got, err)
+	tests := []struct {
+		src  string
+		want int64
+	}{
+		{
+			src:  "px:100+((til 16) mod 8);sym:16#`A`B;idx:where px>=104;vals:(100+(idx mod 8))*(1+(idx mod 3));n:@[16#0;idx;+;vals];s:sum n fby sym;(+/s)+count idx",
+			want: 12664,
+		},
+		{
+			src:  "px:96#100 0Ni 105 110 0Ni 115;sz:1+((til 96) mod 20);sym:96#`AAPL`MSFT`NVDA`TSLA;clean:0^px;idx:where not null px;vals:(clean[idx])*(1+(idx mod 20));n:@[96#0;idx;+;vals];s:sum n fby sym;(+/s)+count where null px",
+			want: qScriptWhereIndexFbySumNullAwareWant(96),
+		},
+	}
+	for _, tt := range tests {
+		plan := buildQScriptPlan(tt.src)
+		if plan.whereIndexFbySum == nil {
+			t.Fatalf("where-index fby sum plan missing for %q", tt.src)
+		}
+		got, err := session.Eval(tt.src)
+		if err != nil || got != tt.want {
+			t.Fatalf("EvalSession.Eval = %#v,%v; want %d,nil", got, err, tt.want)
+		}
 	}
 	hits := uint64(0)
 	for _, stat := range RuntimeKernelExecutionStats() {
@@ -138,9 +152,30 @@ func TestQScriptWhereIndexFbySumPlan(t *testing.T) {
 			hits += stat.Count
 		}
 	}
-	if hits != 1 {
-		t.Fatalf("QScriptWhereIndexFbySumPlan hits = %d, want 1; stats=%#v", hits, RuntimeKernelExecutionStats())
+	if hits != uint64(len(tests)) {
+		t.Fatalf("QScriptWhereIndexFbySumPlan hits = %d, want %d; stats=%#v", hits, len(tests), RuntimeKernelExecutionStats())
 	}
+}
+
+func qScriptWhereIndexFbySumNullAwareWant(rows int) int64 {
+	values := []int64{100, 0, 105, 110, 0, 115}
+	nulls := map[int]bool{1: true, 4: true}
+	var groupSums, groupCounts [4]int64
+	var nullCount int64
+	for row := 0; row < rows; row++ {
+		groupCounts[row%4]++
+		slot := row % len(values)
+		if nulls[slot] {
+			nullCount++
+			continue
+		}
+		groupSums[row%4] += values[slot] * int64(1+row%20)
+	}
+	var total int64
+	for group, sum := range groupSums {
+		total += sum * groupCounts[group]
+	}
+	return total + nullCount
 }
 
 func TestQScriptWhereIndexSumPlanClosesLinearConstrainedPredicates(t *testing.T) {
