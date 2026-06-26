@@ -4217,16 +4217,12 @@ func qSQLCachedPlanTemplate(name, src string) (qSQLPlanTemplate, error) {
 	if tmpl, ok := qSQLTemplateCache[src]; ok {
 		qSQLTemplateStats.TemplateHits++
 		qSQLTemplateCacheMu.Unlock()
-		tmpl.plan = qCloneDataQueryPlan(tmpl.plan)
-		tmpl.sourcePath = qNormalizePathString(tmpl.sourcePath)
-		tmpl.literalFrame = qCloneDataFramePtr(tmpl.literalFrame)
-		tmpl.literalKeys = qCloneDataSymbols(tmpl.literalKeys)
-		tmpl.hiddenCols = qCloneDataSymbols(tmpl.hiddenCols)
-		tmpl.execDict = qCloneQExecDictPlan(tmpl.execDict)
-		tmpl.mutation = qCloneQMutationPlan(tmpl.mutation)
-		tmpl.join = qCloneQJoinPlan(tmpl.join)
-		tmpl.joins = qCloneQJoinPlans(tmpl.joins)
-		tmpl.subs = qCloneQSubPlans(tmpl.subs)
+		if tmpl.mutation != nil {
+			tmpl.sourcePath = qNormalizePathString(tmpl.sourcePath)
+			tmpl.literalFrame = qCloneDataFramePtr(tmpl.literalFrame)
+			tmpl.literalKeys = qCloneDataSymbols(tmpl.literalKeys)
+			tmpl.mutation = qCloneQMutationPlan(tmpl.mutation)
+		}
 		return tmpl, nil
 	}
 	qSQLTemplateStats.TemplateMisses++
