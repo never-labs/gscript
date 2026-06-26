@@ -8,6 +8,7 @@ import (
 )
 
 var qEvalPlanBenchSink any
+var qEvalPlanInt64BenchSink int64
 
 func BenchmarkEvalWithEnvScriptPlanCacheCold(b *testing.B) {
 	const src = "x:a+1;y:x*2;z:y+3;z"
@@ -183,6 +184,40 @@ func BenchmarkPreparedEvalDensePipelinePlanWarm(b *testing.B) {
 			b.Fatalf("PreparedEval dense pipeline warm: %v", err)
 		}
 		qEvalPlanBenchSink = out
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")
+}
+
+func BenchmarkEvalSessionPlannedScalarDensePipelinePlanWarm(b *testing.B) {
+	ClearEvalPlanCaches()
+	defer ClearEvalPlanCaches()
+
+	const src = "+/v where v>threshold"
+	values := make([]int64, 8192)
+	for i := range values {
+		values[i] = int64(i)
+	}
+	session := NewEvalSession(map[string]any{
+		"v":         data.NewI64(values),
+		"threshold": int64(4096),
+	})
+	planned := session.Planned(src)
+	if planned == nil {
+		b.Fatal("Planned returned nil")
+	}
+	if out, ok, err := planned.EvalScalar(); err != nil || !ok || out.Kind != EvalScalarInt {
+		b.Fatalf("warm planned scalar setup: %#v,%v,%v", out, ok, err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	start := time.Now()
+	for i := 0; i < b.N; i++ {
+		out, ok, err := planned.EvalScalar()
+		if err != nil || !ok {
+			b.Fatalf("planned scalar dense pipeline warm: %#v,%v,%v", out, ok, err)
+		}
+		qEvalPlanInt64BenchSink = out.I64
 	}
 	b.StopTimer()
 	b.ReportMetric(float64(b.N)/time.Since(start).Seconds(), "eval/s")

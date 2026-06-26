@@ -5421,11 +5421,14 @@ func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (a
 	if values == nil {
 		return nil, 0, true, fmt.Errorf("sum count where compare arrays must be non-nil")
 	}
-	if sum, count, ok, err := i64RangeSumCountWhereCompareSelf(values, op, scalar); err != nil || ok {
+	if sum, count, ok, err := TryTypedIntegerSumCountWhereCompareSelf(values, op, scalar); err != nil || ok {
+		if err != nil || !ok {
+			return nil, count, ok, err
+		}
+		if count == 0 {
+			return NullValue, 0, true, nil
+		}
 		return sum, count, ok, err
-	}
-	if sum, count, ok := integerColumnSumCountWhereCompareSelf(values, op, scalar); ok {
-		return sum, count, true, nil
 	}
 	scalar = normalizeScalar(values.Kind(), scalar)
 	if sum, count, ok := f64AffineSumCountWhereCompareSelf(values, op, scalar); ok {
@@ -5439,11 +5442,24 @@ func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (a
 	return TryTypedNumericSumCountWhereCompare(values, values, op, scalar)
 }
 
-func integerColumnSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int64, bool) {
+func TryTypedIntegerSumCountWhereCompareSelf(values Array, op Op, scalar any) (int64, int64, bool, error) {
+	if values == nil {
+		return 0, 0, true, fmt.Errorf("sum count where compare arrays must be non-nil")
+	}
+	if sum, count, ok, err := i64RangeSumCountWhereCompareSelf(values, op, scalar); err != nil || ok {
+		return sum, count, ok, err
+	}
+	if sum, count, ok := integerColumnSumCountWhereCompareSelf(values, op, scalar); ok {
+		return sum, count, true, nil
+	}
+	return 0, 0, false, nil
+}
+
+func integerColumnSumCountWhereCompareSelf(values Array, op Op, scalar any) (int64, int64, bool) {
 	source := unwrapAttributedArray(values)
 	target, ok := integerScalarValue(scalar)
 	if !ok {
-		return nil, 0, false
+		return 0, 0, false
 	}
 	switch a := source.(type) {
 	case columnArray[int8]:
@@ -5463,11 +5479,11 @@ func integerColumnSumCountWhereCompareSelf(values Array, op Op, scalar any) (any
 	case columnArray[uint64]:
 		return integerUnsignedSliceSumCountWhereCompareSelf(a.data, op, target)
 	default:
-		return nil, 0, false
+		return 0, 0, false
 	}
 }
 
-func integerSliceSumCountWhereCompareSelf[T signedScalar](values []T, op Op, target int64) (any, int64, bool) {
+func integerSliceSumCountWhereCompareSelf[T signedScalar](values []T, op Op, target int64) (int64, int64, bool) {
 	var total int64
 	var count int64
 	switch op {
@@ -5520,15 +5536,12 @@ func integerSliceSumCountWhereCompareSelf[T signedScalar](values []T, op Op, tar
 			}
 		}
 	default:
-		return nil, 0, false
-	}
-	if count == 0 {
-		return NullValue, 0, true
+		return 0, 0, false
 	}
 	return total, count, true
 }
 
-func integerUnsignedSliceSumCountWhereCompareSelf[T unsignedScalar](values []T, op Op, target int64) (any, int64, bool) {
+func integerUnsignedSliceSumCountWhereCompareSelf[T unsignedScalar](values []T, op Op, target int64) (int64, int64, bool) {
 	if target < 0 {
 		switch op {
 		case OpGT, OpGE, OpNE:
@@ -5536,12 +5549,9 @@ func integerUnsignedSliceSumCountWhereCompareSelf[T unsignedScalar](values []T, 
 			for _, raw := range values {
 				total += int64(raw)
 			}
-			if len(values) == 0 {
-				return NullValue, 0, true
-			}
 			return total, int64(len(values)), true
 		case OpLT, OpLE, OpEQ:
-			return NullValue, 0, true
+			return 0, 0, true
 		}
 	}
 	var total int64
@@ -5597,15 +5607,12 @@ func integerUnsignedSliceSumCountWhereCompareSelf[T unsignedScalar](values []T, 
 			}
 		}
 	default:
-		return nil, 0, false
-	}
-	if count == 0 {
-		return NullValue, 0, true
+		return 0, 0, false
 	}
 	return total, count, true
 }
 
-func i64RangeSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int64, bool, error) {
+func i64RangeSumCountWhereCompareSelf(values Array, op Op, scalar any) (int64, int64, bool, error) {
 	source := unwrapAttributedArray(values)
 	var predicate i64RangeArray
 	switch a := source.(type) {
@@ -5614,22 +5621,22 @@ func i64RangeSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int
 	case i64ScalarDyadicArray:
 		rng, ok := i64ScalarDyadicAffineRange(a)
 		if !ok {
-			return nil, 0, false, nil
+			return 0, 0, false, nil
 		}
 		predicate = rng
 	default:
-		return nil, 0, false, nil
+		return 0, 0, false, nil
 	}
 	target, ok := integerScalarValue(scalar)
 	if !ok {
-		return nil, 0, false, nil
+		return 0, 0, false, nil
 	}
 	start, count, ok := i64RangeCompareSelection(predicate, op, target)
 	if !ok {
-		return nil, 0, false, nil
+		return 0, 0, false, nil
 	}
 	if count == 0 {
-		return NullValue, 0, true, nil
+		return 0, 0, true, nil
 	}
 	selected := i64RangeArray{
 		start: predicate.start + int64(start)*predicate.step,

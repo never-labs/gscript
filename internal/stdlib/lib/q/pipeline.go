@@ -48,40 +48,44 @@ const (
 )
 
 type qPipelinePlan struct {
-	source               string
-	kind                 qPipelineKind
-	shape                string
-	shapeSpec            qPipelineShapeSpec
-	stableShapeID        string
-	pipelineShape        string
-	moduloStatsShapeKey  string
-	moduloStatsShape     string
-	moduloReduceShapeKey string
-	moduloReduceShape    string
-	operands             []qPipelineOperandPlan
-	valueExpr            string
-	valuePlan            qScriptBindingPlan
-	indexExpr            string
-	indexPlan            qScriptBindingPlan
-	maskExpr             string
-	maskPlan             qScriptBindingPlan
-	leftExpr             string
-	leftPlan             qScriptBindingPlan
-	rightExpr            string
-	rightPlan            qScriptBindingPlan
-	compareOp            string
-	comparePrefix        string
-	unaryOp              string
-	modExpr              string
-	modPlan              qScriptBindingPlan
-	modulusExpr          string
-	modulusPlan          qScriptBindingPlan
-	modTargetExpr        string
-	modTargetPlan        qScriptBindingPlan
-	reductionInput       string
-	reductionPlan        qScriptBindingPlan
-	moduloMaskPlan       *qPipelinePlan
-	castTerms            []qPipelineCastTermPlan
+	source                  string
+	kind                    qPipelineKind
+	shape                   string
+	shapeSpec               qPipelineShapeSpec
+	stableShapeID           string
+	pipelineShape           string
+	moduloStatsShapeKey     string
+	moduloStatsShape        string
+	moduloReduceShapeKey    string
+	moduloReduceShape       string
+	compareReduceValuesKind data.Kind
+	compareReduceRightKind  data.Kind
+	compareReduceOp         string
+	compareReduceShape      string
+	operands                []qPipelineOperandPlan
+	valueExpr               string
+	valuePlan               qScriptBindingPlan
+	indexExpr               string
+	indexPlan               qScriptBindingPlan
+	maskExpr                string
+	maskPlan                qScriptBindingPlan
+	leftExpr                string
+	leftPlan                qScriptBindingPlan
+	rightExpr               string
+	rightPlan               qScriptBindingPlan
+	compareOp               string
+	comparePrefix           string
+	unaryOp                 string
+	modExpr                 string
+	modPlan                 qScriptBindingPlan
+	modulusExpr             string
+	modulusPlan             qScriptBindingPlan
+	modTargetExpr           string
+	modTargetPlan           qScriptBindingPlan
+	reductionInput          string
+	reductionPlan           qScriptBindingPlan
+	moduloMaskPlan          *qPipelinePlan
+	castTerms               []qPipelineCastTermPlan
 }
 
 type qPipelineCastTermPlan struct {
@@ -1627,6 +1631,69 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 	return out, handled, err
 }
 
+func (s *EvalState) evalQPipelinePlanScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	if plan == nil || plan.kind == qPipelineInvalid {
+		return EvalScalarResult{}, false, nil
+	}
+	recordRuntimeQPipelinePlanExecution(plan, "attempt", "attempt")
+	var (
+		out     EvalScalarResult
+		handled bool
+		err     error
+	)
+	switch plan.kind {
+	case qPipelineSumWhereMask:
+		out, handled, err = s.evalQPipelineSumWhereMaskScalar(plan)
+	default:
+		recordRuntimeQPipelinePlanExecution(plan, "fallback", RuntimeFallbackPlannerUnhandled)
+		return EvalScalarResult{}, false, nil
+	}
+	switch {
+	case err != nil:
+		recordRuntimeQPipelinePlanExecution(plan, "error", RuntimeFallbackPipelineError)
+	case handled:
+		recordRuntimeQPipelinePlanExecution(plan, "hit", "typed_pipeline")
+	default:
+		recordRuntimeQPipelinePlanExecution(plan, "fallback", "unsupported_runtime_shape")
+	}
+	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineSumWhereMaskScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	if plan.compareOp == "" {
+		return EvalScalarResult{}, false, nil
+	}
+	if strings.TrimSpace(plan.leftExpr) != strings.TrimSpace(plan.valueExpr) {
+		return EvalScalarResult{}, false, nil
+	}
+	dataOp, ok := qDataCompareOpString(plan.compareOp)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	shape := qPipelineCompareReduceShape(plan, array.Kind(), qRuntimeKernelOperandKind(right, nil))
+	sum, count, handled, err := data.TryTypedIntegerSumCountWhereCompareSelf(array, dataOp, right)
+	sum, count, handled, err = qTypedRuntimeResult2Reason("ArrayWhereGatherSumCount", shape, RuntimeFallbackUnsupportedType, sum, count, handled, err)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	if count == 0 {
+		return EvalScalarResult{}, false, nil
+	}
+	return evalScalarInt(sum), true, nil
+}
+
 func (s *EvalState) evalQPipelineCastEnvelopeSum(plan *qPipelinePlan) (any, bool, error) {
 	if len(plan.castTerms) == 0 {
 		return nil, false, nil
@@ -2201,10 +2268,13 @@ func (s *EvalState) evalQPipelineSumWhereCompareMask(plan *qPipelinePlan, values
 	if selfPredicate {
 		dataOp, ok := qDataCompareOpString(plan.compareOp)
 		if ok {
-			shape := "where-reduce/sum-count/" + string(values.Kind()) + "/" + plan.compareOp + "/" + string(values.Kind()) + "/" + string(qRuntimeKernelOperandKind(right, nil))
-			sum, _, handled, err := data.TryTypedNumericSumCountWhereCompareSelf(values, dataOp, right)
-			sum, _, handled, err = qTypedRuntimeResult2Reason("ArrayWhereGatherSumCount", shape, RuntimeFallbackUnsupportedType, sum, int64(0), handled, err)
+			shape := qPipelineCompareReduceShape(plan, values.Kind(), qRuntimeKernelOperandKind(right, nil))
+			sum, count, handled, err := data.TryTypedIntegerSumCountWhereCompareSelf(values, dataOp, right)
+			sum, count, handled, err = qTypedRuntimeResult2Reason("ArrayWhereGatherSumCount", shape, RuntimeFallbackUnsupportedType, sum, count, handled, err)
 			if err != nil || handled {
+				if err == nil && handled && count == 0 {
+					return data.NullValue, true, nil
+				}
 				return sum, handled, err
 			}
 		}
@@ -2591,6 +2661,22 @@ func (s *EvalState) evalQPipelineModuloCompareValueSum(plan *qPipelinePlan, valu
 		return nil, handled, err
 	}
 	return out, true, nil
+}
+
+func qPipelineCompareReduceShape(plan *qPipelinePlan, valuesKind, rightKind data.Kind) string {
+	if plan == nil {
+		return "where-reduce/sum-count/" + string(valuesKind) + "/?/unknown/" + string(rightKind)
+	}
+	if plan.compareReduceShape == "" ||
+		plan.compareReduceValuesKind != valuesKind ||
+		plan.compareReduceRightKind != rightKind ||
+		plan.compareReduceOp != plan.compareOp {
+		plan.compareReduceValuesKind = valuesKind
+		plan.compareReduceRightKind = rightKind
+		plan.compareReduceOp = plan.compareOp
+		plan.compareReduceShape = "where-reduce/sum-count/" + string(valuesKind) + "/" + plan.compareOp + "/" + string(valuesKind) + "/" + string(rightKind)
+	}
+	return plan.compareReduceShape
 }
 
 func qPipelineModuloStatsShape(plan *qPipelinePlan, arrayKind, modulusKind, targetKind data.Kind) string {

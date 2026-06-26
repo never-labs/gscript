@@ -953,6 +953,17 @@ func (s *EvalState) evalScriptPlanScalar(plan qScriptPlan) (EvalScalarResult, bo
 }
 
 func (s *EvalState) evalScriptPlanScalarBody(plan qScriptPlan) (EvalScalarResult, bool, error) {
+	if len(plan.statements) == 1 {
+		stmt := &plan.statements[0]
+		if stmt.assign == "" && stmt.idxAssignName == "" && stmt.fastPlan.kind == qEvalFastPipeline {
+			if out, handled, err := s.evalQPipelinePlanScalar(&stmt.fastPlan.pipeline); err != nil || handled {
+				if handled {
+					recordQEvalDispatch(stmt.src, EvalDispatchFastPlan)
+				}
+				return out, handled, err
+			}
+		}
+	}
 	if plan.numericSum != nil {
 		if out, handled, err := s.evalQScriptNumericSumPlanScalar(plan.numericSum); err != nil || handled {
 			return out, handled, err

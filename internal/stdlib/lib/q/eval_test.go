@@ -3048,6 +3048,30 @@ func TestEvalSessionWarmCachePreservesEnvironmentSemantics(t *testing.T) {
 	}
 }
 
+func TestEvalSessionScalarPipelinePreservesEnvironmentSemantics(t *testing.T) {
+	session := NewEvalSession(map[string]any{
+		"v":         data.NewI64([]int64{1, 2, 3, 4, 5}),
+		"threshold": int64(2),
+	})
+	src := "+/v where v>threshold"
+	got, ok, err := session.EvalScalar(src)
+	if err != nil || !ok || got.Kind != EvalScalarInt || got.I64 != 12 {
+		t.Fatalf("cold EvalScalar returned %#v,%v,%v; want int 12,true,nil", got, ok, err)
+	}
+	entry, ok := session.cache[strings.TrimSpace(src)]
+	if !ok {
+		t.Fatal("session plan cache was not populated")
+	}
+	if entry.script.statements[0].fastPlan.kind != qEvalFastPipeline {
+		t.Fatalf("cached script fast plan = %#v, want pipeline", entry.script.statements[0].fastPlan.kind)
+	}
+	session.state.env["threshold"] = int64(3)
+	got, ok, err = session.EvalScalar(src)
+	if err != nil || !ok || got.Kind != EvalScalarInt || got.I64 != 9 {
+		t.Fatalf("warm EvalScalar returned %#v,%v,%v; want int 9,true,nil", got, ok, err)
+	}
+}
+
 func TestEvalSessionWarmCacheDoesNotPoisonErrorPath(t *testing.T) {
 	session := NewEvalSession(nil)
 	if _, err := session.Eval("x+"); err == nil {
