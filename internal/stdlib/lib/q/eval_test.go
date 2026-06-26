@@ -6373,24 +6373,16 @@ func TestEvalSortRankReducerBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
 	assertEvalValue(t, "(+/iasc 3 1 2 1)+(+/rank `x`a`b`z`c)+(first asc 3 1 2)+(first desc 3 1 2)", int64(20))
 	seenBundle := false
-	seenRank := false
-	seenEdge := false
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected sort/rank reducer fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
 		}
-		if stat.Kernel == "SortRankReducerBundle" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+		if stat.Kernel == "SortRankReducerBundle" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && strings.Contains(stat.Shape, "/static") {
 			seenBundle = true
 		}
-		if stat.Kernel == "ArrayRankSum" && stat.Outcome == "hit" && stat.Shape == "rank-sum/symbol" {
-			seenRank = true
-		}
-		if stat.Kernel == "ArraySortedEdge" && stat.Outcome == "hit" && strings.HasPrefix(stat.Shape, "sort-edge/i64/") {
-			seenEdge = true
-		}
 	}
-	if !seenBundle || !seenRank || !seenEdge {
-		t.Fatalf("missing sort/rank reducer stats: bundle=%v rank=%v edge=%v all=%#v", seenBundle, seenRank, seenEdge, RuntimeKernelExecutionStats())
+	if !seenBundle {
+		t.Fatalf("missing static sort/rank reducer bundle hit: %#v", RuntimeKernelExecutionStats())
 	}
 }
 
@@ -6437,6 +6429,9 @@ func TestQSortRankReducerPlanHoistsOnlyStaticArgs(t *testing.T) {
 	}
 	if terms[1].hasArgValue {
 		t.Fatalf("dynamic sort/rank arg was hoisted: %#v", terms[1])
+	}
+	if !terms[0].hasStaticResult {
+		t.Fatalf("literal sort/rank term was not statically reduced: %#v", terms[0])
 	}
 	assertEvalValue(t, "x:4 1 3;(+/iasc 3 1 2 1)+(+/rank x)", int64(9))
 }

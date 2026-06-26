@@ -1092,15 +1092,17 @@ const (
 )
 
 type qEvalFastPlan struct {
-	kind          qEvalFastPlanKind
-	pipeline      qPipelinePlan
-	scalarIndex   qScalarApplyIndexPlan
-	sortRankTerms []qSortRankReducerTermPlan
-	postfixName   string
-	postfixSymbol data.Symbol
-	constState    qEvalConstState
-	fby           *qFbyFastPlan
-	addChainTerms []qAddChainTermPlan
+	kind                    qEvalFastPlanKind
+	pipeline                qPipelinePlan
+	scalarIndex             qScalarApplyIndexPlan
+	sortRankTerms           []qSortRankReducerTermPlan
+	sortRankStaticResult    int64
+	hasSortRankStaticResult bool
+	postfixName             string
+	postfixSymbol           data.Symbol
+	constState              qEvalConstState
+	fby                     *qFbyFastPlan
+	addChainTerms           []qAddChainTermPlan
 	// applyIndexState memoizes the syntactic gate of evalApplyIndexForm so
 	// warm statements skip the per-call @/. apply string walks.
 	applyIndexState qEvalSyntaxState
@@ -2110,7 +2112,12 @@ func buildQEvalFastPlanRoutes(src string, statementLevel bool) qEvalFastPlan {
 		return qEvalFastPlan{kind: qEvalFastNamePostfixSymbol, postfixName: name, postfixSymbol: sym}
 	}
 	if sortRankTerms := buildQSortRankReducerBundlePlan(src); len(sortRankTerms) > 0 {
-		return qEvalFastPlan{kind: qEvalFastSortRankReducerBundle, sortRankTerms: sortRankTerms}
+		out := qEvalFastPlan{kind: qEvalFastSortRankReducerBundle, sortRankTerms: sortRankTerms}
+		if static, ok := qStaticSortRankReducerBundle(sortRankTerms); ok {
+			out.sortRankStaticResult = static
+			out.hasSortRankStaticResult = true
+		}
+		return out
 	}
 	if qPipelinePlanCandidate(src) {
 		if qPipelinePlanGlobalCacheable(src) {
@@ -2174,6 +2181,10 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 		}
 		return scalarApplyIndexPlanValue(plan.scalarIndex, target)
 	case qEvalFastSortRankReducerBundle:
+		if plan.hasSortRankStaticResult {
+			recordRuntimeKernelProbeReason("SortRankReducerBundle", "sort-rank-reducer-bundle/"+strconv.Itoa(len(plan.sortRankTerms))+"/static", true, nil, RuntimeFallbackUnsupportedType)
+			return plan.sortRankStaticResult, true, nil
+		}
 		return s.evalSortRankReducerBundlePlan(plan.sortRankTerms)
 	case qEvalFastFby:
 		return s.evalQFbyFastPlan(plan.fby)
@@ -6596,13 +6607,15 @@ const (
 )
 
 type qSortRankReducerTermPlan struct {
-	kind        qSortRankReducerTermKind
-	arg         string
-	argExpr     Expr
-	argValue    any
-	hasArgValue bool
-	descending  bool
-	last        bool
+	kind            qSortRankReducerTermKind
+	arg             string
+	argExpr         Expr
+	argValue        any
+	hasArgValue     bool
+	staticResult    int64
+	hasStaticResult bool
+	descending      bool
+	last            bool
 }
 
 func (s *EvalState) tryEvalSortRankReducerBundle(src string) (any, bool, error) {
@@ -6640,6 +6653,9 @@ func (s *EvalState) evalSortRankReducerBundlePlan(terms []qSortRankReducerTermPl
 }
 
 func (s *EvalState) evalSortRankReducerTermPlan(term qSortRankReducerTermPlan) (any, bool, error) {
+	if term.hasStaticResult {
+		return term.staticResult, true, nil
+	}
 	switch term.kind {
 	case qSortRankReducerTermSortIndexSum:
 		return s.evalSortIndexSumPlan(term.arg, term.argExpr, term.argValue, term.hasArgValue, term.descending)
@@ -6811,15 +6827,15 @@ func qSortRankReducerTermPlanFor(src string) (qSortRankReducerTermPlan, bool) {
 		case strings.HasPrefix(body, "iasc ") && wordBoundary(body, 0, len("iasc")):
 			arg := strings.TrimSpace(body[len("iasc "):])
 			expr, value, hasValue := qSortRankReducerArgPlan(arg)
-			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortIndexSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue}, true
+			return qSortRankReducerTermPlanForValue(qSortRankReducerTermPlan{kind: qSortRankReducerTermSortIndexSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue}), true
 		case strings.HasPrefix(body, "idesc ") && wordBoundary(body, 0, len("idesc")):
 			arg := strings.TrimSpace(body[len("idesc "):])
 			expr, value, hasValue := qSortRankReducerArgPlan(arg)
-			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortIndexSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, descending: true}, true
+			return qSortRankReducerTermPlanForValue(qSortRankReducerTermPlan{kind: qSortRankReducerTermSortIndexSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, descending: true}), true
 		case strings.HasPrefix(body, "rank ") && wordBoundary(body, 0, len("rank")):
 			arg := strings.TrimSpace(body[len("rank "):])
 			expr, value, hasValue := qSortRankReducerArgPlan(arg)
-			return qSortRankReducerTermPlan{kind: qSortRankReducerTermRankSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue}, true
+			return qSortRankReducerTermPlanForValue(qSortRankReducerTermPlan{kind: qSortRankReducerTermRankSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue}), true
 		default:
 			return qSortRankReducerTermPlan{}, false
 		}
@@ -6834,16 +6850,72 @@ func qSortRankReducerTermPlanFor(src string) (qSortRankReducerTermPlan, bool) {
 		case strings.HasPrefix(body, "asc ") && wordBoundary(body, 0, len("asc")):
 			arg := strings.TrimSpace(body[len("asc "):])
 			expr, value, hasValue := qSortRankReducerArgPlan(arg)
-			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortedEdge, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, last: last}, true
+			return qSortRankReducerTermPlanForValue(qSortRankReducerTermPlan{kind: qSortRankReducerTermSortedEdge, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, last: last}), true
 		case strings.HasPrefix(body, "desc ") && wordBoundary(body, 0, len("desc")):
 			arg := strings.TrimSpace(body[len("desc "):])
 			expr, value, hasValue := qSortRankReducerArgPlan(arg)
-			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortedEdge, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, descending: true, last: last}, true
+			return qSortRankReducerTermPlanForValue(qSortRankReducerTermPlan{kind: qSortRankReducerTermSortedEdge, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, descending: true, last: last}), true
 		default:
 			return qSortRankReducerTermPlan{}, false
 		}
 	}
 	return qSortRankReducerTermPlan{}, false
+}
+
+func qSortRankReducerTermPlanForValue(plan qSortRankReducerTermPlan) qSortRankReducerTermPlan {
+	if !plan.hasArgValue {
+		return plan
+	}
+	static, ok := qStaticSortRankReducerTerm(plan)
+	if ok {
+		plan.staticResult = static
+		plan.hasStaticResult = true
+	}
+	return plan
+}
+
+func qStaticSortRankReducerBundle(terms []qSortRankReducerTermPlan) (int64, bool) {
+	if len(terms) < 2 {
+		return 0, false
+	}
+	var total int64
+	for _, term := range terms {
+		if !term.hasStaticResult {
+			return 0, false
+		}
+		total += term.staticResult
+	}
+	return total, true
+}
+
+func qStaticSortRankReducerTerm(term qSortRankReducerTermPlan) (int64, bool) {
+	array, ok := term.argValue.(data.Array)
+	switch term.kind {
+	case qSortRankReducerTermSortIndexSum:
+		if !ok {
+			return 0, true
+		}
+		out, handled, err := data.TryTypedSortIndexSumI64(array, term.descending)
+		return out, handled && err == nil
+	case qSortRankReducerTermRankSum:
+		if !ok {
+			return 0, true
+		}
+		out, handled, err := data.TryTypedRankSumI64(array)
+		return out, handled && err == nil
+	case qSortRankReducerTermSortedEdge:
+		if !ok {
+			return 0, false
+		}
+		out, handled, err := data.TryTypedSortedEdge(array, term.descending, term.last)
+		if err != nil || !handled {
+			return 0, false
+		}
+		value, ok := integerValue(out)
+		return value, ok
+	default:
+		return 0, false
+	}
 }
 
 func qSortRankReducerArgPlan(arg string) (Expr, any, bool) {
