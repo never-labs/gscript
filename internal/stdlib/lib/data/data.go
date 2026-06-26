@@ -7702,6 +7702,8 @@ func joinOnWithOptions(left, right Frame, keepUnmatchedLeft bool, opts JoinOptio
 			return Frame{}, err
 		}
 	}
+	defer bulkIntRelease(leftIndexes)
+	defer bulkIntRelease(rightIndexes)
 
 	leftNames := joinOutputLeftColumns(left, opts.LeftColumns)
 	rightNames := joinOutputRightColumns(right, opts.RightColumns)

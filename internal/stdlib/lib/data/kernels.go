@@ -11582,8 +11582,8 @@ func singleColumnTypedJoinIndexesFor[T comparable](left columnArray[T], right Ar
 			rowsByKey[value] = append(rowsByKey[value], row)
 		}
 	}
-	leftIndexes := make([]int, 0, len(left.data))
-	rightIndexes := make([]int, 0, len(left.data))
+	leftIndexes := bulkIntGet(len(left.data))
+	rightIndexes := bulkIntGet(len(left.data))
 	for row, value := range left.data {
 		matches := rowsByKey[value]
 		if keepUnmatchedLeft && len(matches) == 0 {
