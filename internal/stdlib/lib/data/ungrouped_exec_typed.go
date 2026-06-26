@@ -87,10 +87,9 @@ func execUngroupedFilteredWhere(frame Frame, plan QueryPlan) (Frame, bool, error
 	}
 	cols := make([]Column, 0, len(plan.Aggregates))
 	for i, agg := range plan.Aggregates {
-		values := []any{aggregateResult(states[i])}
-		cols = append(cols, aggregateOutputColumn(frame, agg, values))
+		cols = append(cols, aggregateStateOutputColumn(frame, agg, states[i]))
 	}
-	out, err := NewFrame(cols...)
+	out, err := newFrameTrusted(cols...)
 	return out, true, err
 }
 
