@@ -5470,12 +5470,57 @@ func integerColumnSumCountWhereCompareSelf(values Array, op Op, scalar any) (any
 func integerSliceSumCountWhereCompareSelf[T signedScalar](values []T, op Op, target int64) (any, int64, bool) {
 	var total int64
 	var count int64
-	for _, raw := range values {
-		value := int64(raw)
-		if boolCompare(op, value == target, compareInt64(value, target)) {
-			total += value
-			count++
+	switch op {
+	case OpEQ:
+		for _, raw := range values {
+			value := int64(raw)
+			if value == target {
+				total += value
+				count++
+			}
 		}
+	case OpNE:
+		for _, raw := range values {
+			value := int64(raw)
+			if value != target {
+				total += value
+				count++
+			}
+		}
+	case OpLT:
+		for _, raw := range values {
+			value := int64(raw)
+			if value < target {
+				total += value
+				count++
+			}
+		}
+	case OpLE:
+		for _, raw := range values {
+			value := int64(raw)
+			if value <= target {
+				total += value
+				count++
+			}
+		}
+	case OpGT:
+		for _, raw := range values {
+			value := int64(raw)
+			if value > target {
+				total += value
+				count++
+			}
+		}
+	case OpGE:
+		for _, raw := range values {
+			value := int64(raw)
+			if value >= target {
+				total += value
+				count++
+			}
+		}
+	default:
+		return nil, 0, false
 	}
 	if count == 0 {
 		return NullValue, 0, true
@@ -5502,19 +5547,57 @@ func integerUnsignedSliceSumCountWhereCompareSelf[T unsignedScalar](values []T, 
 	var total int64
 	var count int64
 	targetU := uint64(target)
-	for _, raw := range values {
-		value := uint64(raw)
-		cmp := 0
-		switch {
-		case value < targetU:
-			cmp = -1
-		case value > targetU:
-			cmp = 1
+	switch op {
+	case OpEQ:
+		for _, raw := range values {
+			value := uint64(raw)
+			if value == targetU {
+				total += int64(value)
+				count++
+			}
 		}
-		if boolCompare(op, value == targetU, cmp) {
-			total += int64(value)
-			count++
+	case OpNE:
+		for _, raw := range values {
+			value := uint64(raw)
+			if value != targetU {
+				total += int64(value)
+				count++
+			}
 		}
+	case OpLT:
+		for _, raw := range values {
+			value := uint64(raw)
+			if value < targetU {
+				total += int64(value)
+				count++
+			}
+		}
+	case OpLE:
+		for _, raw := range values {
+			value := uint64(raw)
+			if value <= targetU {
+				total += int64(value)
+				count++
+			}
+		}
+	case OpGT:
+		for _, raw := range values {
+			value := uint64(raw)
+			if value > targetU {
+				total += int64(value)
+				count++
+			}
+		}
+	case OpGE:
+		for _, raw := range values {
+			value := uint64(raw)
+			if value >= targetU {
+				total += int64(value)
+				count++
+			}
+		}
+	default:
+		return nil, 0, false
 	}
 	if count == 0 {
 		return NullValue, 0, true
