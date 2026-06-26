@@ -5927,22 +5927,28 @@ func TryTypedI64SelectedExprFbySumTotal(indexes Array, expr I64SelectedExpr, gro
 				bulkI64Release(counts, true)
 				return 0, true, fmt.Errorf("index expression row %d out of range", row)
 			}
-			value, err := evalI64SelectedExpr(expr, row)
-			if err != nil {
-				bulkI64Release(rows, rowsOwned)
-				bulkI64Release(sums, true)
-				bulkI64Release(counts, true)
-				return 0, true, err
-			}
+		}
+		eval := i64SelectedExprBulkEval{rows: rows}
+		values, err := eval.eval(expr)
+		if err != nil {
+			eval.release()
+			bulkI64Release(rows, rowsOwned)
+			bulkI64Release(sums, true)
+			bulkI64Release(counts, true)
+			return 0, true, err
+		}
+		for i, row := range rows {
 			group, err := lookup(int(row))
 			if err != nil {
+				eval.release()
 				bulkI64Release(rows, rowsOwned)
 				bulkI64Release(sums, true)
 				bulkI64Release(counts, true)
 				return 0, true, err
 			}
-			sums[group] += value
+			sums[group] += values[i]
 		}
+		eval.release()
 		bulkI64Release(rows, rowsOwned)
 	} else if err := forEachTypedI64Index(indexes, groups.Len(), func(row int) error {
 		value, err := evalI64SelectedExpr(expr, int64(row))
@@ -5988,13 +5994,9 @@ func TryTypedI64SelectedExprSparseZeroMovingSumAvg(indexes Array, expr I64Select
 	recip := movingAvgReciprocalPrefix(length, width)
 	var msum int64
 	var mavg float64
-	accumulate := func(row int64) error {
+	accumulate := func(row int64, value int64) error {
 		if row < 0 || row >= int64(length) {
 			return fmt.Errorf("sparse moving window index %d out of range", row)
-		}
-		value, err := evalI64SelectedExpr(expr, row)
-		if err != nil {
-			return err
 		}
 		count := length - int(row)
 		if count > width {
@@ -6006,16 +6008,35 @@ func TryTypedI64SelectedExprSparseZeroMovingSumAvg(indexes Array, expr I64Select
 	}
 	if rows, owned, ok := tryBulkI64Values(indexes); ok {
 		for _, row := range rows {
-			if err := accumulate(row); err != nil {
+			if row < 0 || row >= int64(length) {
+				bulkI64Release(rows, owned)
+				return 0, 0, true, fmt.Errorf("sparse moving window index %d out of range", row)
+			}
+		}
+		eval := i64SelectedExprBulkEval{rows: rows}
+		values, err := eval.eval(expr)
+		if err != nil {
+			eval.release()
+			bulkI64Release(rows, owned)
+			return 0, 0, true, err
+		}
+		for i, row := range rows {
+			if err := accumulate(row, values[i]); err != nil {
+				eval.release()
 				bulkI64Release(rows, owned)
 				return 0, 0, true, err
 			}
 		}
+		eval.release()
 		bulkI64Release(rows, owned)
 		return msum, mavg, true, nil
 	}
 	if err := forEachTypedI64Index(indexes, length, func(row int) error {
-		return accumulate(int64(row))
+		value, err := evalI64SelectedExpr(expr, int64(row))
+		if err != nil {
+			return err
+		}
+		return accumulate(int64(row), value)
 	}); err != nil {
 		return 0, 0, true, err
 	}
@@ -6214,6 +6235,336 @@ func evalI64SelectedExprOperands(expr I64SelectedExpr, row int64) (int64, int64,
 		return 0, 0, err
 	}
 	return left, right, nil
+}
+
+// i64SelectedExprBulkEval evaluates selected-row expressions over a dense
+// index vector. It is the selected-value counterpart to i64IndexExprBulkEval:
+// one loop per expression node, pooled temporaries, and scalar-compatible
+// arithmetic/error semantics.
+type i64SelectedExprBulkEval struct {
+	rows        []int64
+	results     [8][]int64
+	resultCount int
+	overflow    [][]int64
+}
+
+func i64SelectedExprConstValue(expr I64SelectedExpr) (int64, bool) {
+	if expr.Op == I64SelectedExprConst {
+		return expr.Value, true
+	}
+	return 0, false
+}
+
+// eval returns a slice owned by the evaluator (or the shared rows slice);
+// callers must treat it as read-only and call release when finished.
+func (e *i64SelectedExprBulkEval) eval(expr I64SelectedExpr) ([]int64, error) {
+	switch expr.Op {
+	case I64SelectedExprIndex:
+		return e.rows, nil
+	case I64SelectedExprConst:
+		out := bulkI64Get(len(e.rows))
+		for i := range out {
+			out[i] = expr.Value
+		}
+		e.remember(out)
+		return out, nil
+	case I64SelectedExprGather:
+		if expr.Source == nil {
+			return nil, fmt.Errorf("selected expression gather source is nil")
+		}
+		out := bulkI64Get(len(e.rows))
+		if err := gatherSelectedI64Rows(expr.Source, e.rows, out); err != nil {
+			bulkI64Release(out, true)
+			return nil, err
+		}
+		e.remember(out)
+		return out, nil
+	case I64SelectedExprAdd, I64SelectedExprSub, I64SelectedExprMul, I64SelectedExprDiv, I64SelectedExprMod:
+		out, err := e.evalDyadic(expr)
+		if err != nil {
+			return nil, err
+		}
+		e.remember(out)
+		return out, nil
+	case I64SelectedExprXbar:
+		if expr.Value <= 0 {
+			return nil, fmt.Errorf("selected expression xbar width must be positive")
+		}
+		left, err := e.eval(*expr.Left)
+		if err != nil {
+			return nil, err
+		}
+		out := bulkI64Get(len(e.rows))
+		for i, v := range left {
+			out[i] = floorInt64(v, expr.Value)
+		}
+		e.remember(out)
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unsupported selected expression op %d", expr.Op)
+	}
+}
+
+func (e *i64SelectedExprBulkEval) evalDyadic(expr I64SelectedExpr) ([]int64, error) {
+	rightConst, rightIsConst := i64SelectedExprConstValue(*expr.Right)
+	left, err := e.eval(*expr.Left)
+	if err != nil {
+		return nil, err
+	}
+	out := bulkI64Get(len(e.rows))
+	if rightIsConst {
+		switch expr.Op {
+		case I64SelectedExprAdd:
+			for i, v := range left {
+				out[i] = v + rightConst
+			}
+		case I64SelectedExprSub:
+			for i, v := range left {
+				out[i] = v - rightConst
+			}
+		case I64SelectedExprMul:
+			for i, v := range left {
+				out[i] = v * rightConst
+			}
+		case I64SelectedExprDiv:
+			if rightConst == 0 && len(left) > 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("selected expression divide by zero")
+			}
+			for i, v := range left {
+				out[i] = v / rightConst
+			}
+		case I64SelectedExprMod:
+			if rightConst == 0 && len(left) > 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("selected expression modulo by zero")
+			}
+			for i, v := range left {
+				out[i] = v % rightConst
+			}
+		}
+		return out, nil
+	}
+	right, err := e.eval(*expr.Right)
+	if err != nil {
+		bulkI64Release(out, true)
+		return nil, err
+	}
+	switch expr.Op {
+	case I64SelectedExprAdd:
+		for i, v := range left {
+			out[i] = v + right[i]
+		}
+	case I64SelectedExprSub:
+		for i, v := range left {
+			out[i] = v - right[i]
+		}
+	case I64SelectedExprMul:
+		for i, v := range left {
+			out[i] = v * right[i]
+		}
+	case I64SelectedExprDiv:
+		for i, v := range left {
+			if right[i] == 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("selected expression divide by zero")
+			}
+			out[i] = v / right[i]
+		}
+	case I64SelectedExprMod:
+		for i, v := range left {
+			if right[i] == 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("selected expression modulo by zero")
+			}
+			out[i] = v % right[i]
+		}
+	}
+	return out, nil
+}
+
+func (e *i64SelectedExprBulkEval) remember(values []int64) {
+	if e.resultCount < len(e.results) {
+		e.results[e.resultCount] = values
+		e.resultCount++
+		return
+	}
+	e.overflow = append(e.overflow, values)
+}
+
+func (e *i64SelectedExprBulkEval) release() {
+	for i := 0; i < e.resultCount; i++ {
+		bulkI64Release(e.results[i], true)
+		e.results[i] = nil
+	}
+	for _, values := range e.overflow {
+		bulkI64Release(values, true)
+	}
+	e.resultCount = 0
+	e.overflow = nil
+}
+
+func gatherSelectedI64Rows(source Array, rows []int64, out []int64) error {
+	switch a := source.(type) {
+	case attributedArray:
+		return gatherSelectedI64Rows(a.array, rows, out)
+	case i64FillArray:
+		return gatherSelectedI64RowsFilled(a.source, a.fill, rows, out)
+	case columnArray[int8]:
+		return gatherSelectedI64ColumnRows(a.data, rows, out)
+	case columnArray[int16]:
+		return gatherSelectedI64ColumnRows(a.data, rows, out)
+	case columnArray[int32]:
+		return gatherSelectedI64ColumnRows(a.data, rows, out)
+	case columnArray[int64]:
+		return gatherSelectedI64ColumnRows(a.data, rows, out)
+	case columnArray[uint8]:
+		return gatherSelectedI64ColumnRows(a.data, rows, out)
+	case columnArray[uint16]:
+		return gatherSelectedI64ColumnRows(a.data, rows, out)
+	case columnArray[uint32]:
+		return gatherSelectedI64ColumnRows(a.data, rows, out)
+	case columnArray[uint64]:
+		return gatherSelectedI64Uint64ColumnRows(a.data, rows, out)
+	case nullBitmapArray[int8]:
+		return gatherSelectedI64NullBitmapRows(a.data, a.nulls, rows, out)
+	case nullBitmapArray[int16]:
+		return gatherSelectedI64NullBitmapRows(a.data, a.nulls, rows, out)
+	case nullBitmapArray[int32]:
+		return gatherSelectedI64NullBitmapRows(a.data, a.nulls, rows, out)
+	case nullBitmapArray[int64]:
+		return gatherSelectedI64NullBitmapRows(a.data, a.nulls, rows, out)
+	case i64RangeArray:
+		for i, row := range rows {
+			if row < 0 || row >= int64(a.len) {
+				return fmt.Errorf("selected expression gather row %d out of range", row)
+			}
+			out[i] = a.start + row*a.step
+		}
+		return nil
+	default:
+		for i, row := range rows {
+			if row < 0 || row >= int64(source.Len()) {
+				return fmt.Errorf("selected expression gather row %d out of range", row)
+			}
+			value, ok, err := integerArrayAt(source, int(row))
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return fmt.Errorf("selected expression gather row %d is null", row)
+			}
+			out[i] = value
+		}
+		return nil
+	}
+}
+
+func gatherSelectedI64RowsFilled(source Array, fill int64, rows []int64, out []int64) error {
+	switch a := source.(type) {
+	case attributedArray:
+		return gatherSelectedI64RowsFilled(a.array, fill, rows, out)
+	case nullBitmapArray[int8]:
+		return gatherSelectedI64NullBitmapRowsFilled(a.data, a.nulls, fill, rows, out)
+	case nullBitmapArray[int16]:
+		return gatherSelectedI64NullBitmapRowsFilled(a.data, a.nulls, fill, rows, out)
+	case nullBitmapArray[int32]:
+		return gatherSelectedI64NullBitmapRowsFilled(a.data, a.nulls, fill, rows, out)
+	case nullBitmapArray[int64]:
+		return gatherSelectedI64NullBitmapRowsFilled(a.data, a.nulls, fill, rows, out)
+	case shiftedArray:
+		for i, row := range rows {
+			if row < 0 || row >= int64(a.Len()) {
+				return fmt.Errorf("selected expression gather row %d out of range", row)
+			}
+			sourceRow := int(row) + a.offset
+			if sourceRow < 0 || sourceRow >= a.source.Len() {
+				out[i] = fill
+				continue
+			}
+			value, ok, err := integerArrayAt(a.source, sourceRow)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				out[i] = fill
+				continue
+			}
+			out[i] = value
+		}
+		return nil
+	default:
+		for i, row := range rows {
+			if row < 0 || row >= int64(source.Len()) {
+				return fmt.Errorf("selected expression gather row %d out of range", row)
+			}
+			value, ok := source.At(int(row))
+			if !ok {
+				return fmt.Errorf("selected expression gather row %d out of range", row)
+			}
+			if IsNull(value) {
+				out[i] = fill
+				continue
+			}
+			n, ok := coerceInt64Exact(value)
+			if !ok {
+				return fmt.Errorf("fill row %d is %T, want integer", row, value)
+			}
+			out[i] = n
+		}
+		return nil
+	}
+}
+
+func gatherSelectedI64ColumnRows[T ~int8 | ~int16 | ~int32 | ~int64 | ~uint8 | ~uint16 | ~uint32](values []T, rows []int64, out []int64) error {
+	for i, row := range rows {
+		if row < 0 || row >= int64(len(values)) {
+			return fmt.Errorf("selected expression gather row %d out of range", row)
+		}
+		out[i] = int64(values[row])
+	}
+	return nil
+}
+
+func gatherSelectedI64Uint64ColumnRows(values []uint64, rows []int64, out []int64) error {
+	for i, row := range rows {
+		if row < 0 || row >= int64(len(values)) {
+			return fmt.Errorf("selected expression gather row %d out of range", row)
+		}
+		value := values[row]
+		if value > math.MaxInt64 {
+			return fmt.Errorf("selected expression gather row %d is uint64 overflow", row)
+		}
+		out[i] = int64(value)
+	}
+	return nil
+}
+
+func gatherSelectedI64NullBitmapRows[T ~int8 | ~int16 | ~int32 | ~int64](values []T, nulls []uint64, rows []int64, out []int64) error {
+	for i, row := range rows {
+		if row < 0 || row >= int64(len(values)) {
+			return fmt.Errorf("selected expression gather row %d out of range", row)
+		}
+		if nullBitGet(nulls, int(row)) {
+			return fmt.Errorf("selected expression gather row %d is null", row)
+		}
+		out[i] = int64(values[row])
+	}
+	return nil
+}
+
+func gatherSelectedI64NullBitmapRowsFilled[T ~int8 | ~int16 | ~int32 | ~int64](values []T, nulls []uint64, fill int64, rows []int64, out []int64) error {
+	for i, row := range rows {
+		if row < 0 || row >= int64(len(values)) {
+			return fmt.Errorf("selected expression gather row %d out of range", row)
+		}
+		if nullBitGet(nulls, int(row)) {
+			out[i] = fill
+			continue
+		}
+		out[i] = int64(values[row])
+	}
+	return nil
 }
 
 func i64IndexExprValid(expr I64IndexExpr) bool {
