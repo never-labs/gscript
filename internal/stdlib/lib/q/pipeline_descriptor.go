@@ -114,6 +114,10 @@ type qEvalPipelineExecutable interface {
 	run(*EvalState) (any, bool, error)
 }
 
+type qEvalPipelineScalarExecutable interface {
+	runScalar(*EvalState) (EvalScalarResult, bool, error)
+}
+
 type qEvalPipelineExpressionExecutable struct {
 	plan qPipelinePlan
 }
@@ -141,6 +145,13 @@ func (e *qEvalPipelineExpressionExecutable) run(s *EvalState) (any, bool, error)
 		return nil, false, nil
 	}
 	return s.evalQPipelinePlan(&e.plan)
+}
+
+func (e *qEvalPipelineExpressionExecutable) runScalar(s *EvalState) (EvalScalarResult, bool, error) {
+	if e == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	return s.evalQPipelinePlanScalar(&e.plan)
 }
 
 type qEvalPipelineScriptExecutable struct {
@@ -437,6 +448,38 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlanRefHot(plan *EvalPipelineEx
 	previous := s.skipPipelineRemember
 	s.skipPipelineRemember = true
 	out, handled, err := s.ExecuteEvalPipelineExecutablePlanRef(plan)
+	s.skipPipelineRemember = previous
+	return out, handled, err
+}
+
+// ExecuteEvalPipelineExecutablePlanRefScalar executes an opaque predecoded
+// plan through typed scalar result channels when the plan supports a scalar
+// terminal. handled=false means callers should use the generic executable path.
+func (s *EvalState) ExecuteEvalPipelineExecutablePlanRefScalar(plan *EvalPipelineExecutablePlan) (EvalScalarResult, bool, error) {
+	if s == nil || plan == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	runner := plan.runner
+	if runner == nil || runner.kind() == "" || !runner.valid() {
+		return EvalScalarResult{}, false, nil
+	}
+	scalar, ok := runner.(qEvalPipelineScalarExecutable)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	return scalar.runScalar(s)
+}
+
+// ExecuteEvalPipelineExecutablePlanRefScalarHot is the scalar counterpart to
+// ExecuteEvalPipelineExecutablePlanRefHot. It is intended for JIT/session hot
+// paths that already own a stable executable plan.
+func (s *EvalState) ExecuteEvalPipelineExecutablePlanRefScalarHot(plan *EvalPipelineExecutablePlan) (EvalScalarResult, bool, error) {
+	if s == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	previous := s.skipPipelineRemember
+	s.skipPipelineRemember = true
+	out, handled, err := s.ExecuteEvalPipelineExecutablePlanRefScalar(plan)
 	s.skipPipelineRemember = previous
 	return out, handled, err
 }

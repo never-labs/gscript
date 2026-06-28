@@ -3072,6 +3072,21 @@ func TestEvalSessionScalarPipelinePreservesEnvironmentSemantics(t *testing.T) {
 	}
 }
 
+func TestEvalPipelineExecutablePlanScalarPath(t *testing.T) {
+	backend, ok := DescribeEvalPipelineBackendPlan("+/til 8 where til 8>3")
+	if !ok {
+		t.Fatal("DescribeEvalPipelineBackendPlan did not recognize scalar pipeline")
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatal("CompileEvalPipelineBackendPlan did not produce executable plan")
+	}
+	got, handled, err := NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRefScalarHot(&executable)
+	if err != nil || !handled || got.Kind != EvalScalarInt || got.I64 != 22 {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlanRefScalarHot = %#v,%v,%v; want int 22,true,nil", got, handled, err)
+	}
+}
+
 func TestEvalSessionWarmCacheDoesNotPoisonErrorPath(t *testing.T) {
 	session := NewEvalSession(nil)
 	if _, err := session.Eval("x+"); err == nil {

@@ -643,6 +643,41 @@ func TestCompiledFunctionHelperExecutesCallableDotCountExecutablePlan(t *testing
 	}
 }
 
+func TestCompiledFunctionHelperExecutesScalarPipelineWithoutAnyExecutor(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "+/til 8 where til 8>3")
+	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+	backendPlanCalls := 0
+	backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+		backendPlanCalls++
+		return nil, false, errors.New("backend plan fallback should not execute when scalar executable handles the plan")
+	}
+	backend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
+		return nil, false, errors.New("descriptor fallback should not execute when scalar executable handles the plan")
+	}
+	backend.executeSource = func(source string) (any, bool, error) {
+		return nil, false, errors.New("source fallback should not execute when scalar executable handles the plan")
+	}
+	cf := &CompiledFunction{
+		QEvalPipelinePlans:       []QEvalPipelinePlanRef{ref},
+		QEvalPipelineBackend:     qRuntimeEvalPipelineBackend{},
+		QEvalPipelinePlanHelpers: newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend),
+	}
+	if len(cf.QEvalPipelinePlanHelpers) != 1 || !cf.QEvalPipelinePlanHelpers[0].hasExecutablePlan || cf.QEvalPipelinePlanHelpers[0].evalState == nil {
+		t.Fatalf("compiled helpers = %+v, want executable helper with eval state", cf.QEvalPipelinePlanHelpers)
+	}
+
+	value, handled, err := cf.ExecuteQEvalPipelinePlanValue(ref.ID)
+	if err != nil {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue: %v", err)
+	}
+	if !handled || !value.IsInt() || value.Int() != 22 {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 22 handled", value, handled)
+	}
+	if backendPlanCalls != 0 {
+		t.Fatalf("backend plan calls = %d, want scalar executable path", backendPlanCalls)
+	}
+}
+
 func TestQEvalPipelineExecutionAdapterSharesTypedBackendForDirectAndSlotRoutes(t *testing.T) {
 	t.Setenv(exitResumeCheckEnv, "")
 	ref := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
@@ -1020,6 +1055,7 @@ func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
 		src  string
 	}{
 		{name: "BinReduceSum", src: "+/til 8192 bin til 8192"},
+		{name: "ScalarWhereReduce", src: "+/til 8192 where til 8192>4096"},
 		{name: "ModuloWhereCount", src: "count where (til 8192 mod 4)=1"},
 		{name: "ScriptModuloGatherReduce", src: "x:til 8192;y:x+1;idx:where (x mod 4)=1;+/y[idx]"},
 		{name: "SumRaze", src: "+/raze 128 64#til 8192"},

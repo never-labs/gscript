@@ -378,6 +378,7 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 		src  string
 	}{
 		{name: "BinReduceSum", src: "+/til 8192 bin til 8192"},
+		{name: "ScalarWhereReduce", src: "+/til 8192 where til 8192>4096"},
 		{name: "ModuloWhereCount", src: "count where (til 8192 mod 4)=1"},
 		{name: "ScriptModuloGatherReduce", src: "x:til 8192;y:x+1;idx:where (x mod 4)=1;+/y[idx]"},
 	} {

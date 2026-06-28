@@ -440,6 +440,14 @@ func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
 	if !h.validForID(h.ref.ID) {
 		return runtime.NilValue(), false, nil
 	}
+	if h.hasExecutablePlan && h.executeExecutable == nil && h.evalState != nil {
+		h.evalStateMu.Lock()
+		out, handled, err := h.evalState.ExecuteEvalPipelineExecutablePlanRefScalarHot(&h.executablePlan)
+		h.evalStateMu.Unlock()
+		if err != nil || handled {
+			return qEvalPipelineScalarRuntimeValue(out, handled, err)
+		}
+	}
 	if h.hasExecutablePlan && h.executeExecutable != nil {
 		out, handled, err := h.executeExecutable(h.executablePlan)
 		if err != nil || !handled {
@@ -552,6 +560,12 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlanValue(ref QEvalPipe
 	if executable, ok := b.lookupExecutablePlan(ref); ok && b.executeExecutable == nil {
 		if state := b.lookupEvalState(ref.ID); state != nil {
 			state.mu.Lock()
+			scalar, scalarHandled, scalarErr := state.state.ExecuteEvalPipelineExecutablePlanRefScalarHot(&executable)
+			state.mu.Unlock()
+			if scalarErr != nil || scalarHandled {
+				return qEvalPipelineScalarRuntimeValue(scalar, scalarHandled, scalarErr)
+			}
+			state.mu.Lock()
 			out, handled, err := state.state.ExecuteEvalPipelineExecutablePlanRefHot(&executable)
 			state.mu.Unlock()
 			if err != nil || !handled {
@@ -576,6 +590,20 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlanValue(ref QEvalPipe
 		return runtime.NilValue(), false, err
 	}
 	return value, true, nil
+}
+
+func qEvalPipelineScalarRuntimeValue(out stdq.EvalScalarResult, handled bool, err error) (runtime.Value, bool, error) {
+	if err != nil || !handled {
+		return runtime.NilValue(), handled, err
+	}
+	switch out.Kind {
+	case stdq.EvalScalarInt:
+		return runtime.IntValue(out.I64), true, nil
+	case stdq.EvalScalarFloat:
+		return runtime.FloatValue(out.F64), true, nil
+	default:
+		return runtime.NilValue(), false, nil
+	}
 }
 
 func (b qRuntimeEvalPipelineBackend) lookupExecutablePlan(ref QEvalPipelinePlanRef) (stdq.EvalPipelineExecutablePlan, bool) {
