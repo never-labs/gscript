@@ -2184,6 +2184,39 @@ func TestExecuteEvalPipelineDescriptorRestoresModuloScriptSubPlan(t *testing.T) 
 	}
 }
 
+func TestExecuteEvalPipelineScalarModuloScriptAffineValue(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want any
+	}{
+		{name: "add", src: "x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]", want: int64(512)},
+		{name: "scale_bias", src: "x:til 64;y:(x*3)+7;idx:where (x mod 4)=1;+/y[idx]", want: int64(1600)},
+		{name: "scalar_minus", src: "x:til 64;y:10-x;idx:where (x mod 4)=1;+/y[idx]", want: int64(-336)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			got, handled, err := ExecuteEvalPipeline(test.src)
+			if err != nil || !handled || got != test.want {
+				t.Fatalf("ExecuteEvalPipeline = %#v,%v,%v; want %#v,true,nil", got, handled, err, test.want)
+			}
+			seenReduce := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Kernel == "ArrayModuloCompareReduceSum" && stat.Outcome == "hit" && stat.Count > 0 {
+					seenReduce = true
+				}
+				if stat.Kernel == "ArrayGatherReduceSum" && stat.Outcome == "hit" {
+					t.Fatalf("affine modulo script should not gather: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+			}
+			if !seenReduce {
+				t.Fatalf("missing affine modulo reduce hit: %#v", RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 func TestExecuteEvalPipelineUsesIndexExprReducer(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

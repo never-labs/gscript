@@ -183,6 +183,13 @@ func (e *qEvalPipelineScriptExecutable) run(s *EvalState) (any, bool, error) {
 	return s.tryEvalQScriptPipeline(e.descriptor)
 }
 
+func (e *qEvalPipelineScriptExecutable) runScalar(s *EvalState) (EvalScalarResult, bool, error) {
+	if e == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	return s.tryEvalQScriptPipelineScalar(e.descriptor)
+}
+
 func (p EvalPipelineBackendPlan) Valid() bool {
 	return p.Backend != "" && p.Descriptor.Kind != "" && p.Descriptor.Kernel != "" && p.Descriptor.Shape != ""
 }

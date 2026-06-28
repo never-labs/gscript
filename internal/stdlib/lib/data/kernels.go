@@ -7454,6 +7454,18 @@ func TryTypedNumericSumWhereModuloCompare(values, modSource Array, modulus any, 
 	if !isDenseIntegerArray(modSource) || !isNumericArray(values) {
 		return nil, false, nil
 	}
+	if sum, count, handled, err := tryTypedIntegerSumWhereModuloCompare(values, modSource, modulusI64, op, targetI64); err != nil || handled {
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		if count == 0 {
+			return NullValue, true, nil
+		}
+		return sum, true, nil
+	}
+	if !isNumericArray(values) {
+		return nil, false, nil
+	}
 	if plan, ok := i64ModuloComparePlanForArray(modSource, modulusI64, op, targetI64); ok {
 		if out, handled, err := tryTypedNumericSumWhereModuloComparePlan(values, plan); err != nil || handled {
 			return out, handled, err
@@ -7509,6 +7521,62 @@ func TryTypedNumericSumWhereModuloCompare(values, modSource Array, modulus any, 
 		return NullValue, true, nil
 	}
 	return total, true, nil
+}
+
+func TryTypedIntegerSumWhereModuloCompare(values, modSource Array, modulus any, op Op, target any) (int64, int64, bool, error) {
+	modulusI64, targetI64, ok := moduloCompareOperands(modulus, op, target)
+	if !ok {
+		return 0, 0, false, nil
+	}
+	if values == nil || modSource == nil {
+		return 0, 0, true, fmt.Errorf("modulo compare sum arrays must be non-nil")
+	}
+	if values.Len() != modSource.Len() {
+		return 0, 0, true, fmt.Errorf("modulo compare sum length mismatch: values=%d source=%d", values.Len(), modSource.Len())
+	}
+	return tryTypedIntegerSumWhereModuloCompare(values, modSource, modulusI64, op, targetI64)
+}
+
+func tryTypedIntegerSumWhereModuloCompare(values, modSource Array, modulus int64, op Op, target int64) (int64, int64, bool, error) {
+	if !isDenseIntegerArray(values) || !isDenseIntegerArray(modSource) {
+		return 0, 0, false, nil
+	}
+	if plan, ok := i64ModuloComparePlanForArray(modSource, modulus, op, target); ok {
+		count, ok := plan.trueCount()
+		if !ok {
+			return 0, 0, false, nil
+		}
+		if count == 0 {
+			return 0, 0, true, nil
+		}
+		switch a := unwrapAttributedArray(values).(type) {
+		case i64RangeArray:
+			if a.len != plan.length {
+				return 0, 0, true, fmt.Errorf("modulo compare sum length mismatch: values=%d source=%d", a.len, plan.length)
+			}
+			return a.start*count + a.step*plan.indexSum(), count, true, nil
+		}
+	}
+	var total int64
+	var count int64
+	for row := 0; row < modSource.Len(); row++ {
+		match, err := integerModuloCompareAt(modSource, row, modulus, op, target)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if !match {
+			continue
+		}
+		value, ok, err := integerArrayAt(values, row)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if ok {
+			total += value
+		}
+		count++
+	}
+	return total, count, true, nil
 }
 
 func tryTypedNumericSumWhereModuloComparePlan(values Array, plan i64ModuloComparePlan) (any, bool, error) {

@@ -54,10 +54,15 @@ type qPipelinePlan struct {
 	shapeSpec               qPipelineShapeSpec
 	stableShapeID           string
 	pipelineShape           string
-	moduloStatsShapeKey     string
 	moduloStatsShape        string
-	moduloReduceShapeKey    string
+	moduloStatsArrayKind    data.Kind
+	moduloStatsModulusKind  data.Kind
+	moduloStatsTargetKind   data.Kind
 	moduloReduceShape       string
+	moduloReduceValuesKind  data.Kind
+	moduloReduceArrayKind   data.Kind
+	moduloReduceModulusKind data.Kind
+	moduloReduceTargetKind  data.Kind
 	compareReduceValuesKind data.Kind
 	compareReduceRightKind  data.Kind
 	compareReduceOp         string
@@ -1644,6 +1649,10 @@ func (s *EvalState) evalQPipelinePlanScalar(plan *qPipelinePlan) (EvalScalarResu
 	switch plan.kind {
 	case qPipelineSumWhereMask:
 		out, handled, err = s.evalQPipelineSumWhereMaskScalar(plan)
+	case qPipelineSumWhereModuloCompare:
+		out, handled, err = s.evalQPipelineSumWhereModuloCompareScalar(plan)
+	case qPipelineCountWhereModuloCompare:
+		out, handled, err = s.evalQPipelineCountWhereModuloCompareScalar(plan)
 	default:
 		recordRuntimeQPipelinePlanExecution(plan, "fallback", RuntimeFallbackPlannerUnhandled)
 		return EvalScalarResult{}, false, nil
@@ -2611,6 +2620,25 @@ func (s *EvalState) evalQPipelineCountWhereModuloCompare(plan *qPipelinePlan) (a
 	return nil, false, nil
 }
 
+func (s *EvalState) evalQPipelineSumWhereModuloCompareScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	count, sum, handled, err := s.evalQPipelineWhereModuloCompareIndexStats(plan)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	if count == 0 {
+		return EvalScalarResult{}, false, nil
+	}
+	return evalScalarInt(sum), true, nil
+}
+
+func (s *EvalState) evalQPipelineCountWhereModuloCompareScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	count, _, handled, err := s.evalQPipelineWhereModuloCompareIndexStats(plan)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	return evalScalarInt(count), true, nil
+}
+
 func (s *EvalState) evalQPipelineWhereModuloCompareIndexes(plan *qPipelinePlan) (any, bool, error) {
 	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
 	if err != nil || !handled {
@@ -2663,6 +2691,23 @@ func (s *EvalState) evalQPipelineModuloCompareValueSum(plan *qPipelinePlan, valu
 	return out, true, nil
 }
 
+func (s *EvalState) evalQPipelineModuloCompareValueSumScalar(plan *qPipelinePlan, values data.Array) (EvalScalarResult, int64, bool, error) {
+	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(plan)
+	if err != nil || !handled {
+		return EvalScalarResult{}, 0, handled, err
+	}
+	shape := qPipelineModuloReduceShape(plan, values.Kind(), array.Kind(), qRuntimeKernelOperandKind(modulus, nil), qRuntimeKernelOperandKind(target, nil))
+	sum, count, handled, err := data.TryTypedIntegerSumWhereModuloCompare(values, array, modulus, dataOp, target)
+	sum, count, handled, err = qTypedRuntimeResult2Reason("ArrayModuloCompareReduceSum", shape, RuntimeFallbackUnsupportedType, sum, count, handled, err)
+	if err != nil || !handled {
+		return EvalScalarResult{}, count, handled, err
+	}
+	if count == 0 {
+		return EvalScalarResult{}, count, false, nil
+	}
+	return evalScalarInt(sum), count, true, nil
+}
+
 func qPipelineCompareReduceShape(plan *qPipelinePlan, valuesKind, rightKind data.Kind) string {
 	if plan == nil {
 		return "where-reduce/sum-count/" + string(valuesKind) + "/?/unknown/" + string(rightKind)
@@ -2683,9 +2728,13 @@ func qPipelineModuloStatsShape(plan *qPipelinePlan, arrayKind, modulusKind, targ
 	if plan == nil {
 		return "modulo-stats/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
 	}
-	key := string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
-	if plan.moduloStatsShape == "" || plan.moduloStatsShapeKey != key {
-		plan.moduloStatsShapeKey = key
+	if plan.moduloStatsShape == "" ||
+		plan.moduloStatsArrayKind != arrayKind ||
+		plan.moduloStatsModulusKind != modulusKind ||
+		plan.moduloStatsTargetKind != targetKind {
+		plan.moduloStatsArrayKind = arrayKind
+		plan.moduloStatsModulusKind = modulusKind
+		plan.moduloStatsTargetKind = targetKind
 		plan.moduloStatsShape = plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
 	}
 	return plan.moduloStatsShape
@@ -2695,9 +2744,15 @@ func qPipelineModuloReduceShape(plan *qPipelinePlan, valuesKind, arrayKind, modu
 	if plan == nil {
 		return "where-mod-reduce/" + string(valuesKind) + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
 	}
-	key := string(valuesKind) + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
-	if plan.moduloReduceShape == "" || plan.moduloReduceShapeKey != key {
-		plan.moduloReduceShapeKey = key
+	if plan.moduloReduceShape == "" ||
+		plan.moduloReduceValuesKind != valuesKind ||
+		plan.moduloReduceArrayKind != arrayKind ||
+		plan.moduloReduceModulusKind != modulusKind ||
+		plan.moduloReduceTargetKind != targetKind {
+		plan.moduloReduceValuesKind = valuesKind
+		plan.moduloReduceArrayKind = arrayKind
+		plan.moduloReduceModulusKind = modulusKind
+		plan.moduloReduceTargetKind = targetKind
 		plan.moduloReduceShape = "where-mod-reduce/" + string(valuesKind) + "/" + string(arrayKind) + "/" + string(modulusKind) + "/" + string(targetKind)
 	}
 	return plan.moduloReduceShape

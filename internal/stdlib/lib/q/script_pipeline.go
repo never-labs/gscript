@@ -43,6 +43,7 @@ type qScriptPipelineDescriptor struct {
 	valueExpr         string
 	valueBinding      string
 	valuePlan         qScriptBindingPlan
+	valueBindingPlan  qScriptBindingPlan
 	indexExpr         string
 	indexBinding      string
 	indexPlan         qScriptBindingPlan
@@ -155,13 +156,18 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 func qNormalizeScriptPipelineDescriptor(descriptor qScriptPipelineDescriptor) qScriptPipelineDescriptor {
 	descriptor.terminalPlan = qScriptPipelineDescriptorTerminalPlan(descriptor)
 	descriptor.valuePlan = buildQScriptBindingPlanForRHS(descriptor.valueExpr, nil)
+	if binding := strings.TrimSpace(descriptor.valueBinding); binding != "" {
+		descriptor.valueBindingPlan = buildQScriptBindingPlanForRHS(binding, nil)
+	}
 	if descriptor.kind == qScriptPipelineCallableOverScanSum && strings.TrimSpace(descriptor.valueBinding) != "" {
 		descriptor.valuePlan = buildQScriptWarmBindingPlan(descriptor.valueBinding, parseCachedValueExpr(descriptor.valueBinding))
+		descriptor.valueBindingPlan = descriptor.valuePlan
 	}
 	descriptor.indexPlan = buildQScriptBindingPlanForRHS(descriptor.indexExpr, nil)
 	if descriptor.kind == qScriptPipelineFindReduceSum {
 		if binding := strings.TrimSpace(descriptor.valueBinding); binding != "" {
 			descriptor.valuePlan = buildQScriptWarmBindingPlan(binding, parseCachedValueExpr(binding))
+			descriptor.valueBindingPlan = descriptor.valuePlan
 		}
 		if binding := strings.TrimSpace(descriptor.indexBinding); binding != "" {
 			descriptor.indexPlan = buildQScriptWarmBindingPlan(binding, parseCachedValueExpr(binding))
@@ -1925,8 +1931,9 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		return nil, false, nil
 	}
 	s.rememberQPipelinePlanKnownSource(descriptor.terminal, *terminal)
-	for _, assignment := range descriptor.assignments {
-		if qScriptPipelineCanDeferAssignment(descriptor, assignment) {
+	for i := range descriptor.assignments {
+		assignment := &descriptor.assignments[i]
+		if qScriptPipelineCanDeferAssignment(descriptor, *assignment) {
 			continue
 		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
@@ -1946,6 +1953,42 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
 	out, handled, err := s.evalQScriptTerminalPipeline(descriptor, terminal)
+	recordQScriptPipelineResult(shape, handled, err)
+	return out, handled, err
+}
+
+func (s *EvalState) tryEvalQScriptPipelineScalar(descriptor *qScriptPipelineDescriptor) (EvalScalarResult, bool, error) {
+	if descriptor == nil || descriptor.kind == qScriptPipelineUnsupported {
+		return EvalScalarResult{}, false, nil
+	}
+	shape := descriptor.shape()
+	terminal := &descriptor.terminalPlan
+	if terminal.kind == qPipelineInvalid {
+		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
+		return EvalScalarResult{}, false, nil
+	}
+	s.rememberQPipelinePlanKnownSource(descriptor.terminal, *terminal)
+	for i := range descriptor.assignments {
+		assignment := &descriptor.assignments[i]
+		if qScriptPipelineCanDeferAssignmentScalar(descriptor, *assignment) {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
+			return EvalScalarResult{}, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
+				return EvalScalarResult{}, true, err
+			}
+		}
+		s.ensureOwnedEnv()
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	out, handled, err := s.evalQScriptTerminalPipelineScalar(descriptor, terminal)
 	recordQScriptPipelineResult(shape, handled, err)
 	return out, handled, err
 }
@@ -3454,6 +3497,160 @@ func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescr
 	}
 }
 
+func (s *EvalState) evalQScriptTerminalPipelineScalar(descriptor *qScriptPipelineDescriptor, terminal *qPipelinePlan) (EvalScalarResult, bool, error) {
+	switch terminal.kind {
+	case qPipelineSumWhereIndex:
+		if descriptor.kind == qScriptPipelineWhereIndexReduceSum && descriptor.moduloMaskPlan != nil {
+			if out, handled, err := s.evalQScriptModuloScalarDyadicValueSum(descriptor); err != nil || handled {
+				return out, handled, err
+			}
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return EvalScalarResult{}, true, err
+		}
+		if !handled {
+			return EvalScalarResult{}, false, nil
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			return EvalScalarResult{}, false, nil
+		}
+		if descriptor.kind == qScriptPipelineWhereIndexReduceSum && descriptor.moduloMaskPlan != nil {
+			out, _, handled, err := s.evalQPipelineModuloCompareValueSumScalar(descriptor.moduloMaskPlan, array)
+			if err != nil || handled {
+				return out, handled, err
+			}
+		}
+		return EvalScalarResult{}, false, nil
+	case qPipelineSumGatherIndexes:
+		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return EvalScalarResult{}, true, err
+		}
+		if !handled {
+			return EvalScalarResult{}, false, nil
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			return EvalScalarResult{}, false, nil
+		}
+		if descriptor.kind == qScriptPipelineWhereIndexReduceSum && descriptor.moduloMaskPlan != nil {
+			out, _, handled, err := s.evalQPipelineModuloCompareValueSumScalar(descriptor.moduloMaskPlan, array)
+			if err != nil || handled {
+				return out, handled, err
+			}
+		}
+		return EvalScalarResult{}, false, nil
+	default:
+		return EvalScalarResult{}, false, nil
+	}
+}
+
+func (s *EvalState) evalQScriptModuloScalarDyadicValueSum(descriptor *qScriptPipelineDescriptor) (EvalScalarResult, bool, error) {
+	if descriptor == nil || descriptor.moduloMaskPlan == nil {
+		return EvalScalarResult{}, false, nil
+	}
+	sourceName, scale, bias, ok := qScriptPipelineAffineValueOverModuloSource(descriptor)
+	if !ok || sourceName != strings.TrimSpace(descriptor.moduloMaskPlan.modExpr) {
+		return EvalScalarResult{}, false, nil
+	}
+	array, modulus, target, dataOp, handled, err := s.evalQPipelineModuloCompareOperands(descriptor.moduloMaskPlan)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	sum, count, handled, err := data.TryTypedIntegerSumWhereModuloCompare(array, array, modulus, dataOp, target)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	if count == 0 {
+		return EvalScalarResult{}, false, nil
+	}
+	out := sum*scale + count*bias
+	shape := qPipelineModuloReduceShape(descriptor.moduloMaskPlan, data.KindI64, array.Kind(), qRuntimeKernelOperandKind(modulus, nil), qRuntimeKernelOperandKind(target, nil))
+	recordRuntimeKernelProbeReason("ArrayModuloCompareReduceSum", shape, true, nil, RuntimeFallbackUnsupportedType)
+	return evalScalarInt(out), true, nil
+}
+
+func qScriptPipelineAffineValueOverModuloSource(descriptor *qScriptPipelineDescriptor) (string, int64, int64, bool) {
+	if descriptor == nil {
+		return "", 0, 0, false
+	}
+	plan := descriptor.valuePlan
+	if descriptor.valueBindingPlan.kind != qScriptBindingInvalid {
+		plan = descriptor.valueBindingPlan
+	}
+	sourceName, scale, bias, ok := qScriptPipelineAffineI64Plan(&plan)
+	if !ok || sourceName == "" || scale == 0 {
+		return "", 0, 0, false
+	}
+	return sourceName, scale, bias, true
+}
+
+func qScriptPipelineAffineI64Plan(plan *qScriptBindingPlan) (string, int64, int64, bool) {
+	if plan == nil {
+		return "", 0, 0, false
+	}
+	switch plan.kind {
+	case qScriptBindingName:
+		name := strings.TrimSpace(plan.name)
+		if name == "" {
+			return "", 0, 0, false
+		}
+		return name, 1, 0, true
+	case qScriptBindingLiteral:
+		value, ok := integerValue(plan.literal)
+		return "", 0, value, ok
+	case qScriptBindingBinary:
+		if plan.left == nil || plan.right == nil {
+			return "", 0, 0, false
+		}
+		leftName, leftScale, leftBias, leftOK := qScriptPipelineAffineI64Plan(plan.left)
+		rightName, rightScale, rightBias, rightOK := qScriptPipelineAffineI64Plan(plan.right)
+		if !leftOK || !rightOK {
+			return "", 0, 0, false
+		}
+		switch plan.op {
+		case "+":
+			name, ok := qScriptPipelineMergeAffineSources(leftName, rightName)
+			if !ok {
+				return "", 0, 0, false
+			}
+			return name, leftScale + rightScale, leftBias + rightBias, true
+		case "-":
+			name, ok := qScriptPipelineMergeAffineSources(leftName, rightName)
+			if !ok {
+				return "", 0, 0, false
+			}
+			return name, leftScale - rightScale, leftBias - rightBias, true
+		case "*":
+			if leftName == "" && leftScale == 0 {
+				return rightName, rightScale * leftBias, rightBias * leftBias, true
+			}
+			if rightName == "" && rightScale == 0 {
+				return leftName, leftScale * rightBias, leftBias * rightBias, true
+			}
+			return "", 0, 0, false
+		default:
+			return "", 0, 0, false
+		}
+	default:
+		return "", 0, 0, false
+	}
+}
+
+func qScriptPipelineMergeAffineSources(left, right string) (string, bool) {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" {
+		return right, true
+	}
+	if right == "" || right == left {
+		return left, true
+	}
+	return "", false
+}
+
 func qScriptPipelineCanDeferAssignment(descriptor *qScriptPipelineDescriptor, assignment qScriptPipelineAssignment) bool {
 	if descriptor == nil {
 		return false
@@ -3470,6 +3667,20 @@ func qScriptPipelineCanDeferAssignment(descriptor *qScriptPipelineDescriptor, as
 	default:
 		return false
 	}
+}
+
+func qScriptPipelineCanDeferAssignmentScalar(descriptor *qScriptPipelineDescriptor, assignment qScriptPipelineAssignment) bool {
+	if qScriptPipelineCanDeferAssignment(descriptor, assignment) {
+		return true
+	}
+	if descriptor == nil || descriptor.kind != qScriptPipelineWhereIndexReduceSum || descriptor.moduloMaskPlan == nil {
+		return false
+	}
+	if strings.TrimSpace(descriptor.valueExpr) != strings.TrimSpace(assignment.name) {
+		return false
+	}
+	sourceName, _, _, ok := qScriptPipelineAffineValueOverModuloSource(descriptor)
+	return ok && sourceName == strings.TrimSpace(descriptor.moduloMaskPlan.modExpr)
 }
 
 func qScriptPipelineModuloMaskPlan(maskExpr string) *qPipelinePlan {
