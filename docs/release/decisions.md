@@ -14,6 +14,7 @@ or local validation runs.
 | Release channels | Publish GitHub Releases, `scripts/install.sh`, and `go install`; package managers are not official for the initial public release. | Resolved. |
 | Artifact signing | Publish SHA256 checksums for release archives; cosign/GPG signing is not required for the initial public release. | Resolved. |
 | Compatibility policy | Use a pre-1.0 compatibility policy: spec-covered language behavior is maintained where practical; experimental dialect, AI, JIT, and provider surfaces may change with release notes. | Resolved. |
+| Branch policy | Develop on `main` only until release workflow requires explicit release branches. Historical local worktrees and non-main GitHub branches were cleaned on 2026-06-29. | Resolved. |
 
 ## License
 
@@ -83,3 +84,19 @@ given tag. Experimental surfaces include AI provider integration, live
 providers, JIT internals, typed runtime kernels, diagnostics formats not marked
 as release evidence, and newly added dialect extensions. User-visible changes
 must be listed in release notes with migration guidance.
+
+## Branch Policy
+
+Development uses `main` as the only active branch until a release workflow
+explicitly introduces protected release branches.
+
+Record from the 2026-06-29 cleanup:
+
+- local worktrees were pruned to the repository root worktree only;
+- local branches were pruned to `main` only;
+- GitHub remote branches were pruned to `main` only;
+- historical refs were bundled before deletion at
+  `/tmp/leia-branch-cleanup-20260629-205123/leia-all-refs.bundle`;
+- uncommitted pre-cleanup work was preserved in stash entries named
+  `cleanup backup claude-main before branch/worktree prune 20260629` and
+  `cleanup backup before branch/worktree prune 20260629`.
