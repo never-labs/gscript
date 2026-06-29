@@ -5195,6 +5195,19 @@ func TryTypedBinSum(domain Array, query any) (any, bool, error) {
 	if domain == nil {
 		return nil, true, fmt.Errorf("bin sum domain must be non-nil")
 	}
+	if sum, handled, err := TryTypedBinSumI64(domain, query); err != nil || handled {
+		return sum, handled, err
+	}
+	return nil, false, nil
+}
+
+// TryTypedBinSumI64 reduces q's `domain bin query` result directly into an
+// int64 sum. It is the scalar counterpart to TryTypedBinSum for hot runtime
+// paths that must avoid boxing the result as any.
+func TryTypedBinSumI64(domain Array, query any) (int64, bool, error) {
+	if domain == nil {
+		return 0, true, fmt.Errorf("bin sum domain must be non-nil")
+	}
 	if sum, handled, err := binSumTyped(domain, query); err != nil || handled {
 		return sum, handled, err
 	}
@@ -5203,11 +5216,11 @@ func TryTypedBinSum(domain Array, query any) (any, bool, error) {
 		for row := 0; row < queryArray.Len(); row++ {
 			value, ok := queryArray.At(row)
 			if !ok {
-				return nil, true, fmt.Errorf("bin query row %d out of range", row)
+				return 0, true, fmt.Errorf("bin query row %d out of range", row)
 			}
 			index, err := kdbBinScalar(domain, value)
 			if err != nil {
-				return nil, true, err
+				return 0, true, err
 			}
 			total += index
 		}
@@ -5215,7 +5228,7 @@ func TryTypedBinSum(domain Array, query any) (any, bool, error) {
 	}
 	index, err := kdbBinScalar(domain, query)
 	if err != nil {
-		return nil, true, err
+		return 0, true, err
 	}
 	return index, true, nil
 }

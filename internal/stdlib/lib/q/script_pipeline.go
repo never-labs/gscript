@@ -3542,6 +3542,8 @@ func (s *EvalState) evalQScriptTerminalPipelineScalar(descriptor *qScriptPipelin
 			}
 		}
 		return EvalScalarResult{}, false, nil
+	case qPipelineApplyScalarIndex:
+		return s.evalQPipelineApplyScalarIndexScalar(terminal)
 	default:
 		return EvalScalarResult{}, false, nil
 	}

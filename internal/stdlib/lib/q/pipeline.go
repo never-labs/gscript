@@ -63,6 +63,11 @@ type qPipelinePlan struct {
 	moduloReduceArrayKind   data.Kind
 	moduloReduceModulusKind data.Kind
 	moduloReduceTargetKind  data.Kind
+	binReduceShape          string
+	binReduceDomainKind     data.Kind
+	binReduceQueryKind      data.Kind
+	razeReduceShape         string
+	razeReduceInputKind     data.Kind
 	compareReduceValuesKind data.Kind
 	compareReduceRightKind  data.Kind
 	compareReduceOp         string
@@ -1653,6 +1658,12 @@ func (s *EvalState) evalQPipelinePlanScalar(plan *qPipelinePlan) (EvalScalarResu
 		out, handled, err = s.evalQPipelineSumWhereModuloCompareScalar(plan)
 	case qPipelineCountWhereModuloCompare:
 		out, handled, err = s.evalQPipelineCountWhereModuloCompareScalar(plan)
+	case qPipelineSumBin:
+		out, handled, err = s.evalQPipelineSumBinScalar(plan)
+	case qPipelineSumRaze:
+		out, handled, err = s.evalQPipelineSumRazeScalar(plan)
+	case qPipelineApplyScalarIndex:
+		out, handled, err = s.evalQPipelineApplyScalarIndexScalar(plan)
 	default:
 		recordRuntimeQPipelinePlanExecution(plan, "fallback", RuntimeFallbackPlannerUnhandled)
 		return EvalScalarResult{}, false, nil
@@ -1812,13 +1823,18 @@ func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, boo
 	if err != nil {
 		return nil, true, err
 	}
-	indexValue, err := s.evalQPipelinePlannedExpr(plan.indexExpr, &plan.indexPlan)
-	if err != nil {
-		return nil, true, err
-	}
 	mode := qApplyIndexAt
 	if plan.compareOp == "dot" {
 		mode = qApplyIndexDot
+	}
+	if row, ok := parseScalarIndexLiteral(plan.indexExpr); ok {
+		if out, handled, err := scalarIndexValue(mode, target, row); err != nil || handled {
+			return out, handled, err
+		}
+	}
+	indexValue, err := s.evalQPipelinePlannedExpr(plan.indexExpr, &plan.indexPlan)
+	if err != nil {
+		return nil, true, err
 	}
 	indexes, scalar, err := indexInts(indexValue)
 	if err != nil {
@@ -1859,6 +1875,39 @@ func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, boo
 		return nil, true, err
 	}
 	return out, true, nil
+}
+
+func (s *EvalState) evalQPipelineApplyScalarIndexScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	target, err := s.evalQPipelinePlannedExpr(plan.valueExpr, &plan.valuePlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	row, ok := parseScalarIndexLiteral(plan.indexExpr)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	mode := qApplyIndexAt
+	if plan.compareOp == "dot" {
+		mode = qApplyIndexDot
+	}
+	array, ok := target.(data.Array)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	shape := qScalarApplyIndexShape(mode, string(array.Kind()))
+	if row < 0 || row >= array.Len() {
+		recordQTypedRuntimeKernelReason("ArrayScalarIndex", shape, true, nil, RuntimeFallbackUnsupportedType)
+		return EvalScalarResult{}, false, nil
+	}
+	if array.Kind() != data.KindI64 {
+		return EvalScalarResult{}, false, nil
+	}
+	value, handled, err := data.TryTypedScalarIndexI64(array, row)
+	recordQTypedRuntimeKernelReason("ArrayScalarIndex", shape, handled, err, RuntimeFallbackUnsupportedType)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	return evalScalarInt(value), true, nil
 }
 
 func (s *EvalState) evalQPipelineSumSequenceTransform(plan *qPipelinePlan) (any, bool, error) {
@@ -2074,7 +2123,7 @@ func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error)
 	if err != nil {
 		return nil, true, err
 	}
-	shape := "vector-reduce/sum-raze/" + string(qRuntimeKernelOperandKind(value, nil))
+	shape := qPipelineRazeReduceShape(plan, qRuntimeKernelOperandKind(value, nil))
 	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
 		kernel:         "ArrayNestedRazeSum",
 		shape:          shape,
@@ -2098,6 +2147,33 @@ func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error)
 			return data.TryTypedNestedNumericSum(value)
 		},
 	})
+}
+
+func (s *EvalState) evalQPipelineSumRazeScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	if array, ok := value.(data.Array); ok && array.Kind() == data.KindAny && qSumRazeLeavesNestedArrays(array) {
+		recordQTypedRuntimeKernelReason("ArrayNestedRazeSum", qPipelineRazeReduceShape(plan, qRuntimeKernelOperandKind(value, nil)), false, nil, RuntimeFallbackUnsupportedType)
+		return EvalScalarResult{}, false, nil
+	}
+	if _, isArray := value.(data.Array); !isArray {
+		if _, isMatrix := value.(data.Matrix); !isMatrix {
+			recordQTypedRuntimeKernelReason("ArrayNestedRazeSum", qPipelineRazeReduceShape(plan, qRuntimeKernelOperandKind(value, nil)), false, nil, RuntimeFallbackUnsupportedType)
+			return EvalScalarResult{}, false, nil
+		}
+	}
+	shape := qPipelineRazeReduceShape(plan, qRuntimeKernelOperandKind(value, nil))
+	integer, float, hasFloat, handled, err := data.TryTypedNestedNumericScalarSum(value)
+	recordQTypedRuntimeKernelReason("ArrayNestedRazeSum", shape, handled, err, RuntimeFallbackUnsupportedType)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	if hasFloat {
+		return evalScalarFloat(float), true, nil
+	}
+	return evalScalarInt(integer), true, nil
 }
 
 func (s *EvalState) evalQPipelineFindIndexes(plan *qPipelinePlan) (any, bool, error) {
@@ -2758,6 +2834,31 @@ func qPipelineModuloReduceShape(plan *qPipelinePlan, valuesKind, arrayKind, modu
 	return plan.moduloReduceShape
 }
 
+func qPipelineBinReduceShape(plan *qPipelinePlan, domainKind, queryKind data.Kind) string {
+	if plan == nil {
+		return "bin-reduce/sum/" + string(domainKind) + "/" + string(queryKind)
+	}
+	if plan.binReduceShape == "" ||
+		plan.binReduceDomainKind != domainKind ||
+		plan.binReduceQueryKind != queryKind {
+		plan.binReduceDomainKind = domainKind
+		plan.binReduceQueryKind = queryKind
+		plan.binReduceShape = "bin-reduce/sum/" + string(domainKind) + "/" + string(queryKind)
+	}
+	return plan.binReduceShape
+}
+
+func qPipelineRazeReduceShape(plan *qPipelinePlan, inputKind data.Kind) string {
+	if plan == nil {
+		return "vector-reduce/sum-raze/" + string(inputKind)
+	}
+	if plan.razeReduceShape == "" || plan.razeReduceInputKind != inputKind {
+		plan.razeReduceInputKind = inputKind
+		plan.razeReduceShape = "vector-reduce/sum-raze/" + string(inputKind)
+	}
+	return plan.razeReduceShape
+}
+
 func (s *EvalState) evalQPipelineModuloCompareOperands(plan *qPipelinePlan) (data.Array, any, any, data.Op, bool, error) {
 	source, err := s.evalQPipelinePlannedExpr(plan.modExpr, &plan.modPlan)
 	if err != nil {
@@ -2971,7 +3072,7 @@ func (s *EvalState) evalQPipelineSumBin(plan *qPipelinePlan) (any, bool, error) 
 	if err != nil {
 		return nil, true, err
 	}
-	shape := "bin-reduce/sum/" + string(domain.Kind()) + "/" + string(qRuntimeKernelOperandKind(query, nil))
+	shape := qPipelineBinReduceShape(plan, domain.Kind(), qRuntimeKernelOperandKind(query, nil))
 	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
 		kernel: "ArrayBinReduceSum",
 		shape:  shape,
@@ -2979,6 +3080,28 @@ func (s *EvalState) evalQPipelineSumBin(plan *qPipelinePlan) (any, bool, error) 
 			return data.TryTypedBinSum(domain, query)
 		},
 	})
+}
+
+func (s *EvalState) evalQPipelineSumBinScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	domain, ok := left.(data.Array)
+	if !ok {
+		return EvalScalarResult{}, false, nil
+	}
+	query, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	shape := qPipelineBinReduceShape(plan, domain.Kind(), qRuntimeKernelOperandKind(query, nil))
+	sum, handled, err := data.TryTypedBinSumI64(domain, query)
+	sum, handled, err = qTypedRuntimeResultReason("ArrayBinReduceSum", shape, RuntimeFallbackUnsupportedType, sum, handled, err)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	return evalScalarInt(sum), true, nil
 }
 
 func (s *EvalState) evalQPipelineSumVectorExpr(plan *qPipelinePlan) (any, bool, error) {

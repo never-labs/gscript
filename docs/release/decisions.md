@@ -14,7 +14,6 @@ or local validation runs.
 | Release channels | Publish GitHub Releases, `scripts/install.sh`, and `go install`; package managers are not official for the initial public release. | Resolved. |
 | Artifact signing | Publish SHA256 checksums for release archives; cosign/GPG signing is not required for the initial public release. | Resolved. |
 | Compatibility policy | Use a pre-1.0 compatibility policy: spec-covered language behavior is maintained where practical; experimental dialect, AI, JIT, and provider surfaces may change with release notes. | Resolved. |
-| Branch policy | Develop on `main` only until release workflow requires explicit release branches. Historical local worktrees and non-main GitHub branches were cleaned on 2026-06-29. | Resolved. |
 
 ## License
 

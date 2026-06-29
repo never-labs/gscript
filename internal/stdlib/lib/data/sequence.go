@@ -927,6 +927,17 @@ func TryTypedNestedNumericSum(value any) (any, bool, error) {
 	return sum.integer, true, nil
 }
 
+// TryTypedNestedNumericScalarSum reduces raze value directly into primitive
+// scalar carriers. It is the low-allocation counterpart to
+// TryTypedNestedNumericSum for runtimes that can return typed scalars.
+func TryTypedNestedNumericScalarSum(value any) (integer int64, float float64, hasFloat bool, handled bool, err error) {
+	sum, handled, err := nestedNumericSum(value)
+	if err != nil || !handled {
+		return 0, 0, false, handled, err
+	}
+	return sum.integer, sum.float, sum.hasFloat, true, nil
+}
+
 // Cross returns the Cartesian product of two scalar-or-array values. The
 // product rows are two-item arrays so callers can preserve tuple-like shape.
 func Cross(left, right any) Array {
@@ -1434,6 +1445,9 @@ func nestedNumericSum(value any) (nestedSum, bool, error) {
 }
 
 func nestedNumericArraySum(array Array) (nestedSum, bool, error) {
+	if sum, handled, err := numericPrimitiveScalarSum(array); err != nil || handled {
+		return sum, handled, err
+	}
 	out, handled, err := TryTypedNumericSum(array)
 	if err != nil || !handled {
 		return nestedSum{}, handled, err
@@ -1466,6 +1480,90 @@ func nestedNumericArraySum(array Array) (nestedSum, bool, error) {
 		}
 		return nestedSum{}, false, nil
 	}
+}
+
+func numericPrimitiveScalarSum(array Array) (nestedSum, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return numericPrimitiveScalarSum(a.array)
+	case columnArray[int8]:
+		return nestedIntegerSum(numericSumIntegerValue(a.data)), true, nil
+	case columnArray[int16]:
+		return nestedIntegerSum(numericSumIntegerValue(a.data)), true, nil
+	case columnArray[int32]:
+		return nestedIntegerSum(numericSumIntegerValue(a.data)), true, nil
+	case columnArray[int64]:
+		return nestedIntegerSum(numericSumIntegerValue(a.data)), true, nil
+	case i64RangeArray:
+		return nestedIntegerSum(i64RangeSum(a)), true, nil
+	case i64BucketArray:
+		value, handled, err := i64BucketSum(a)
+		return nestedIntegerSum(value), handled, err
+	case i64XrankArray:
+		value, handled, err := i64XrankSum(a)
+		return nestedIntegerSum(value), handled, err
+	case i64ScalarDyadicArray:
+		if value, handled, err := i64ScalarDyadicSum(a); err != nil || handled {
+			if err != nil || !handled {
+				return nestedSum{}, handled, err
+			}
+			sum, ok := numericValueToNestedSum(value)
+			return sum, ok, nil
+		}
+		return nestedSum{}, false, nil
+	case indexedArray:
+		if value, handled, err := indexedArrayIntegerSum(a); err != nil || handled {
+			if err != nil || !handled {
+				return nestedSum{}, handled, err
+			}
+			sum, ok := numericValueToNestedSum(value)
+			return sum, ok, nil
+		}
+		return nestedSum{}, false, nil
+	case i64ScalarDyadicRunningSumArray:
+		value, handled, err := i64ScalarDyadicRunningSumSum(a)
+		return nestedIntegerSum(value), handled, err
+	case i64SparseAmendArray:
+		value, handled, err := i64SparseAmendSum(a)
+		return nestedIntegerSum(value), handled, err
+	case i64FillArray:
+		return nestedIntegerSum(a.sum()), true, nil
+	case fbyI64BroadcastArray:
+		return nestedIntegerSum(a.total()), true, nil
+	case fbyI64TiledBroadcastArray:
+		return nestedIntegerSum(a.total()), true, nil
+	case f64RangeArray:
+		return nestedFloatSum(f64RangeSum(a)), true, nil
+	case columnArray[float32]:
+		sum, _, _, err := numericSumSlice(a.data)
+		return nestedFloatSum(sum), err == nil, err
+	case columnArray[float64]:
+		sum, _, _, err := numericSumSlice(a.data)
+		return nestedFloatSum(sum), err == nil, err
+	default:
+		return nestedSum{}, false, nil
+	}
+}
+
+func nestedIntegerSum(value int64) nestedSum {
+	return nestedSum{integer: value, float: float64(value)}
+}
+
+func nestedFloatSum(value float64) nestedSum {
+	return nestedSum{float: value, hasFloat: true}
+}
+
+func numericValueToNestedSum(value any) (nestedSum, bool) {
+	if IsNull(value) {
+		return nestedSum{}, true
+	}
+	if n, ok := integerValue(value); ok {
+		return nestedIntegerSum(n), true
+	}
+	if n, ok := numeric(value); ok {
+		return nestedFloatSum(n), true
+	}
+	return nestedSum{}, false
 }
 
 func nestedNumericMatrixSum(matrix Matrix) (nestedSum, bool, error) {
