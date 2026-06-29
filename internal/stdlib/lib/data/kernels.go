@@ -2512,15 +2512,182 @@ func TryTypedQNumericDyadicFloat(op string, left, right any) (Array, bool, error
 }
 
 func TryTypedQNumericDyadicFloatSum(op string, left, right any) (any, bool, error) {
+	sum, handled, err := TryTypedQNumericDyadicFloatScalarSum(op, left, right)
+	if err != nil || handled {
+		return sum, handled, err
+	}
 	bound, handled, err := BindNumericDyadicFloat(op, left, right)
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	sum, err := bound.Sum()
+	sum, err = bound.Sum()
 	if err != nil {
 		return nil, true, err
 	}
 	return sum, true, nil
+}
+
+// TryTypedQNumericDyadicFloatScalarSum reduces left op right directly into a
+// scalar float without constructing a bound producer or materialized array.
+// It preserves NumericDyadicFloatBound.Sum semantics: array/scalar operands
+// broadcast through numericDyadicLength, null rows are skipped, and scalar/
+// scalar expressions stay with the regular scalar evaluator.
+func TryTypedQNumericDyadicFloatScalarSum(op string, left, right any) (float64, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return 0, false, nil
+	}
+	if !typedNumericOperand(left) || !typedNumericOperand(right) {
+		return 0, false, nil
+	}
+	length, err := numericDyadicLength(op, leftArray, rightArray)
+	if err != nil {
+		return 0, true, err
+	}
+	apply, ok := numericDyadicFloatFunc(op)
+	if !ok {
+		return 0, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
+	}
+	if total, ok := tryTypedQNumericScalarDenseDyadicFloatSum(left, right, leftIsArray, rightIsArray, length, apply); ok {
+		return total, true, nil
+	}
+	var total float64
+	for row := 0; row < length; row++ {
+		leftValue, leftOK, err := numericDyadicFloatOperandAt(left, leftArray, leftIsArray, row, length)
+		if err != nil {
+			return 0, true, err
+		}
+		if !leftOK {
+			continue
+		}
+		rightValue, rightOK, err := numericDyadicFloatOperandAt(right, rightArray, rightIsArray, row, length)
+		if err != nil {
+			return 0, true, err
+		}
+		if !rightOK {
+			continue
+		}
+		total += apply(leftValue, rightValue)
+	}
+	return total, true, nil
+}
+
+func tryTypedQNumericScalarDenseDyadicFloatSum(left, right any, leftIsArray, rightIsArray bool, length int, apply f64DyadicFunc) (float64, bool) {
+	if leftIsArray == rightIsArray {
+		return 0, false
+	}
+	if leftIsArray {
+		scalar, ok := numeric(right)
+		if !ok {
+			return 0, false
+		}
+		return numericDenseArrayScalarDyadicFloatSum(left.(Array), scalar, false, length, apply)
+	}
+	scalar, ok := numeric(left)
+	if !ok {
+		return 0, false
+	}
+	return numericDenseArrayScalarDyadicFloatSum(right.(Array), scalar, true, length, apply)
+}
+
+func numericDenseArrayScalarDyadicFloatSum(array Array, scalar float64, scalarLeft bool, length int, apply f64DyadicFunc) (float64, bool) {
+	switch values := array.(type) {
+	case i64RangeArray:
+		if values.len != length {
+			return 0, false
+		}
+		return scalarDyadicI64RangeSum(values, scalar, scalarLeft, apply), true
+	case f64RangeArray:
+		if values.len != length {
+			return 0, false
+		}
+		return scalarDyadicF64RangeSum(values, scalar, scalarLeft, apply), true
+	case columnArray[int32]:
+		if len(values.data) != length {
+			return 0, false
+		}
+		return scalarDyadicSignedSliceSum(values.data, scalar, scalarLeft, apply), true
+	case columnArray[int64]:
+		if len(values.data) != length {
+			return 0, false
+		}
+		return scalarDyadicSignedSliceSum(values.data, scalar, scalarLeft, apply), true
+	case columnArray[float32]:
+		if len(values.data) != length {
+			return 0, false
+		}
+		return scalarDyadicFloatSliceSum(values.data, scalar, scalarLeft, apply), true
+	case columnArray[float64]:
+		if len(values.data) != length {
+			return 0, false
+		}
+		return scalarDyadicFloatSliceSum(values.data, scalar, scalarLeft, apply), true
+	default:
+		return 0, false
+	}
+}
+
+func scalarDyadicI64RangeSum(values i64RangeArray, scalar float64, scalarLeft bool, apply f64DyadicFunc) float64 {
+	var total float64
+	current := values.start
+	if scalarLeft {
+		for row := 0; row < values.len; row++ {
+			total += apply(scalar, float64(current))
+			current += values.step
+		}
+		return total
+	}
+	for row := 0; row < values.len; row++ {
+		total += apply(float64(current), scalar)
+		current += values.step
+	}
+	return total
+}
+
+func scalarDyadicF64RangeSum(values f64RangeArray, scalar float64, scalarLeft bool, apply f64DyadicFunc) float64 {
+	var total float64
+	current := values.start
+	if scalarLeft {
+		for row := 0; row < values.len; row++ {
+			total += apply(scalar, current)
+			current += values.step
+		}
+		return total
+	}
+	for row := 0; row < values.len; row++ {
+		total += apply(current, scalar)
+		current += values.step
+	}
+	return total
+}
+
+func scalarDyadicSignedSliceSum[T signedScalar](values []T, scalar float64, scalarLeft bool, apply f64DyadicFunc) float64 {
+	var total float64
+	if scalarLeft {
+		for _, value := range values {
+			total += apply(scalar, float64(value))
+		}
+		return total
+	}
+	for _, value := range values {
+		total += apply(float64(value), scalar)
+	}
+	return total
+}
+
+func scalarDyadicFloatSliceSum[T floatScalar](values []T, scalar float64, scalarLeft bool, apply f64DyadicFunc) float64 {
+	var total float64
+	if scalarLeft {
+		for _, value := range values {
+			total += apply(scalar, float64(value))
+		}
+		return total
+	}
+	for _, value := range values {
+		total += apply(float64(value), scalar)
+	}
+	return total
 }
 
 // TryTypedNumericSumPlusScalarDyadicFloatSum fuses two reducers over one

@@ -1660,6 +1660,8 @@ func (s *EvalState) evalQPipelinePlanScalar(plan *qPipelinePlan) (EvalScalarResu
 		out, handled, err = s.evalQPipelineCountWhereModuloCompareScalar(plan)
 	case qPipelineSumBin:
 		out, handled, err = s.evalQPipelineSumBinScalar(plan)
+	case qPipelineSumDyadicFloatMath:
+		out, handled, err = s.evalQPipelineSumDyadicFloatMathScalar(plan)
 	case qPipelineSumRaze:
 		out, handled, err = s.evalQPipelineSumRazeScalar(plan)
 	case qPipelineApplyScalarIndex:
@@ -3299,6 +3301,27 @@ func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan *qPipelinePlan) (any, b
 	shape := qRuntimeKernelDyadicFloatSumShape(plan.compareOp, qRuntimeKernelOperandKind(left, nil), qRuntimeKernelOperandKind(right, nil))
 	out, handled, err := data.TryTypedQNumericDyadicFloatSum(plan.compareOp, left, right)
 	return qTypedRuntimeResult("ArrayNumericDyadicFloatSum", shape, out, handled, err)
+}
+
+func (s *EvalState) evalQPipelineSumDyadicFloatMathScalar(plan *qPipelinePlan) (EvalScalarResult, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return EvalScalarResult{}, true, err
+	}
+	if qPipelineFusedSumEmptyOperand(left, right) {
+		return EvalScalarResult{}, false, nil
+	}
+	shape := qRuntimeKernelDyadicFloatSumShape(plan.compareOp, qRuntimeKernelOperandKind(left, nil), qRuntimeKernelOperandKind(right, nil))
+	sum, handled, err := data.TryTypedQNumericDyadicFloatScalarSum(plan.compareOp, left, right)
+	sum, handled, err = qTypedRuntimeResultReason("ArrayNumericDyadicFloatSum", shape, RuntimeFallbackUnsupportedType, sum, handled, err)
+	if err != nil || !handled {
+		return EvalScalarResult{}, handled, err
+	}
+	return evalScalarFloat(sum), true, nil
 }
 
 func (s *EvalState) evalQPipelineCountRunningScan(plan *qPipelinePlan) (any, bool, error) {
