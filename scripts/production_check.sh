@@ -115,9 +115,7 @@ RELEASE_CRITICAL_SKIP_NAMES=(
     "Documentation References"
     "Editor Assets"
     "Performance Gate"
-    "Q Performance Gate"
     "Language Conformance Surface"
-    "Q Conformance Gate"
     "Release Smoke"
     "CLI Experience"
     "Public Release Blockers"
@@ -410,16 +408,6 @@ add_performance_smoke() {
     add_run "Performance Smoke" "$cmd"
 }
 
-add_q_performance_gate() {
-    if ! have_cmd go; then
-        add_skip "Q Performance Gate" "missing go"
-        return
-    fi
-    # Full mode only, like the other long performance stages; --quick keeps it
-    # out of the plan. The launcher owns q-suite capture and q-report evidence.
-    add_run "Q Performance Gate" "scripts/run.sh q-perf"
-}
-
 add_documentation_references() {
     if [ ! -f scripts/docs_check.sh ]; then
         add_skip "Documentation References" "missing scripts/docs_check.sh"
@@ -450,18 +438,6 @@ add_language_conformance_gate() {
         return
     fi
     add_run "Language Conformance Surface" "scripts/run.sh language-conformance"
-}
-
-add_q_conformance_gate() {
-    if ! have_cmd go; then
-        add_skip "Q Conformance Gate" "missing go"
-        return
-    fi
-    if [ ! -f scripts/q_conformance_gate.sh ]; then
-        add_skip "Q Conformance Gate" "missing scripts/q_conformance_gate.sh"
-        return
-    fi
-    add_run "Q Conformance Gate" "scripts/run.sh q --scope core --bench smoke"
 }
 
 add_editor_assets() {
@@ -679,10 +655,8 @@ build_full_plan() {
     add_documentation_references
     add_editor_assets
     add_performance_gate
-    add_q_performance_gate
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
         add_language_conformance_gate
-        add_q_conformance_gate
     fi
     add_release_smoke
     add_cli_experience_gate

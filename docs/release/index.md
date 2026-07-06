@@ -24,8 +24,6 @@ scripts/run.sh diagnostics --output /tmp/leia-diag --skip-go-tests --skip-benchm
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json
 go run ./cmd/leia doc check --json
-scripts/run.sh q --scope core --bench smoke --json
-scripts/run.sh q-perf --output /tmp/leia-q-perf
 scripts/run.sh editor --json
 scripts/run.sh public-blockers --json
 scripts/run.sh release-notes --json --version vX.Y.Z
@@ -140,9 +138,7 @@ release-critical:
 | Documentation References | Markdown links, spec HTML, generated references, and runnable examples. |
 | Editor Assets | TextMate, tree-sitter, VS Code, and editor smoke checks. |
 | Performance Gate | LuaJIT-class timing and strict performance evidence. |
-| Q Performance Gate | q benchmark report generation and threshold checks. |
 | Language Conformance Surface | Language conformance inventory. |
-| Q Conformance Gate | q language, example, and benchmark conformance. |
 | Release Smoke | Release-profile smoke checks. |
 | CLI Experience | CLI examples and user-facing command checks. |
 | Public Release Blockers | License, security, platform, channel, signing, and compatibility decisions. |

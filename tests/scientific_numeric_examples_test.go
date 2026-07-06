@@ -20,17 +20,17 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"mat([[1.0, dt], [0.0, 1.0]])", "row(1.0, 0.0)", "[0.0, 1.0]", "eye(2, 0.01)", `names: ["position", "velocity"]`, "stats.gaussian_state", "stats.linear_predict", "stats.linear_update", "state.innovation", "trace(state.P)", "state.x.position", "state.x.velocity", "stats.rms", "near(", "q {", "+/${state.x}", "assert(near(q_state_sum, position + velocity, 0.000000001))"},
+			wantAPI: []string{"mat([[1.0, dt], [0.0, 1.0]])", "row(1.0, 0.0)", "[0.0, 1.0]", "eye(2, 0.01)", `names: ["position", "velocity"]`, "stats.gaussian_state", "stats.linear_predict", "stats.linear_update", "state.innovation", "trace(state.P)", "state.x.position", "state.x.velocity", "stats.rms", "near(", "state_sum := sum([position, velocity])", "assert(near(state_sum, position + velocity, 0.000000001))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "stats.normal", "rand.samples", "rand.add_noise", "stats.observe", "measurements := [", "stats.describe(ensemble)", "near(", "sqrt(variance)", "q {", "avg ${ensemble.values}", "assert(near(q_value_mean, last_measurement, 0.25))"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.samples", "rand.add_noise", "stats.observe", "measurements := [", "stats.describe(ensemble)", "near(", "sqrt(variance)", "value_mean := stats.mean(ensemble.values)", "assert(near(value_mean, last_measurement, 0.25))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"A := [[0.0, 1.0], [g / l, 0.0]]", "diag(12.0, 1.5)", "control.lqr", "control.policy", "control.apply", "ode.solve", "pendulum_state := {names: [", "state: pendulum_state", "named_state", "x.theta", "x.omega", "wrap:", "sin(x.theta)", "cos(x.theta)", "final_state", "stats.describe_fields", "near(", "q {", "avg ${observed}.energy", "at(mat(A), 2, 1)", "assert(near(q_checksum, mean_energy, 0.000000001))"},
+			wantAPI: []string{"A := [[0.0, 1.0], [g / l, 0.0]]", "diag(12.0, 1.5)", "control.lqr", "control.policy", "control.apply", "ode.solve", "pendulum_state := {names: [", "state: pendulum_state", "named_state", "x.theta", "x.omega", "wrap:", "sin(x.theta)", "cos(x.theta)", "final_state", "stats.describe_fields", "near(", "energy_checksum := stats.mean(observed.energy)", "at(mat(A), 2, 1)", "assert(near(energy_checksum, mean_energy, 0.000000001))"},
 		},
 	}
 	for _, tc := range cases {

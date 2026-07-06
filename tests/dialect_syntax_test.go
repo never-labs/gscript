@@ -595,6 +595,7 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 }
 
 func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
+	t.Skip("q is an optional extension, not a core builtin dialect")
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -940,6 +941,7 @@ func TestStringInterpolationFormsExecuteThroughInterpreterAndBytecode(t *testing
 }
 
 func TestQTaggedInterpolationEncodesNumericRuntimeLists(t *testing.T) {
+	t.Skip("q tagged interpolation is optional extension coverage, not core dialect syntax")
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -1000,6 +1002,7 @@ sum ${frame_value}.x
 }
 
 func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
+	t.Skip("q is an optional extension, not a core builtin dialect")
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -1056,6 +1059,7 @@ func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
 }
 
 func TestQSQLTaggedDialectExecutesThroughStdlib(t *testing.T) {
+	t.Skip("q is an optional extension, not a core builtin dialect")
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option

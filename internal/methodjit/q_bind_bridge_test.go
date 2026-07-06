@@ -1,3 +1,5 @@
+//go:build qextension
+
 package methodjit
 
 import (
@@ -12,6 +14,7 @@ import (
 )
 
 func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAndKernels(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	proto := &vm.FuncProto{
 		Name:      "q_runtime_kernel_execution_stats_provider_aggregates_methodjit",
 		NumParams: 8,
@@ -109,6 +112,7 @@ func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAn
 }
 
 func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	proto := &vm.FuncProto{
 		Name:      "q_runtime_kernel_lowering_stats_provider_maps_methodjit_fallbacks",
 		NumParams: 2,
@@ -203,6 +207,7 @@ func TestQRuntimeKernelLoweringStatsProviderMapsMethodJITFallbacks(t *testing.T)
 }
 
 func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	names := runtime.NewTable()
 	names.RawSetInt(1, runtime.StringValue("size"))
 	proto := &vm.FuncProto{

@@ -121,6 +121,9 @@ func TestInternalStdlibDirsRepresentCatalogModules(t *testing.T) {
 			continue
 		}
 		dir := entry.Name()
+		if dir == "q" {
+			continue
+		}
 		module := dir
 		if mapped := dirToModule[dir]; mapped != "" {
 			module = mapped
@@ -181,7 +184,7 @@ func TestBuiltinDialectRegistryStaysModular(t *testing.T) {
 		"dialect_protocol.go":         {"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt"},
 		"dialect_protocol_network.go": {"ipaddr", "cidr", "hostport"},
 		"dialect_web.go":              {"serve"},
-		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "qsql", "pem", "xlsx", "excel"},
+		"dialect_data.go":             {"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem", "xlsx", "excel"},
 		"dialect_xlsx.go":             nil,
 		"dialect_database.go":         {"sql"},
 		"dialect_ai.go":               {"prompt", "quote", "model", "turn", "tool", "agent"},

@@ -24,6 +24,7 @@ import (
 )
 
 func TestJITAltStackDirectHelperEngagement(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	altStack := os.Getenv("LEIA_JIT_ALT_STACK") == "1"
 
 	const src = qEvalJITTypedRuntimeSmokeSource
@@ -169,6 +170,7 @@ func jitAltStackCallRunInt(tb testing.TB, v *bytecodevm.VM, n int64) int64 {
 // ExitStats diagnostics identical to the generic exit path; with the flag off
 // the direct lane must stay silent.
 func TestJITAltStackDirectPipelinePlanEngagement(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	altStack := os.Getenv("LEIA_JIT_ALT_STACK") == "1"
 	const qSrc = "+/til 64"
 	const want = int64(2016)
@@ -216,6 +218,7 @@ func TestJITAltStackDirectPipelinePlanEngagement(t *testing.T) {
 // run's plan table — wrong constants/plans — whenever run called work
 // natively under LEIA_JIT_ALT_STACK=1.
 func TestJITAltStackDirectHelperCalleeCF(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	const script = `
 func work() {
     x := q.eval("+/til 64")

@@ -39,7 +39,7 @@ set.
 | `examples/api/` | Offline API-client style scripts for host-facing workflow examples. |
 | `examples/automation/` | Offline business and release automation workflows. |
 | `examples/dialects/` | Built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialect examples. |
-| `examples/data/` | Focused data-language examples, including q/kdb+-style symbolic vectors and SQLite-to-columnar analytics projects. |
+| `examples/data/` | Focused data-language and optional compatibility examples. |
 | `examples/data_processing/` | Data structures, string processing, dense arrays, and SoA kernels. |
 | `examples/database/` | Package-managed database capability examples. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
@@ -51,7 +51,7 @@ set.
 | `examples/operations/` | Local operations and release-risk reporting workflows. |
 | `examples/performance/` | Execution mode and benchmark policy examples. |
 | `examples/security/` | Supply-chain and vendor security workflow examples. |
-| `examples/scientific/` | Scientific numeric examples using linalg, stats, ODE, control, q, math, and rand APIs. |
+| `examples/scientific/` | Scientific numeric examples using linalg, stats, ODE, control, math, and rand APIs. |
 | `examples/site/` | Static site and release dashboard generation examples. |
 | `examples/testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
 | `examples/tooling/` | Release evidence, diagnostics, and cross-domain release-gate project examples. |
@@ -64,25 +64,19 @@ set.
 
 ```bash
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
-go run ./cmd/leia examples check examples/data/q_vector_basics.leia
-go run ./cmd/leia examples check examples/data/q_trade_analytics_project
-go run ./cmd/leia examples check examples/data/db_q_frame_project
+go run ./cmd/leia examples run examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia
+go run ./cmd/leia examples check examples/database/package_managed
 go run ./cmd/leia examples check examples/scientific/kalman_filter.leia examples/scientific/particle_filter.leia examples/scientific/inverted_pendulum.leia
-go run ./cmd/leia examples run repo-tooling-release_gate_project-main
 go run ./cmd/leia examples check examples/web/fullstack_project
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 
 Use these with the [data-oriented reference](../reference/data-oriented/index.md),
 the [scientific numeric reference](../reference/scientific/index.md), and
-`benchmarks/data/` when evaluating numeric or SoA-heavy code. The
-`q_trade_analytics_project` example covers q/kdb+-style symbolic vectors,
-dictionaries, scans, filters, and table rollups. The `db_q_frame_project`
-example exercises SQLite `db.frame`, SoA-backed `q.query`, and `xlsx`/`excel`
-round-tripping as one runnable data workflow. The
-`release_gate_project` example combines fixture globbing, shell/process
-dialects, SQLite, q-style columnar aggregation, Excel round-tripping, AI agent
-mocking, and a loopback web route in one runnable release-gate workflow. The
+`benchmarks/data/` when evaluating numeric or SoA-heavy code. The database
+package example exercises SQLite `db.frame` with `xlsx`/`excel`
+round-tripping as one runnable data workflow. The SoA and dense-array examples
+cover columnar layout, masks, reductions, and dense numeric kernels. The
 particle integration example runs through the repository's higher-step-budget
 example runner; use the explicit `examples check` command above instead of the
 playground's default step budget when validating it.
@@ -107,12 +101,6 @@ The runnable dialect examples cover the CLI-visible built-in dialect surface,
 including shell/process literals, `env` lookup literals, `sql`,
 `markdown`/`md`, Markdown table parsing/encoding, AI prompt/quote literals,
 protocol fixtures, and data-format fixtures.
-
-For a larger cross-domain dialect example:
-
-```bash
-go run ./cmd/leia examples run repo-tooling-release_gate_project-main
-```
 
 ## AI Examples
 

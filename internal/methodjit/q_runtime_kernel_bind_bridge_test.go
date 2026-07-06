@@ -1,3 +1,5 @@
+//go:build qextension
+
 package methodjit
 
 import (

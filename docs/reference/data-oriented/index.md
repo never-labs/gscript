@@ -2,10 +2,9 @@
 
 Leia includes data-oriented standard libraries for numeric scripts that need
 columnar layout, typed dense arrays, vectors, matrices, masks, and hot-loop
-kernels. The `q` dialect is the core high-performance in-memory columnar
-analytics DSL in this area. This is a language feature area, not only a library
-convenience: runtime and JIT paths can specialize these shapes while preserving
-normal script semantics.
+kernels. This is a language feature area, not only a library convenience:
+runtime and JIT paths can specialize these shapes while preserving normal script
+semantics.
 
 ## Dense Arrays
 
@@ -69,20 +68,18 @@ conn.exec("create table sales(channel_id integer, amount real)")
 conn.exec("insert into sales values (?, ?)", [1, 120])
 
 frame := conn.frame("select channel_id, amount from sales", {})
-total := q.query(frame.soa, {
-    by: ["channel_id"]
-    select: {amount: "amount"}
-    aggregate: {amount: "sum"}
-    order_by: {column: "amount", desc: true}
-})
+total := 0.0
+for _, row := range ipairs(frame.rows) {
+    total = total + row.amount
+}
 ```
 
 Use row data when crossing API boundaries, and use `frame.soa` / numeric
-columns when feeding `q.query` or SoA kernels. Spreadsheet dialects complete the
+columns when feeding SoA kernels. Spreadsheet dialects complete the
 round trip:
 
 ```leia
-workbook := dialect.eval("xlsx", total, {
+workbook := dialect.eval("xlsx", frame.rows, {
     mode: "encode"
     headers: ["channel_id", "amount"]
     sheet: "summary"
@@ -90,12 +87,11 @@ workbook := dialect.eval("xlsx", total, {
 roundtrip := dialect.eval("excel", workbook, {headers: true})
 ```
 
-The runnable project `examples/data/db_q_frame_project` exercises SQLite
-`db.frame`, SoA-backed `q.query`, and `xlsx`/`excel` import/export together. It
-keeps published data-oriented claims tied to an executable example. Larger
-tooling workflows use the same bridge alongside shell, optional LLM, and web
-dialects; string categories are mapped to stable numeric ids before entering the
-SoA/q aggregation path.
+The runnable project `examples/database/package_managed` exercises SQLite
+queries and data-shaped results. The data-oriented examples under
+`examples/data_processing/data_oriented/` cover SoA kernels, masks, dense
+arrays, and vector/matrix hot paths. Spreadsheet dialects demonstrate
+`xlsx`/`excel` import/export as a separate data-format boundary.
 
 ## Shape And Schema
 

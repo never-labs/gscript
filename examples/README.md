@@ -12,8 +12,6 @@ These should run from a clean checkout without secrets:
 go run ../cmd/leia examples list
 go run ../cmd/leia examples check hello/fib.leia hello/types_demo.leia hello/dialects.leia
 go run ../cmd/leia examples check dialects/text_parsing.leia dialects/sql_result_analytics.leia
-go run ../cmd/leia examples check data/q_vector_basics.leia
-go run ../cmd/leia examples check data/db_q_frame_project
 go run ../cmd/leia examples check automation/invoice_reconciliation.leia
 go run ../cmd/leia examples check ai/coding_agent_project
 go run ../cmd/leia examples check operations/local_ops_report.leia
@@ -39,7 +37,7 @@ Directories:
 | `operations/` | Project-level offline workflows for local logs, backup hygiene, deploy risk, and ops reporting. |
 | `tooling/` | Project-level offline workflows for release evidence, diagnostics, and CLI gate planning. |
 | `performance/` | User-facing execution mode and benchmark policy examples. |
-| `data/` | Focused data-language examples, including q/kdb+-style symbolic vector evaluation and SQLite-to-columnar q analytics. |
+| `data/` | Focused data-language and optional compatibility examples. |
 | `data_processing/` | Strings, containers, dense data, vectors, matrices, and SoA. |
 | `database/` | Package-managed SQLite ledger analytics project. |
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |
@@ -48,7 +46,7 @@ Directories:
 | `llm/` | LLM models, tools, agents, direct turns, streaming, and provider smoke scripts. |
 | `macos/` | Package-managed macOS automation capability examples. |
 | `security/` | Supply-chain and vendor security workflow examples. |
-| `scientific/` | Scientific numeric examples using linalg, stats, ODE, control, q, math, and rand APIs. |
+| `scientific/` | Scientific numeric examples using linalg, stats, ODE, control, math, and rand APIs. |
 | `site/` | Static site and release dashboard generation examples. |
 | `testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
 | `ui/` | Package-managed UI capability examples. |

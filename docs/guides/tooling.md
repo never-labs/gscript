@@ -217,7 +217,6 @@ scripts/run.sh production --quick
 scripts/run.sh production --quick --list --json
 scripts/run.sh production --quick --list --out-dir /tmp/leia-release-plan
 scripts/run.sh test release-matrix
-scripts/run.sh q --scope core --bench none --json
 scripts/run.sh editor --json
 scripts/run.sh release-dist --json
 scripts/run.sh release-check --json --version vX.Y.Z

@@ -1066,14 +1066,13 @@ print(task.body.user)`,
 			ID:      "data-dialects",
 			Title:   "Data Dialects",
 			Section: "Shell And Data",
-			Summary: "q-style vectors and spreadsheet round-trips are available without shelling out.",
+			Summary: "Data-format dialects convert structured values without shelling out.",
 			Concepts: []string{
-				"`q`...`` parses compact q-style vectors, dictionaries, and tables.",
+				"`json` turns structured text into ordinary Leia values.",
 				"`xlsx` encodes rows to an in-memory workbook byte string.",
 				"`excel` decodes workbook bytes back into ordinary Leia rows.",
 			},
-			Source: `spread := q` + "`100 101.5 103 - 99.5 100 101`" + `
-symbols := dialect.eval("q", "` + "`bid`ask!99.5 100.5" + `")
+			Source: `doc := json` + "`{\"kind\":\"dialect\",\"score\":99.5}`" + `
 rows := [
     {channel: "web", amount: 120},
     {channel: "partner", amount: 80},
@@ -1085,8 +1084,8 @@ workbook := dialect.eval("xlsx", rows, {
 })
 roundtrip := dialect.eval("excel", workbook, {headers: true})
 
-print("spread", json.encode(spread))
-print("bid", symbols.bid)
+print("kind", doc.kind)
+print("score", doc.score)
 print("rows", #roundtrip)`,
 			Runnable: true,
 		},
@@ -1894,7 +1893,8 @@ func playgroundExamplesRoot() string {
 }
 
 func repositoryExampleRunnable(path string) bool {
-	return !strings.Contains(path, "/evaluate/") &&
+	return !exampleUsesOptionalQExtension(path) &&
+		!strings.Contains(path, "/evaluate/") &&
 		!strings.Contains(path, "/ai/") &&
 		!strings.Contains(path, "/llm/") &&
 		!strings.Contains(path, "/testing/") &&
@@ -1915,12 +1915,13 @@ func repositoryExampleRunnable(path string) bool {
 		!strings.Contains(path, "/concurrency/pipeline_project/") &&
 		!strings.Contains(path, "/concurrency/context_process.leia") &&
 		!strings.Contains(path, "/concurrency/goroutine_errors.leia") &&
-		!strings.Contains(path, "/data/db_q_frame_project/") &&
 		!strings.Contains(path, "/data_processing/data_oriented/particle_integration.leia")
 }
 
 func repositoryExampleRequires(path string) string {
 	switch {
+	case exampleUsesOptionalQExtension(path):
+		return "optional q extension"
 	case strings.Contains(path, "/evaluate/"):
 		return "leia evaluate CLI"
 	case strings.Contains(path, "/ai/"):
@@ -1963,8 +1964,6 @@ func repositoryExampleRequires(path string) string {
 		return "process host access"
 	case strings.Contains(path, "/concurrency/goroutine_errors.leia"):
 		return "debug event sink host access"
-	case strings.Contains(path, "/data/db_q_frame_project/"):
-		return "SQLite and host VM data runner"
 	case strings.Contains(path, "/data_processing/data_oriented/particle_integration.leia"):
 		return "higher playground step budget"
 	default:

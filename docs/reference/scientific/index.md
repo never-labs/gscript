@@ -40,25 +40,22 @@ state = stats.linear_update(state, H, 0.95, 0.04)
 
 residual := state.innovation[1]
 energy := dot([state.x.position, state.x.velocity], [state.x.position, state.x.velocity])
-checksum := q {
-+/${state.x}
-}
+checksum := sum([state.x.position, state.x.velocity])
 
 assert(abs(residual) < 1.0)
 assert(energy > 0)
 assert(near(checksum, state.x.position + state.x.velocity, 0.000000001))
 ```
 
-The same values can move through Leia functions, q raw blocks, tagged q strings,
-and host embeddings without forcing users to serialize numeric lists into
-source text.
+The same values can move through Leia functions, tagged dialects, and host
+embeddings without forcing users to serialize numeric lists into source text.
 
 ## Design Rules
 
 - Prefer typed vector and matrix values over table-shaped adapters.
 - Prefer reusable primitives over vertical algorithm facades.
-- Let q handle compact vector and columnar expressions when it makes the code
-  shorter.
+- Keep compact numeric programs in ordinary Leia syntax unless a domain
+  extension is explicitly installed.
 - Keep fallback observable in runtime and JIT diagnostics instead of changing
   language semantics.
 

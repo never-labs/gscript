@@ -654,7 +654,8 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 		"repo-concurrency-pipeline_project-main":                  "host VM concurrency runner",
 		"repo-concurrency-context_process":                        "process host access",
 		"repo-concurrency-goroutine_errors":                       "debug event sink host access",
-		"repo-data-db_q_frame_project-main":                       "SQLite and host VM data runner",
+		"repo-data-db_q_frame_project-main":                       "optional q extension",
+		"repo-data_processing-column_query-trade_analytics":       "optional q extension",
 		"repo-data_processing-data_oriented-particle_integration": "higher playground step budget",
 		"repo-dialects-shell_filesystem":                          "process shell and filesystem host access",
 	}
@@ -967,7 +968,7 @@ func TestReadmeFacingFeatureMatrixClaimsKeepRunnableExamples(t *testing.T) {
 		{"embeddable scripting language for Go", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
 		{"turn {", "ai_dialect_integration", "examples/llm/agent.leia"},
 		{"first-class extensible domain dialects", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
-		{"q-style high-throughput in-memory columnar analytics", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
+		{"high-throughput in-memory data runtime", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
 		{"LuaJIT-class execution model", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
 	}
 
@@ -1238,10 +1239,6 @@ func TestPlaygroundRepositoryHighLevelReleaseExamplesAreExposed(t *testing.T) {
 		requires string
 		snippets []string
 	}{
-		"repo-data-db_q_frame_project-main": {
-			requires: "SQLite and host VM data runner",
-			snippets: []string{"conn.frame(", "q.query(", "dialect.eval(\"xlsx\"", "dialect.eval(\"excel\""},
-		},
 		"repo-evaluate-project_agent_regression": {
 			requires: "leia evaluate CLI",
 			snippets: []string{"stream: true", "on_stream:", "eval.usage().turns", "eval.usage().stream_events"},
@@ -1253,10 +1250,6 @@ func TestPlaygroundRepositoryHighLevelReleaseExamplesAreExposed(t *testing.T) {
 		"repo-web-tiny_fullstack_app": {
 			requires: "network/server host access",
 			snippets: []string{"serve {", "db.memory()", "http.get(", "net.post(", "/static/:name"},
-		},
-		"repo-tooling-release_gate_project-main": {
-			requires: "examples CLI release-gate-project runner",
-			snippets: []string{"release_gate_project", "sh`printf release-gate`", "q.query(", "dialect.eval(\"xlsx\"", "agent {", "serve {"},
 		},
 	}
 	for id, want := range want {
@@ -1409,8 +1402,8 @@ func TestPlaygroundTourExamplesProduceTeachingOutputs(t *testing.T) {
 			"Explain dialect",
 		},
 		"data-dialects": {
-			"spread",
-			"bid\t99.5",
+			"kind\tdialect",
+			"score\t99.5",
 			"rows\t2",
 		},
 	}

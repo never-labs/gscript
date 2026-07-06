@@ -116,9 +116,9 @@ expr_list     = expr { "," expr } ;
 
 Tables, calls, member selection, indexing, anonymous functions, dense arrays,
 imports, and tagged dialect forms are layered on this core grammar. Dialect
-tags and blocks are the generic extension mechanism; q columnar analytics,
-shell/data/web forms, spreadsheets, and AI workflows all use the same dialect
-boundary.
+tags and blocks are the generic extension mechanism; shell/data/web forms,
+spreadsheets, AI workflows, and host-defined extensions all use the same
+dialect boundary.
 
 ## Tagged Dialects
 
@@ -126,15 +126,10 @@ Leia supports tagged dialect forms. The generic syntax, interpolation,
 fail-fast bang behavior, registration rules, and host capability boundary are
 specified in [Tagged Dialects](dialects.md).
 
-`q` is Leia's core dialect for high-performance in-memory columnar analytics.
-It works with q-style vectors, dictionaries, tables, and SoA-backed query plans;
-it is specified in [q Dialect](q-dialect.md). q is a dialect implementation over
-ordinary Leia values, not a second language runtime.
-
 The AI surface is an optional standard-library layer rather than a separate
 execution engine or an "AI-intrinsic" language mode. It is one dialect
-implementation built on the same tagged dialect mechanism as q and other DSLs;
-it is specified in [AI Dialect Syntax](ai-dialect.md).
+implementation built on the same tagged dialect mechanism as other DSLs; it is
+specified in [AI Dialect Syntax](ai-dialect.md).
 
 An agent is a callable value produced by `agent { ... }` or `llm.agent`. Its
 configuration function returns the turn fields for each call. There is no
@@ -315,7 +310,7 @@ Leia differs from Lua when Go-native embedding, safety, or product clarity wins:
 
 - Go-style `//` comments and `func` syntax are canonical.
 - Host capabilities are explicit and can be sandboxed.
-- `defer`, `go`, channels, tagged dialect helpers, SOA and q columnar
+- `defer`, `go`, channels, tagged dialect helpers, SOA and data-runtime columnar
   analytics, and module tooling are Leia features, not Lua compatibility
   features.
 - Debug and GC internals are not promised to match Lua.

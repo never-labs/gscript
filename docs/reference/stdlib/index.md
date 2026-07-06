@@ -48,11 +48,10 @@ This inventory is generated from the standard-library metadata used by the curre
 | `data` | `binary` | Binary pack/unpack over Leia strings using declarative field formats. | true | none |
 | `data` | `control` | Control-system helpers for saturation, angle wrapping, compact state-space gains, and named-state feedback policies. | true | none |
 | `data` | `csv` | CSV parse and encode helpers backed by Go's CSV behavior. | true | none |
-| `data` | `data` | Column arrays, frames, query plans, and qSQL lowering substrate. | true | none |
+| `data` | `data` | Column arrays, frames, and shared query-plan helpers. | true | none |
 | `data` | `linalg` | Dense vector and matrix construction, algebra, solves, and norms. | true | none |
 | `data` | `matrix` | Dense matrix values and numeric matrix helpers. | true | none |
 | `data` | `ode` | Reusable numeric ODE integration helpers over typed state vectors. | true | none |
-| `data` | `q` | Table-driven column queries over SoA values for high-level data analysis. | true | none |
 | `data` | `soa` | Structure-of-arrays records and column-oriented data processing. | true | none |
 | `data` | `stats` | Numeric reductions, normalization, scans, and resampling helpers. | true | none |
 | `data` | `vec` | Vector construction, arithmetic, geometry, and numeric helpers. | true | none |

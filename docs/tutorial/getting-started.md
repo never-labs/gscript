@@ -41,16 +41,16 @@ go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_de
 go run ./cmd/leia examples run repo-hello-fib
 ```
 
-Then try examples for concurrency, data-oriented code, and q-style analytics:
+Then try examples for concurrency and data-oriented code:
 
 ```bash
 go run ./cmd/leia examples run examples/concurrency/goroutines_channels.leia
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
-go run ./cmd/leia examples run repo-data-q_trade_analytics_project-main
+go run ./cmd/leia examples run examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia
 ```
 
-Leia's larger examples emphasize DSLs: q-style analytics, shell/data/web
-dialects, spreadsheets, and optional AI workflows. AI examples require a host
+Leia's larger examples emphasize DSLs: shell/data/web dialects, spreadsheets,
+data-oriented runtime paths, and optional AI workflows. AI examples require a host
 provider or replay fixture; keep API keys in environment variables, not source
 files.
 

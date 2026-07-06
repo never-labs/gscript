@@ -1,10 +1,10 @@
 # Leia
 
-Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.
+Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.
 
 ```go
-a := [1,2,3,4,5,6,7,8,6]
-x := q`sum ${a}`
+a := [1, 2, 3, 4, 5, 6, 7, 8, 6]
+x := sum(a)
 
 answer, err := turn {
     model: "mock-fast"

@@ -18,7 +18,7 @@ tagged forms for common AI workflows, yet the language core does not gain
 model-specific evaluation rules, hidden prompt state, or a privileged AI
 scheduler. Every AI dialect form must lower to ordinary runtime helpers and
 ordinary values before provider I/O occurs. This is the same extension boundary
-used by other dialects, including `q` for columnar analytics.
+used by other standard and host-defined dialects.
 
 This principle has four consequences:
 

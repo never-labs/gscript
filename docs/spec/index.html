@@ -120,7 +120,7 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <body>
 <div class="topbar"><span class="brand">Leia</span><span>Language Specification</span></div>
 <div class="shell">
-<nav aria-label="Table of contents"><h2>Contents</h2><ol><li><a href="#introduction">Introduction</a></li><li><a href="#notation">Notation</a></li><li><a href="#source-code-representation">Source code representation</a></li><li><a href="#lexical-elements">Lexical elements</a></li><li><a href="#declarations-and-scope">Declarations and scope</a></li><li><a href="#values-and-types">Values and types</a></li><li><a href="#expressions">Expressions</a></li><li><a href="#statements">Statements</a></li><li><a href="#functions">Functions</a></li><li><a href="#tables-and-metatables">Tables and metatables</a></li><li><a href="#concurrency">Concurrency</a></li><li><a href="#tagged-dialects">Tagged Dialects</a></li><li><a href="#q-dialect">q Dialect</a></li><li><a href="#ai-dialect-syntax">AI Dialect Syntax</a></li><li><a href="#modules-and-loading">Modules and loading</a></li><li><a href="#errors-and-diagnostics">Errors and diagnostics</a></li><li><a href="#implementation-requirements">Implementation requirements</a></li><li><a href="#grammar-appendix">Grammar appendix</a></li></ol></nav>
+<nav aria-label="Table of contents"><h2>Contents</h2><ol><li><a href="#introduction">Introduction</a></li><li><a href="#notation">Notation</a></li><li><a href="#source-code-representation">Source code representation</a></li><li><a href="#lexical-elements">Lexical elements</a></li><li><a href="#declarations-and-scope">Declarations and scope</a></li><li><a href="#values-and-types">Values and types</a></li><li><a href="#expressions">Expressions</a></li><li><a href="#statements">Statements</a></li><li><a href="#functions">Functions</a></li><li><a href="#tables-and-metatables">Tables and metatables</a></li><li><a href="#concurrency">Concurrency</a></li><li><a href="#tagged-dialects">Tagged Dialects</a></li><li><a href="#ai-dialect-syntax">AI Dialect Syntax</a></li><li><a href="#modules-and-loading">Modules and loading</a></li><li><a href="#errors-and-diagnostics">Errors and diagnostics</a></li><li><a href="#implementation-requirements">Implementation requirements</a></li><li><a href="#grammar-appendix">Grammar appendix</a></li></ol></nav>
 <main>
 <header>
 <h1>The Leia Programming Language Specification</h1>
@@ -128,7 +128,7 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 </header>
 <section><h2 id="introduction">Leia Language Specification</h2>
 <p>This is the normative reference for Leia, a Go-embedded scripting language with Go-like syntax. It defines the source syntax, value model, execution semantics, module behavior, tagged dialect syntax, and implementation obligations that user-facing tools, interpreters, bytecode VMs, JITs, and embedding APIs must preserve.</p>
-<p>Leia uses Go-like syntax with dynamic values, Lua-compatible table and multi-return behavior where useful, explicit host capabilities, Go-native embedding, source-level hot reload, and a generic tagged-dialect mechanism for domain-specific syntax. <code>q</code> is the core high-performance in-memory columnar analytics dialect; shell/data/web forms, spreadsheets, and optional AI workflows use the same dialect boundary.</p>
+<p>Leia uses Go-like syntax with dynamic values, Lua-compatible table and multi-return behavior where useful, explicit host capabilities, Go-native embedding, source-level hot reload, and a generic tagged-dialect mechanism for domain-specific syntax. Shell/data/web forms, spreadsheets, optional AI workflows, and host-defined extensions use the same dialect boundary.</p>
 <h3 id="introduction-version">Version</h3>
 <p>This specification describes the language surface implemented by the current repository version. A release may label a subset as stable, experimental, or implementation-defined in release notes. Stable behavior is behavior covered by this specification and by the release feature matrix.</p>
 <p>GitHub Pages publishes this file as the single-page language specification. The chapter files remain the editable sources for each section, and the <a href="#grammar-appendix">grammar appendix</a> remains the syntax source of truth.</p>
@@ -145,7 +145,6 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <li><a href="#tables-and-metatables">Tables And Metatables</a>: table identity, constructors, raw access, sequence behavior, metatables, and metamethods.</li>
 <li><a href="#concurrency">Concurrency</a>: goroutine-like tasks, channels, select, sync, cancellation, and host scheduling boundaries.</li>
 <li><a href="#tagged-dialects">Tagged Dialects</a>: generic DSL extension syntax, interpolation, bang forms, runtime boundaries, registration, and standard dialect families.</li>
-<li><a href="#q-dialect">q Dialect</a>: q-style vectors, dictionaries, tables, qSQL, functional query forms, and columnar runtime/JIT contracts.</li>
 <li><a href="#ai-dialect-syntax">AI Dialect Syntax</a>: model, tool, agent, and turn dialects as one optional standard-library dialect implementation; messages, budgets, output validation, providers, trace, replay, and evaluation. AI is not a privileged language mode.</li>
 <li><a href="#modules-and-loading">Modules And Loading</a>: <code>require</code>, <code>import &#34;go:...&#34;</code>, <code>leia.mod</code>, <code>leia.sum</code>, vendoring, module caches, and capabilities.</li>
 <li><a href="#errors-and-diagnostics">Errors And Diagnostics</a>: runtime errors, recoverable errors, diagnostics, protected calls, and host failure reporting.</li>
@@ -884,7 +883,7 @@ holder <span class="tok-operator">:=</span> { child: child }
 <span class="tok-builtin">assert</span>(holder.child <span class="tok-operator">==</span> child)
 <span class="tok-builtin">assert</span>(holder[<span class="tok-string">&#34;child&#34;</span>] <span class="tok-operator">==</span> child)</code></pre>
 <h4 id="introduction-tagged-dialect-forms">Tagged Dialect Forms</h4>
-<p>Tagged dialect forms are expressions. The generic syntax, interpolation rules, bang behavior, registration model, and runtime boundary are specified in <a href="#tagged-dialects">Tagged Dialects</a>. The core q analytics dialect is specified in <a href="#q-dialect">q Dialect</a>. The optional standard AI dialect family is specified in <a href="#ai-dialect-syntax">AI Dialect Syntax</a>.</p>
+<p>Tagged dialect forms are expressions. The generic syntax, interpolation rules, bang behavior, registration model, and runtime boundary are specified in <a href="#tagged-dialects">Tagged Dialects</a>. The optional standard AI dialect family is specified in <a href="#ai-dialect-syntax">AI Dialect Syntax</a>. Other dialects may be provided by standard-library packages, host applications, or external extensions.</p>
 <h4 id="introduction-evaluation-order">Evaluation Order</h4>
 <p>Within an expression list, subexpressions are evaluated left-to-right unless a specific expression form short-circuits. Implementations may optimize execution but must preserve observable side effects and error behavior.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> []
@@ -1840,21 +1839,10 @@ tag!```body```</code></pre>
 <pre class="language-text"><code class="language-text">tag { fields }
 tag! { fields }</code></pre>
 <p>Tagged blocks use normal Leia block/table syntax at the outer boundary. The dialect owns the meaning of the fields inside its registered block contract.</p>
-<p>The q dialect also accepts a raw source block:</p>
-<pre class="language-text"><code class="language-text">q {
-    select avg price by sym from trades
-}
-q! {
-    +/1 2 3
-}</code></pre>
-<p>In this form the text inside the braces is q source, not Leia fields. It may span lines. The outer lexer matches balanced braces and skips braces inside quoted strings and comments. Raw q blocks support <code>${expr}</code> interpolation with the same binding semantics as tagged raw strings:</p>
-<pre class="language-text"><code class="language-text">q`sum ${xs}`
-q {
-    sum ${xs}
-}</code></pre>
+<p>An extension may define additional tagged block contracts, but such contracts must still enter the runtime through the registered dialect boundary. Core Leia does not assign domain-specific meaning to a tag name by itself.</p>
 <h4 id="introduction-interpolation">Interpolation</h4>
 <p>Untagged raw strings do not interpolate. Tagged raw strings and fenced tagged raw strings may contain <code>${expr}</code> interpolation segments.</p>
-<p>For each interpolation segment, Leia evaluates <code>expr</code> in the surrounding lexical scope before the dialect receives the body. The dialect receives the raw body plus the evaluated values. The dialect decides whether an interpolated value is escaped as text, encoded as JSON, bound as a parameter, converted to a q value, or rejected.</p>
+<p>For each interpolation segment, Leia evaluates <code>expr</code> in the surrounding lexical scope before the dialect receives the body. The dialect receives the raw body plus the evaluated values. The dialect decides whether an interpolated value is escaped as text, encoded as JSON, bound as a parameter, converted to a domain value, or rejected.</p>
 <p>Literal source text and interpolated values are distinct at the dialect boundary. Source text is preserved byte-for-byte; only <code>${expr}</code> results pass through the dialect&#39;s value encoder. This lets a dialect safely treat a tagged body such as <code>sum ${xs}</code> as raw dialect source <code>sum </code> plus an encoded Leia value, instead of forcing every value through generic string conversion.</p>
 <p>Interpolation must preserve normal Leia evaluation order and error behavior. If evaluating an interpolation expression fails, the dialect implementation is not invoked.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">name <span class="tok-operator">:=</span> <span class="tok-string">&#34;Ada&#34;</span>
@@ -1890,7 +1878,7 @@ profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&#34
 <h4 id="introduction-standard-dialect-families">Standard Dialect Families</h4>
 <p>Leia&#39;s standard dialect families include:</p>
 <ul>
-<li><code>q</code>, the core high-performance in-memory columnar analytics dialect;</li>
+<li>optional data dialects for high-throughput in-memory analytics;</li>
 <li>data and protocol dialects such as <code>json</code>, <code>yaml</code>, <code>csv</code>, <code>urlquery</code>, and <code>headers</code>;</li>
 <li>host automation dialects such as <code>sh</code>, <code>$</code>, <code>cmd</code>, <code>glob</code>, and <code>env</code>;</li>
 <li>document and tabular dialects such as <code>xlsx</code> and <code>excel</code>;</li>
@@ -1908,145 +1896,11 @@ profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&#34
 <li>reference documentation for user-facing result shapes;</li>
 <li>a feature-matrix entry when the dialect is part of the stable release surface.</li>
 </ul>
-<h3 id="introduction-q-dialect">q Dialect</h3>
-<p>The <code>q</code> dialect is Leia&#39;s core dialect for high-performance in-memory columnar analytics. It provides q-style concise syntax for vectors, dictionaries, tables, adverbs, qSQL, and columnar query plans while remaining an implementation over ordinary Leia values and runtime helpers.</p>
-<p>Leia does not aim to be a byte-for-byte kdb+/q clone. The stable goal is a native Leia analytics dialect with q-like density, predictable embedding in Go, and runtime/JIT paths that can specialize columnar shapes.</p>
-<h4 id="introduction-scope">Scope</h4>
-<p>The stable q dialect surface includes:</p>
-<ul>
-<li>scalar atoms, symbols, strings, and temporal values supported by the runtime;</li>
-<li>homogeneous and mixed vectors;</li>
-<li>dictionaries and keyed dictionaries;</li>
-<li>flipped tables and keyed tables;</li>
-<li>q-style unary and dyadic verbs implemented by the current runtime;</li>
-<li>adverbs and scans covered by the q conformance matrix;</li>
-<li>qSQL select, exec, update, delete, joins, grouping, ordering, and projection forms covered by the q conformance matrix;</li>
-<li>functional query forms that lower to the same query plan representation;</li>
-<li>SoA-backed query plans used by <code>q.query</code> and data-oriented libraries.</li>
-</ul>
-<p>Unsupported or intentionally different kdb+/q behavior must fail explicitly or be documented as implementation-defined. A construct is not stable merely because a parser accepts part of its spelling.</p>
-<h4 id="introduction-values">Values</h4>
-<p>q dialect values cross the dialect boundary as ordinary Leia values:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>q concept</th><th>Leia-visible shape</th></tr></thead>
-<tbody>
-<tr><td>Atom</td><td>Boolean, integer, float, string, symbol, temporal, or null-like value.</td></tr>
-<tr><td>Vector</td><td>Dense or ordinary sequence value, depending on element kind and runtime path.</td></tr>
-<tr><td>Dictionary</td><td>Table-like key/value mapping with q symbol keys when applicable.</td></tr>
-<tr><td>Table</td><td>Frame value with named columns and a stable schema.</td></tr>
-<tr><td>Keyed table</td><td>Frame plus key metadata.</td></tr>
-<tr><td>Parse tree</td><td>Ordinary list/dictionary structure accepted by functional query helpers.</td></tr>
-</tbody></table></div>
-<p>Implementations may use internal typed carriers, frames, vectors, masks, and runtime kernels. Those carriers are implementation details unless exposed by a documented standard-library API.</p>
-<h4 id="introduction-tagged-forms">Tagged Forms</h4>
-<p>The q dialect uses the generic tagged dialect syntax:</p>
-<pre class="language-text"><code class="language-text">q`1 2 3`
-q```flip `sym`px!(`AAPL`MSFT;100 101.5)```</code></pre>
-<p>The fenced form is preferred for q source that contains symbol backticks, queries, or multiline tables. The short form is useful for simple expressions that do not contain backticks inside the body.</p>
-<p><code>dialect.eval(&#34;q&#34;, body, opts)</code> is equivalent to invoking the registered q dialect implementation directly. Hosts may use it when the q source is dynamic or when the tag spelling would be inconvenient.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">v <span class="tok-operator">:=</span> q<span class="tok-string">`1 2 3`</span>
-<span class="tok-builtin">assert</span>(v[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">1</span>)
-<span class="tok-builtin">assert</span>(v[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">3</span>)
-
-trades <span class="tok-operator">:=</span> dialect.eval(<span class="tok-string">&#34;q&#34;</span>, <span class="tok-string">&#34;flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)&#34;</span>)
-leader <span class="tok-operator">:=</span> q.sql(trades, <span class="tok-string">&#34;select qty:sum qty, avg_px:avg px by sym from trades order by qty desc&#34;</span>)
-<span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].sym <span class="tok-operator">==</span> <span class="tok-string">&#34;AAPL&#34;</span>)
-<span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].qty <span class="tok-operator">==</span> <span class="tok-number">18</span>)
-<span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].avg_px <span class="tok-operator">==</span> <span class="tok-number">100.375</span>)</code></pre>
-<h4 id="introduction-interpolation">Interpolation</h4>
-<p>q tagged strings and raw q blocks use the generic dialect interpolation boundary with a q-aware encoder for <code>${expr}</code> values. Literal q source remains raw q text. Interpolated values are either encoded inline as q source fragments or bound into the q environment when preserving runtime shape is required.</p>
-<p>Stable q interpolation encodings are:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Leia value</th><th>q representation</th></tr></thead>
-<tbody>
-<tr><td>Integer or float</td><td>Numeric literal.</td></tr>
-<tr><td>Boolean</td><td><code>1b</code> or <code>0b</code>.</td></tr>
-<tr><td>String</td><td>q string literal with escapes.</td></tr>
-<tr><td><code>nil</code></td><td><code>0N</code>.</td></tr>
-<tr><td>Dense sequential list/table</td><td>Space-separated q list, recursively encoded.</td></tr>
-<tr><td>Dense array</td><td>Space-separated q list.</td></tr>
-<tr><td>Dense matrix or linalg matrix</td><td>Bound q matrix value.</td></tr>
-<tr><td>Frame or keyed frame</td><td>Bound q table value.</td></tr>
-<tr><td>String-keyed dictionary</td><td>Bound q dictionary value.</td></tr>
-</tbody></table></div>
-<p>Non-sequential tables are not implicitly stringified for q interpolation. Implementations must reject them with a diagnostic instead of emitting pointer text such as <code>table: ...</code>.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">a <span class="tok-operator">:=</span> [<span class="tok-number">1</span>,<span class="tok-number">2</span>,<span class="tok-number">3</span>,<span class="tok-number">4</span>,<span class="tok-number">5</span>,<span class="tok-number">6</span>,<span class="tok-number">7</span>,<span class="tok-number">8</span>,<span class="tok-number">6</span>]
-x <span class="tok-operator">:=</span> q<span class="tok-string">`sum ${a}`</span>
-<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">42</span>)
-
-name <span class="tok-operator">:=</span> <span class="tok-string">&#34;abc&#34;</span>
-n <span class="tok-operator">:=</span> q<span class="tok-string">`count ${name}`</span>
-<span class="tok-builtin">assert</span>(n <span class="tok-operator">==</span> <span class="tok-number">3</span>)
-
-flag <span class="tok-operator">:=</span> <span class="tok-constant">true</span>
-choice <span class="tok-operator">:=</span> q<span class="tok-string">`$[${flag};10;20]`</span>
-<span class="tok-builtin">assert</span>(choice <span class="tok-operator">==</span> <span class="tok-number">10</span>)
-
-m <span class="tok-operator">:=</span> mat([[<span class="tok-number">1.0</span>, <span class="tok-number">2.0</span>], [<span class="tok-number">3.0</span>, <span class="tok-number">4.0</span>]])
-matrix_sum <span class="tok-operator">:=</span> q<span class="tok-string">`+/raze ${m}`</span>
-<span class="tok-builtin">assert</span>(matrix_sum <span class="tok-operator">==</span> <span class="tok-number">10</span>)
-
-rows <span class="tok-operator">:=</span> data.frame({x: data.i64([<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>])})
-frame_sum <span class="tok-operator">:=</span> q {
-sum ${rows}.x
-}
-<span class="tok-builtin">assert</span>(frame_sum <span class="tok-operator">==</span> <span class="tok-number">6</span>)</code></pre>
-<h4 id="introduction-qsql">qSQL</h4>
-<p>qSQL is part of the q dialect, not a separate language runtime. qSQL forms lower to query plans over frame-like values. The implementation may execute a plan with interpreter helpers, typed runtime kernels, cached shape plans, or JIT handoff, but the visible result must be the same for supported shapes.</p>
-<p>Stable qSQL behavior includes:</p>
-<ul>
-<li><code>select</code> projections over table columns;</li>
-<li><code>where</code> filters and typed comparison masks;</li>
-<li>aggregate projections such as <code>sum</code>, <code>avg</code>, <code>min</code>, <code>max</code>, and <code>count</code>;</li>
-<li><code>by</code> grouping for supported key and expression shapes;</li>
-<li>ordering and limiting for supported table values;</li>
-<li>update and delete forms covered by conformance tests;</li>
-<li>joins, as-of joins, and keyed operations covered by conformance tests.</li>
-</ul>
-<p>qSQL may also be invoked through standard helper APIs such as <code>q.sql(table, query)</code> when a Leia value already holds the input frame.</p>
-<h4 id="introduction-functional-query-forms">Functional Query Forms</h4>
-<p>Functional query forms such as <code>?[t;c;b;a]</code> and <code>![t;c;b;a]</code> are supported when their operands can be represented as stable q values or parse-tree structures. They lower to the same internal query plan family as qSQL.</p>
-<p>Callable q values, host functions, and arbitrary Leia closures are not implicitly bridgeable into functional q parse trees. Implementations must reject unbridgeable operands with a diagnostic instead of silently falling back to a different meaning.</p>
-<h4 id="introduction-columnar-runtime-contract">Columnar Runtime Contract</h4>
-<p>The q dialect is allowed to use specialized runtime and JIT paths. Stable columnar optimizations include, when implemented for a shape:</p>
-<ul>
-<li>typed column loads;</li>
-<li>typed comparison masks;</li>
-<li>boolean mask combination;</li>
-<li><code>where</code> index extraction;</li>
-<li>gather/filter operations;</li>
-<li>select projection;</li>
-<li>grouped aggregate kernels;</li>
-<li>join and as-of join kernels;</li>
-<li>schema-stable plan caching.</li>
-</ul>
-<p>These optimizations are not independent semantics. A typed kernel, cached plan, or JIT handoff must preserve:</p>
-<ul>
-<li>result values and column order;</li>
-<li>null and missing-value behavior;</li>
-<li>error messages for unsupported stable shapes where specified;</li>
-<li>resource-budget and capability behavior;</li>
-<li>fallback observability for unsupported or unoptimized shapes.</li>
-</ul>
-<p>Fallback must be explainable. Runtime statistics should distinguish typed kernel hits, cache hits, JIT handoffs, and fallback reasons so unsupported paths can be reduced without changing q semantics.</p>
-<h4 id="introduction-compatibility">Compatibility</h4>
-<p>The q dialect follows q/kdb+ spelling where doing so serves concise analytics inside Leia. Full kdb+ compatibility, IPC wire compatibility, remote execution, and every q system command are not language goals unless a future release marks them stable.</p>
-<p>The q conformance matrix defines the current supported, rejected, and extended surfaces. Stable q features must have language tests or examples and, for hot paths, benchmark coverage.</p>
-<h4 id="introduction-conformance">Conformance</h4>
-<p>Stable q behavior requires:</p>
-<ul>
-<li>a row in the q conformance matrix;</li>
-<li>at least one q language test or runnable example for accepted behavior;</li>
-<li>an explicit rejected test for intentionally unsupported q/kdb+ spelling when the parser could otherwise accept it ambiguously;</li>
-<li>benchmark coverage for public hot paths such as qSQL filters, groupings, joins, projections, typed comparisons, and vector/adverb pipelines;</li>
-<li>release notes for user-visible compatibility changes.</li>
-</ul>
-<p>The q conformance matrix is descriptive of the current stable surface. It must not be used to justify test-specific optimizations. Runtime and JIT specialization must be driven by general shape recognition, type information, and schema-stable plans.</p>
 <h3 id="introduction-ai-dialect-syntax">AI Dialect Syntax</h3>
 <p>Leia&#39;s AI dialect is an optional standard-library runtime exposed through tagged dialect forms and ordinary modules. The language implementation must route these forms through the same <code>llm</code>, <code>msg</code>, <code>history</code>, <code>dialect</code>, and host-provider paths as direct library calls. There is no separate AI execution engine, and Leia is not an AI-intrinsic language. AI is one DSL implementation on top of the generic tagged-dialect mechanism.</p>
 <p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Conformance tests that need stable behavior should use host-side replay records or mock providers.</p>
 <h4 id="introduction-design-principle">Design Principle</h4>
-<p>AI is a dialect layer, not language intrinsic. The grammar may provide small tagged forms for common AI workflows, yet the language core does not gain model-specific evaluation rules, hidden prompt state, or a privileged AI scheduler. Every AI dialect form must lower to ordinary runtime helpers and ordinary values before provider I/O occurs. This is the same extension boundary used by other dialects, including <code>q</code> for columnar analytics.</p>
+<p>AI is a dialect layer, not language intrinsic. The grammar may provide small tagged forms for common AI workflows, yet the language core does not gain model-specific evaluation rules, hidden prompt state, or a privileged AI scheduler. Every AI dialect form must lower to ordinary runtime helpers and ordinary values before provider I/O occurs. This is the same extension boundary used by other standard and host-defined dialects.</p>
 <p>This principle has four consequences:</p>
 <ul>
 <li>Dialect syntax is a convenience boundary, not a semantic fork. <code>agent</code>, <code>turn</code>, <code>tool</code>, <code>model</code>, prompt message objects, output schemas, budgets, trace, and replay all use the same <code>llm</code>, <code>msg</code>, <code>history</code>, and host-provider paths that direct library calls use.</li>
@@ -3640,7 +3494,7 @@ holder <span class="tok-operator">:=</span> { child: child }
 <span class="tok-builtin">assert</span>(holder.child <span class="tok-operator">==</span> child)
 <span class="tok-builtin">assert</span>(holder[<span class="tok-string">&#34;child&#34;</span>] <span class="tok-operator">==</span> child)</code></pre>
 <h3 id="expressions-tagged-dialect-forms">Tagged Dialect Forms</h3>
-<p>Tagged dialect forms are expressions. The generic syntax, interpolation rules, bang behavior, registration model, and runtime boundary are specified in <a href="#tagged-dialects">Tagged Dialects</a>. The core q analytics dialect is specified in <a href="#q-dialect">q Dialect</a>. The optional standard AI dialect family is specified in <a href="#ai-dialect-syntax">AI Dialect Syntax</a>.</p>
+<p>Tagged dialect forms are expressions. The generic syntax, interpolation rules, bang behavior, registration model, and runtime boundary are specified in <a href="#tagged-dialects">Tagged Dialects</a>. The optional standard AI dialect family is specified in <a href="#ai-dialect-syntax">AI Dialect Syntax</a>. Other dialects may be provided by standard-library packages, host applications, or external extensions.</p>
 <h3 id="expressions-evaluation-order">Evaluation Order</h3>
 <p>Within an expression list, subexpressions are evaluated left-to-right unless a specific expression form short-circuits. Implementations may optimize execution but must preserve observable side effects and error behavior.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> []
@@ -4591,21 +4445,10 @@ tag!```body```</code></pre>
 <pre class="language-text"><code class="language-text">tag { fields }
 tag! { fields }</code></pre>
 <p>Tagged blocks use normal Leia block/table syntax at the outer boundary. The dialect owns the meaning of the fields inside its registered block contract.</p>
-<p>The q dialect also accepts a raw source block:</p>
-<pre class="language-text"><code class="language-text">q {
-    select avg price by sym from trades
-}
-q! {
-    +/1 2 3
-}</code></pre>
-<p>In this form the text inside the braces is q source, not Leia fields. It may span lines. The outer lexer matches balanced braces and skips braces inside quoted strings and comments. Raw q blocks support <code>${expr}</code> interpolation with the same binding semantics as tagged raw strings:</p>
-<pre class="language-text"><code class="language-text">q`sum ${xs}`
-q {
-    sum ${xs}
-}</code></pre>
+<p>An extension may define additional tagged block contracts, but such contracts must still enter the runtime through the registered dialect boundary. Core Leia does not assign domain-specific meaning to a tag name by itself.</p>
 <h3 id="tagged-dialects-interpolation">Interpolation</h3>
 <p>Untagged raw strings do not interpolate. Tagged raw strings and fenced tagged raw strings may contain <code>${expr}</code> interpolation segments.</p>
-<p>For each interpolation segment, Leia evaluates <code>expr</code> in the surrounding lexical scope before the dialect receives the body. The dialect receives the raw body plus the evaluated values. The dialect decides whether an interpolated value is escaped as text, encoded as JSON, bound as a parameter, converted to a q value, or rejected.</p>
+<p>For each interpolation segment, Leia evaluates <code>expr</code> in the surrounding lexical scope before the dialect receives the body. The dialect receives the raw body plus the evaluated values. The dialect decides whether an interpolated value is escaped as text, encoded as JSON, bound as a parameter, converted to a domain value, or rejected.</p>
 <p>Literal source text and interpolated values are distinct at the dialect boundary. Source text is preserved byte-for-byte; only <code>${expr}</code> results pass through the dialect&#39;s value encoder. This lets a dialect safely treat a tagged body such as <code>sum ${xs}</code> as raw dialect source <code>sum </code> plus an encoded Leia value, instead of forcing every value through generic string conversion.</p>
 <p>Interpolation must preserve normal Leia evaluation order and error behavior. If evaluating an interpolation expression fails, the dialect implementation is not invoked.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">name <span class="tok-operator">:=</span> <span class="tok-string">&#34;Ada&#34;</span>
@@ -4641,7 +4484,7 @@ profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&#34
 <h3 id="tagged-dialects-standard-dialect-families">Standard Dialect Families</h3>
 <p>Leia&#39;s standard dialect families include:</p>
 <ul>
-<li><code>q</code>, the core high-performance in-memory columnar analytics dialect;</li>
+<li>optional data dialects for high-throughput in-memory analytics;</li>
 <li>data and protocol dialects such as <code>json</code>, <code>yaml</code>, <code>csv</code>, <code>urlquery</code>, and <code>headers</code>;</li>
 <li>host automation dialects such as <code>sh</code>, <code>$</code>, <code>cmd</code>, <code>glob</code>, and <code>env</code>;</li>
 <li>document and tabular dialects such as <code>xlsx</code> and <code>excel</code>;</li>
@@ -4658,144 +4501,11 @@ profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&#34
 <li>capability-boundary tests when the dialect reaches host resources;</li>
 <li>reference documentation for user-facing result shapes;</li>
 <li>a feature-matrix entry when the dialect is part of the stable release surface.</li>
-</ul></section><section><h2 id="q-dialect">q Dialect</h2>
-<p>The <code>q</code> dialect is Leia&#39;s core dialect for high-performance in-memory columnar analytics. It provides q-style concise syntax for vectors, dictionaries, tables, adverbs, qSQL, and columnar query plans while remaining an implementation over ordinary Leia values and runtime helpers.</p>
-<p>Leia does not aim to be a byte-for-byte kdb+/q clone. The stable goal is a native Leia analytics dialect with q-like density, predictable embedding in Go, and runtime/JIT paths that can specialize columnar shapes.</p>
-<h3 id="q-dialect-scope">Scope</h3>
-<p>The stable q dialect surface includes:</p>
-<ul>
-<li>scalar atoms, symbols, strings, and temporal values supported by the runtime;</li>
-<li>homogeneous and mixed vectors;</li>
-<li>dictionaries and keyed dictionaries;</li>
-<li>flipped tables and keyed tables;</li>
-<li>q-style unary and dyadic verbs implemented by the current runtime;</li>
-<li>adverbs and scans covered by the q conformance matrix;</li>
-<li>qSQL select, exec, update, delete, joins, grouping, ordering, and projection forms covered by the q conformance matrix;</li>
-<li>functional query forms that lower to the same query plan representation;</li>
-<li>SoA-backed query plans used by <code>q.query</code> and data-oriented libraries.</li>
-</ul>
-<p>Unsupported or intentionally different kdb+/q behavior must fail explicitly or be documented as implementation-defined. A construct is not stable merely because a parser accepts part of its spelling.</p>
-<h3 id="q-dialect-values">Values</h3>
-<p>q dialect values cross the dialect boundary as ordinary Leia values:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>q concept</th><th>Leia-visible shape</th></tr></thead>
-<tbody>
-<tr><td>Atom</td><td>Boolean, integer, float, string, symbol, temporal, or null-like value.</td></tr>
-<tr><td>Vector</td><td>Dense or ordinary sequence value, depending on element kind and runtime path.</td></tr>
-<tr><td>Dictionary</td><td>Table-like key/value mapping with q symbol keys when applicable.</td></tr>
-<tr><td>Table</td><td>Frame value with named columns and a stable schema.</td></tr>
-<tr><td>Keyed table</td><td>Frame plus key metadata.</td></tr>
-<tr><td>Parse tree</td><td>Ordinary list/dictionary structure accepted by functional query helpers.</td></tr>
-</tbody></table></div>
-<p>Implementations may use internal typed carriers, frames, vectors, masks, and runtime kernels. Those carriers are implementation details unless exposed by a documented standard-library API.</p>
-<h3 id="q-dialect-tagged-forms">Tagged Forms</h3>
-<p>The q dialect uses the generic tagged dialect syntax:</p>
-<pre class="language-text"><code class="language-text">q`1 2 3`
-q```flip `sym`px!(`AAPL`MSFT;100 101.5)```</code></pre>
-<p>The fenced form is preferred for q source that contains symbol backticks, queries, or multiline tables. The short form is useful for simple expressions that do not contain backticks inside the body.</p>
-<p><code>dialect.eval(&#34;q&#34;, body, opts)</code> is equivalent to invoking the registered q dialect implementation directly. Hosts may use it when the q source is dynamic or when the tag spelling would be inconvenient.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">v <span class="tok-operator">:=</span> q<span class="tok-string">`1 2 3`</span>
-<span class="tok-builtin">assert</span>(v[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">1</span>)
-<span class="tok-builtin">assert</span>(v[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">3</span>)
-
-trades <span class="tok-operator">:=</span> dialect.eval(<span class="tok-string">&#34;q&#34;</span>, <span class="tok-string">&#34;flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)&#34;</span>)
-leader <span class="tok-operator">:=</span> q.sql(trades, <span class="tok-string">&#34;select qty:sum qty, avg_px:avg px by sym from trades order by qty desc&#34;</span>)
-<span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].sym <span class="tok-operator">==</span> <span class="tok-string">&#34;AAPL&#34;</span>)
-<span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].qty <span class="tok-operator">==</span> <span class="tok-number">18</span>)
-<span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].avg_px <span class="tok-operator">==</span> <span class="tok-number">100.375</span>)</code></pre>
-<h3 id="q-dialect-interpolation">Interpolation</h3>
-<p>q tagged strings and raw q blocks use the generic dialect interpolation boundary with a q-aware encoder for <code>${expr}</code> values. Literal q source remains raw q text. Interpolated values are either encoded inline as q source fragments or bound into the q environment when preserving runtime shape is required.</p>
-<p>Stable q interpolation encodings are:</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Leia value</th><th>q representation</th></tr></thead>
-<tbody>
-<tr><td>Integer or float</td><td>Numeric literal.</td></tr>
-<tr><td>Boolean</td><td><code>1b</code> or <code>0b</code>.</td></tr>
-<tr><td>String</td><td>q string literal with escapes.</td></tr>
-<tr><td><code>nil</code></td><td><code>0N</code>.</td></tr>
-<tr><td>Dense sequential list/table</td><td>Space-separated q list, recursively encoded.</td></tr>
-<tr><td>Dense array</td><td>Space-separated q list.</td></tr>
-<tr><td>Dense matrix or linalg matrix</td><td>Bound q matrix value.</td></tr>
-<tr><td>Frame or keyed frame</td><td>Bound q table value.</td></tr>
-<tr><td>String-keyed dictionary</td><td>Bound q dictionary value.</td></tr>
-</tbody></table></div>
-<p>Non-sequential tables are not implicitly stringified for q interpolation. Implementations must reject them with a diagnostic instead of emitting pointer text such as <code>table: ...</code>.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">a <span class="tok-operator">:=</span> [<span class="tok-number">1</span>,<span class="tok-number">2</span>,<span class="tok-number">3</span>,<span class="tok-number">4</span>,<span class="tok-number">5</span>,<span class="tok-number">6</span>,<span class="tok-number">7</span>,<span class="tok-number">8</span>,<span class="tok-number">6</span>]
-x <span class="tok-operator">:=</span> q<span class="tok-string">`sum ${a}`</span>
-<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">42</span>)
-
-name <span class="tok-operator">:=</span> <span class="tok-string">&#34;abc&#34;</span>
-n <span class="tok-operator">:=</span> q<span class="tok-string">`count ${name}`</span>
-<span class="tok-builtin">assert</span>(n <span class="tok-operator">==</span> <span class="tok-number">3</span>)
-
-flag <span class="tok-operator">:=</span> <span class="tok-constant">true</span>
-choice <span class="tok-operator">:=</span> q<span class="tok-string">`$[${flag};10;20]`</span>
-<span class="tok-builtin">assert</span>(choice <span class="tok-operator">==</span> <span class="tok-number">10</span>)
-
-m <span class="tok-operator">:=</span> mat([[<span class="tok-number">1.0</span>, <span class="tok-number">2.0</span>], [<span class="tok-number">3.0</span>, <span class="tok-number">4.0</span>]])
-matrix_sum <span class="tok-operator">:=</span> q<span class="tok-string">`+/raze ${m}`</span>
-<span class="tok-builtin">assert</span>(matrix_sum <span class="tok-operator">==</span> <span class="tok-number">10</span>)
-
-rows <span class="tok-operator">:=</span> data.frame({x: data.i64([<span class="tok-number">1</span>, <span class="tok-number">2</span>, <span class="tok-number">3</span>])})
-frame_sum <span class="tok-operator">:=</span> q {
-sum ${rows}.x
-}
-<span class="tok-builtin">assert</span>(frame_sum <span class="tok-operator">==</span> <span class="tok-number">6</span>)</code></pre>
-<h3 id="q-dialect-qsql">qSQL</h3>
-<p>qSQL is part of the q dialect, not a separate language runtime. qSQL forms lower to query plans over frame-like values. The implementation may execute a plan with interpreter helpers, typed runtime kernels, cached shape plans, or JIT handoff, but the visible result must be the same for supported shapes.</p>
-<p>Stable qSQL behavior includes:</p>
-<ul>
-<li><code>select</code> projections over table columns;</li>
-<li><code>where</code> filters and typed comparison masks;</li>
-<li>aggregate projections such as <code>sum</code>, <code>avg</code>, <code>min</code>, <code>max</code>, and <code>count</code>;</li>
-<li><code>by</code> grouping for supported key and expression shapes;</li>
-<li>ordering and limiting for supported table values;</li>
-<li>update and delete forms covered by conformance tests;</li>
-<li>joins, as-of joins, and keyed operations covered by conformance tests.</li>
-</ul>
-<p>qSQL may also be invoked through standard helper APIs such as <code>q.sql(table, query)</code> when a Leia value already holds the input frame.</p>
-<h3 id="q-dialect-functional-query-forms">Functional Query Forms</h3>
-<p>Functional query forms such as <code>?[t;c;b;a]</code> and <code>![t;c;b;a]</code> are supported when their operands can be represented as stable q values or parse-tree structures. They lower to the same internal query plan family as qSQL.</p>
-<p>Callable q values, host functions, and arbitrary Leia closures are not implicitly bridgeable into functional q parse trees. Implementations must reject unbridgeable operands with a diagnostic instead of silently falling back to a different meaning.</p>
-<h3 id="q-dialect-columnar-runtime-contract">Columnar Runtime Contract</h3>
-<p>The q dialect is allowed to use specialized runtime and JIT paths. Stable columnar optimizations include, when implemented for a shape:</p>
-<ul>
-<li>typed column loads;</li>
-<li>typed comparison masks;</li>
-<li>boolean mask combination;</li>
-<li><code>where</code> index extraction;</li>
-<li>gather/filter operations;</li>
-<li>select projection;</li>
-<li>grouped aggregate kernels;</li>
-<li>join and as-of join kernels;</li>
-<li>schema-stable plan caching.</li>
-</ul>
-<p>These optimizations are not independent semantics. A typed kernel, cached plan, or JIT handoff must preserve:</p>
-<ul>
-<li>result values and column order;</li>
-<li>null and missing-value behavior;</li>
-<li>error messages for unsupported stable shapes where specified;</li>
-<li>resource-budget and capability behavior;</li>
-<li>fallback observability for unsupported or unoptimized shapes.</li>
-</ul>
-<p>Fallback must be explainable. Runtime statistics should distinguish typed kernel hits, cache hits, JIT handoffs, and fallback reasons so unsupported paths can be reduced without changing q semantics.</p>
-<h3 id="q-dialect-compatibility">Compatibility</h3>
-<p>The q dialect follows q/kdb+ spelling where doing so serves concise analytics inside Leia. Full kdb+ compatibility, IPC wire compatibility, remote execution, and every q system command are not language goals unless a future release marks them stable.</p>
-<p>The q conformance matrix defines the current supported, rejected, and extended surfaces. Stable q features must have language tests or examples and, for hot paths, benchmark coverage.</p>
-<h3 id="q-dialect-conformance">Conformance</h3>
-<p>Stable q behavior requires:</p>
-<ul>
-<li>a row in the q conformance matrix;</li>
-<li>at least one q language test or runnable example for accepted behavior;</li>
-<li>an explicit rejected test for intentionally unsupported q/kdb+ spelling when the parser could otherwise accept it ambiguously;</li>
-<li>benchmark coverage for public hot paths such as qSQL filters, groupings, joins, projections, typed comparisons, and vector/adverb pipelines;</li>
-<li>release notes for user-visible compatibility changes.</li>
-</ul>
-<p>The q conformance matrix is descriptive of the current stable surface. It must not be used to justify test-specific optimizations. Runtime and JIT specialization must be driven by general shape recognition, type information, and schema-stable plans.</p></section><section><h2 id="ai-dialect-syntax">AI Dialect Syntax</h2>
+</ul></section><section><h2 id="ai-dialect-syntax">AI Dialect Syntax</h2>
 <p>Leia&#39;s AI dialect is an optional standard-library runtime exposed through tagged dialect forms and ordinary modules. The language implementation must route these forms through the same <code>llm</code>, <code>msg</code>, <code>history</code>, <code>dialect</code>, and host-provider paths as direct library calls. There is no separate AI execution engine, and Leia is not an AI-intrinsic language. AI is one DSL implementation on top of the generic tagged-dialect mechanism.</p>
 <p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Conformance tests that need stable behavior should use host-side replay records or mock providers.</p>
 <h3 id="ai-dialect-syntax-design-principle">Design Principle</h3>
-<p>AI is a dialect layer, not language intrinsic. The grammar may provide small tagged forms for common AI workflows, yet the language core does not gain model-specific evaluation rules, hidden prompt state, or a privileged AI scheduler. Every AI dialect form must lower to ordinary runtime helpers and ordinary values before provider I/O occurs. This is the same extension boundary used by other dialects, including <code>q</code> for columnar analytics.</p>
+<p>AI is a dialect layer, not language intrinsic. The grammar may provide small tagged forms for common AI workflows, yet the language core does not gain model-specific evaluation rules, hidden prompt state, or a privileged AI scheduler. Every AI dialect form must lower to ordinary runtime helpers and ordinary values before provider I/O occurs. This is the same extension boundary used by other standard and host-defined dialects.</p>
 <p>This principle has four consequences:</p>
 <ul>
 <li>Dialect syntax is a convenience boundary, not a semantic fork. <code>agent</code>, <code>turn</code>, <code>tool</code>, <code>model</code>, prompt message objects, output schemas, budgets, trace, and replay all use the same <code>llm</code>, <code>msg</code>, <code>history</code>, and host-provider paths that direct library calls use.</li>

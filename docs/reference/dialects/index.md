@@ -2,7 +2,7 @@
 
 The registry table is generated from the current `leia` binary dialect registry; explanatory sections below are maintained with the generated reference.
 
-Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, q-style analytics, spreadsheets, and optional LLM integrations. A dialect is an explicit tagged expression that returns an ordinary Leia value.
+Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, spreadsheets, and optional LLM integrations. A dialect is an explicit tagged expression that returns an ordinary Leia value.
 
 ## Forms
 
@@ -76,8 +76,6 @@ summarizer := agent {
 | `path` | `text` | true | false | none | none |
 | `pem` | `data` | true | false | none | none |
 | `prompt` | `llm` | true | true | none | none |
-| `q` | `data` | true | true | none | none |
-| `qsql` | `data` | true | true | none | none |
 | `quote` | `llm` | true | true | none | none |
 | `re` | `text` | true | false | none | regexp |
 | `regexp` | `text` | true | false | none | re |
@@ -122,7 +120,6 @@ summarizer := agent {
 | `cmd` | Argv-safe command result table with the same command result shape as `sh`. |
 | `glob` | Sorted path array. |
 | `sql` | `{query, args, names}` with named parameters lowered to positional placeholders. |
-| `q` | Tagged q source returns q-style vectors, dictionaries, and tables. Standard-library helpers such as `q.sql` and `q.query` are separate data/SoA module APIs. |
 | `xlsx` encode | Workbook byte string suitable for writing or decoding with `excel`. |
 | `excel` decode | Row array; with `{headers: true}`, rows are tables keyed by the first worksheet row. |
 | `serve` | Route server descriptor/loopback result as documented by runnable web examples. |
@@ -136,12 +133,11 @@ go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/
 go run ./cmd/leia examples run repo-dialects-data_aggregation_report
 ```
 
-The larger tooling workflow combines shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, an LLM-style agent boundary, and a loopback web route. The focused examples below show the same dialect surface in smaller programs.
+The focused examples below show shell/process, data-format, spreadsheet, AI, and web dialect surfaces in small runnable programs.
 
 Additional focused evidence lives in:
 
 - `examples/dialects/ai_prompt_quote.leia` for prompt and quote tags.
 - `examples/dialects/data_aggregation_report.leia` for mixed data-format tags.
 - `examples/dialects/http_protocol_trace.leia` and `examples/dialects/network_protocols.leia` for web/protocol tags.
-- `examples/data/q_trade_analytics_project/main.leia` for q-style vectors, dictionaries, scans, filters, and table rollups.
 - `examples/web/serve_dialect_app.leia` and `examples/web/route_workbench.leia` for route/server evidence.

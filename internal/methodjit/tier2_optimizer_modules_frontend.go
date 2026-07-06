@@ -373,11 +373,15 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		tier2PassModuleWithCtxOptionalReads("CallResultRangeGuard (final)", Tier2PhaseFinalCall, callResultRangeGuardFacts(), nil, analysisFacts(AnalysisFactGlobals), CallResultRangeGuardPassCtx),
 		tier2PassModuleWithCtx("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPassCtx),
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
-		tier2PassModuleWith("QQueryHotPath", Tier2PhaseFinalCall, nil, nil, QQueryHotPathRemarkPass),
-		tier2PassModuleWith("QEvalHotPlan", Tier2PhaseFinalCall, nil, nil, QEvalHotPlanRemarkPass),
-		tier2PassModuleWith("QEvalPipelineLowering", Tier2PhaseFinalCall, nil, nil, QEvalPipelineLoweringPass),
-		tier2PassModuleWith("QEvalSessionEvalLowering", Tier2PhaseFinalCall, nil, nil, QEvalSessionEvalLoweringPass),
-		tier2PassModuleWith("QQueryNativeLowering", Tier2PhaseFinalCall, nil, nil, QQueryNativeLoweringPass),
+	}
+	if os.Getenv("LEIA_ENABLE_Q_CORE_JIT") == "1" {
+		modules = append(modules,
+			tier2PassModuleWith("QQueryHotPath", Tier2PhaseFinalCall, nil, nil, QQueryHotPathRemarkPass),
+			tier2PassModuleWith("QEvalHotPlan", Tier2PhaseFinalCall, nil, nil, QEvalHotPlanRemarkPass),
+			tier2PassModuleWith("QEvalPipelineLowering", Tier2PhaseFinalCall, nil, nil, QEvalPipelineLoweringPass),
+			tier2PassModuleWith("QEvalSessionEvalLowering", Tier2PhaseFinalCall, nil, nil, QEvalSessionEvalLoweringPass),
+			tier2PassModuleWith("QQueryNativeLowering", Tier2PhaseFinalCall, nil, nil, QQueryNativeLoweringPass),
+		)
 	}
 	if os.Getenv("LEIA_FIELD_SHAPE_SPLIT") == "1" {
 		modules = append(modules, tier2PassModuleWithCtx("FieldShapeCallSplit (experimental)", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPassCtx))

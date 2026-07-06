@@ -19,7 +19,7 @@ func TestDialectTagsExposeInstalledHandlers(t *testing.T) {
 		"agent", "base32", "base64", "binary", "cidr", "cmd", "cookie", "cookies", "csv", "deflate", "duration", "emailaddr", "env", "excel", "form", "glob",
 		"gzip", "hash", "headers", "hex", "hostport", "html", "html_escape", "http_headers", "httpmsg", "ini", "ipaddr", "json", "jsonl", "jsonptr",
 		"junit", "jwt", "kv", "lines", "logfmt", "mailaddr", "markdown", "md", "mdtable", "mime", "model", "multipart", "numbers", "nums", "path", "pem", "prompt",
-		"q", "qsql", "quote", "re", "regexp", "rfc3339", "semver", "serve", "sh", "shellwords", "split", "sql", "sse", "tap", "template", "timestamp", "tool", "tsv",
+		"quote", "re", "regexp", "rfc3339", "semver", "serve", "sh", "shellwords", "split", "sql", "sse", "tap", "template", "timestamp", "tool", "tsv",
 		"turn", "url", "urlform", "urlpath", "urlquery", "uuid", "words", "xlsx", "xml", "yaml", "yml", "zlib",
 	}
 	for _, name := range want {
@@ -62,7 +62,6 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 		glob_info := dialect.info("glob")
 		env_info := dialect.info("env")
 		json_info := dialect.info("json")
-		q_info := dialect.info("q")
 		jsonptr_info := dialect.info("jsonptr")
 			logfmt_info := dialect.info("logfmt")
 			junit_info := dialect.info("junit")
@@ -98,13 +97,6 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	}
 	if got := interp.GetGlobal("json_info").Table().RawGetString("category").Str(); got != "text" {
 		t.Fatalf("json category = %q, want text", got)
-	}
-	qInfo := interp.GetGlobal("q_info").Table()
-	if got := qInfo.RawGetString("category").Str(); got != "data" {
-		t.Fatalf("q category = %q, want data", got)
-	}
-	if !qInfo.RawGetString("builtin").Bool() || !qInfo.RawGetString("eval").Bool() || !qInfo.RawGetString("block").Bool() {
-		t.Fatalf("q info flags = builtin:%v eval:%v block:%v, want builtin eval+block", qInfo.RawGetString("builtin"), qInfo.RawGetString("eval"), qInfo.RawGetString("block"))
 	}
 	for name, global := range map[string]string{
 		"jsonptr":   "jsonptr_info",
@@ -231,7 +223,7 @@ func expectedBuiltinDialectCategories() map[string]string {
 		"shellwords": "text", "path": "text", "re": "text", "regexp": "text", "json": "text", "jsonptr": "text", "jsonl": "text", "csv": "text", "tsv": "text", "mdtable": "text", "markdown": "text", "md": "text", "lines": "text", "split": "text", "words": "text", "nums": "text", "numbers": "text", "kv": "text", "logfmt": "text", "ini": "text", "yaml": "text", "yml": "text", "semver": "text", "duration": "text", "timestamp": "text", "rfc3339": "text", "tap": "text", "xml": "text", "template": "text",
 		"url": "protocol", "html_escape": "protocol", "html": "protocol", "urlquery": "protocol", "form": "protocol", "urlform": "protocol", "urlpath": "protocol", "mime": "protocol", "mailaddr": "protocol", "emailaddr": "protocol", "headers": "protocol", "http_headers": "protocol", "cookie": "protocol", "cookies": "protocol", "httpmsg": "protocol", "sse": "protocol", "multipart": "protocol", "jwt": "protocol", "ipaddr": "protocol", "cidr": "protocol", "hostport": "protocol",
 		"serve":  "web",
-		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data", "q": "data", "qsql": "data", "pem": "data", "xlsx": "data", "excel": "data",
+		"base64": "data", "hash": "data", "hex": "data", "base32": "data", "uuid": "data", "gzip": "data", "zlib": "data", "deflate": "data", "binary": "data", "pem": "data", "xlsx": "data", "excel": "data",
 		"sql":   "database",
 		"agent": "llm", "model": "llm", "prompt": "llm", "quote": "llm", "tool": "llm", "turn": "llm",
 		"junit": "compat",

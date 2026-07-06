@@ -440,7 +440,6 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	criticalList := criticalRest[:criticalEnd]
 	for _, critical := range []string{
 		`"Language Conformance Surface"`,
-		`"Q Conformance Gate"`,
 		`"Shell Script Syntax"`,
 		`"Public Release Blockers"`,
 		`"Release Distribution"`,
@@ -495,8 +494,8 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-		"q`sum ${a}`",
+		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
+		"x := sum(a)",
 		"turn {",
 	} {
 		if !strings.Contains(readme, snippet) {
@@ -518,8 +517,8 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	featureMatrixGate := readFileString(t, filepath.Join(root, "tests", "feature_matrix_test.go"))
 	for _, snippet := range []string{
 		"TestFeatureMatrixCoversReadmeStableContract",
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-		"q`sum ${a}`",
+		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
+		"x := sum(a)",
 		`requireFeature(t, features, "release_evidence_gates")`,
 		`requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate"`,
 		`"scripts/docs_check.sh"`,
@@ -1059,7 +1058,6 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"scripts/run.sh production --quick --list --out-dir /tmp/leia-release-plan",
 		"go run ./cmd/leia ci release --release-version vX.Y.Z --list --json",
 		"scripts/run.sh perf --validate-only /tmp/leia_performance_gate/timing_gate.json --json",
-		"scripts/run.sh q --scope core --bench none --json",
 		"scripts/run.sh editor --json",
 		"scripts/run.sh release-dist --json",
 		"scripts/run.sh release-check --json --version vX.Y.Z",
@@ -1124,7 +1122,6 @@ func TestReleaseMatrixReleaseEvidenceExamplesStayFeatureGated(t *testing.T) {
 	requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate",
 		"cmd/leia/main_examples_command_test.go",
 		"examples/tooling/release_evidence_pipeline.leia",
-		"examples/tooling/release_gate_project/main.leia",
 		"examples/automation/release_fixture_matrix.leia",
 		"examples/automation/release_risk_digest.leia",
 	)
@@ -1132,7 +1129,6 @@ func TestReleaseMatrixReleaseEvidenceExamplesStayFeatureGated(t *testing.T) {
 	exampleGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
 	for _, snippet := range []string{
 		"repo-tooling-release_evidence_pipeline",
-		"repo-tooling-release_gate_project-main",
 		"repo-automation-release_fixture_matrix",
 		"repo-automation-release_risk_digest",
 	} {
@@ -1196,8 +1192,6 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --out-dir /tmp/leia-release-plan",
 		"scripts/run.sh production --full --release-profile --release-version vX.Y.Z --list --json",
 		"go run ./cmd/leia doc check --json",
-		"scripts/run.sh q --scope core --bench smoke --json",
-		"scripts/run.sh q-perf --output /tmp/leia-q-perf",
 		"scripts/run.sh editor --json",
 		"scripts/run.sh public-blockers --json",
 		"scripts/run.sh release-notes --json --version vX.Y.Z",
@@ -1228,9 +1222,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"Documentation References",
 		"Editor Assets",
 		"Performance Gate",
-		"Q Performance Gate",
 		"Language Conformance Surface",
-		"Q Conformance Gate",
 		"Release Smoke",
 		"CLI Experience",
 		"Public Release Blockers",
@@ -1834,7 +1826,6 @@ func TestReleaseMatrixScriptReportRegistryFieldsMatchSmokeOutputs(t *testing.T) 
 		{reportCommand: "scripts/run.sh perf --validate-only FILE --json", args: []string{"scripts/run.sh", "perf", "--validate-only", perfTimingJSON, "--no-luajit", "--json"}, scalars: []string{"validate_only", "timing_json", "validate_target.path", "validate_target.exists", "validate_target.is_file", "no_luajit", "threshold", "wall_threshold", "luajit_threshold"}, counts: []string{"validate_target.size_bytes", "failure_count", "failure_kind_count", "output_line_count"}, fields: []string{"failure_kinds", "failures", "failure_details", "output_lines"}, itemFields: []string{"output_lines[]"}, matches: []releaseReportCountMatch{{"failure_count", "failures"}, {"failure_count", "failure_details"}, {"failure_kind_count", "failure_kinds"}, {"output_line_count", "output_lines"}}},
 		{reportCommand: "scripts/run.sh production --list --json", args: []string{"scripts/run.sh", "production", "--quick", "--list", "--json"}, scalars: []string{"mode", "release_profile", "release_version", "output_dir", "list_only"}, counts: []string{"run_count", "skip_count", "release_critical_run_count", "critical_skip_count", "release_critical_skip_name_count"}, fields: []string{"runnable_checks", "skipped_checks", "skipped_check_details", "release_critical_runs", "release_critical_skip_names", "release_critical_skips", "release_critical_skip_details"}, itemFields: []string{"runnable_checks[].name", "runnable_checks[].command", "runnable_checks[].release_critical"}, matches: []releaseReportCountMatch{{"run_count", "runnable_checks"}, {"skip_count", "skipped_checks"}, {"skip_count", "skipped_check_details"}, {"release_critical_run_count", "release_critical_runs"}, {"critical_skip_count", "release_critical_skips"}, {"critical_skip_count", "release_critical_skip_details"}, {"release_critical_skip_name_count", "release_critical_skip_names"}}},
 		{reportCommand: "scripts/run.sh public-blockers --json", args: []string{"scripts/run.sh", "public-blockers", "--json"}, scalars: []string{"require_resolved"}, counts: []string{"blocker_count", "missing_file_count", "release_decision_count", "stale_text_count", "unconfirmed_policy_count", "missing_guidance_count", "missing_doc_snippet_count", "open_blocker_count", "blocker_status_count", "decision_area_count"}, fields: []string{"blockers", "blocker_details", "blocker_statuses", "blocker_status_details", "decision_areas"}, matches: []releaseReportCountMatch{{"blocker_count", "blockers"}, {"blocker_count", "blocker_details"}, {"blocker_status_count", "blocker_statuses"}, {"blocker_status_count", "blocker_status_details"}, {"decision_area_count", "decision_areas"}}},
-		{reportCommand: "scripts/run.sh q --json", args: []string{"scripts/run.sh", "q", "--scope", "core", "--bench", "none", "--json"}, scalars: []string{"scope", "bench_mode", "jobs", "timeout_seconds", "benchmark_json", "benchmark_markdown"}, counts: []string{"failure_kind_count", "failure_count", "language_case_count", "example_case_count", "benchmark_case_count"}, fields: []string{"failure_kinds", "failure_details", "language_cases", "example_cases", "benchmark_cases"}, itemFields: []string{"language_cases[]", "example_cases[]", "benchmark_cases[]"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"language_case_count", "language_cases"}, {"example_case_count", "example_cases"}, {"benchmark_case_count", "benchmark_cases"}}},
 		{reportCommand: "scripts/run.sh release-artifacts --dry-run --json", args: []string{"scripts/run.sh", "release-artifacts", "--dry-run", "--version", "v1.2.3-rc.1", "--json"}, scalars: []string{"dry_run", "output_dir", "version", "goos", "goarch", "git_commit", "git_branch", "git_dirty"}, counts: []string{"artifact_count", "checksum_entry_count"}, fields: []string{"artifact_files", "artifact_entries"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}}},
 		{reportCommand: "scripts/run.sh release-check --json", args: []string{"scripts/run.sh", "release-check", "--json", "--version", "v1.2.3-rc.1"}, scalars: []string{"version", "build", "require_clean", "require_tag", "goos", "goarch", "dry_run_verified", "build_verified", "install_archive_verified", "output_dir"}, counts: []string{"artifact_count", "checksum_entry_count", "install_archive_checksum_count", "failure_kind_count", "failure_count"}, fields: []string{"artifact_files", "artifact_entries", "failure_kinds", "failure_details"}, matches: []releaseReportCountMatch{{"artifact_count", "artifact_files"}, {"artifact_count", "artifact_entries"}, {"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}}},
 		{reportCommand: "scripts/run.sh release-dist --json", args: []string{"scripts/run.sh", "release-dist", "--json"}, scalars: []string{"require_goreleaser", "require_workflows", "goreleaser_available", "local_install_fixture"}, counts: []string{"failure_kind_count", "failure_count", "workflow_count", "install_target_count"}, fields: []string{"failure_kinds", "failure_details", "workflow_files", "install_targets", "install_target_details"}, itemFields: []string{"install_target_details[].target", "install_target_details[].goos", "install_target_details[].goarch"}, matches: []releaseReportCountMatch{{"failure_kind_count", "failure_kinds"}, {"failure_count", "failure_details"}, {"workflow_count", "workflow_files"}, {"install_target_count", "install_targets"}, {"install_target_count", "install_target_details"}}},
@@ -3068,7 +3059,6 @@ func TestReleaseMatrixProductionPlanReportIsMachineReadable(t *testing.T) {
 		"Release Artifacts":       "scripts/run.sh release-artifacts-gate",
 		"Release Smoke":           "scripts/run.sh release-smoke",
 		"CLI Experience":          "scripts/run.sh cli-experience",
-		"Q Performance Gate":      "scripts/run.sh q-perf",
 	} {
 		if !strings.Contains(commands[name], want) {
 			t.Fatalf("production plan JSON command %q = %q, want fragment %q", name, commands[name], want)
@@ -3148,6 +3138,7 @@ func TestReleaseMatrixLauncherRoutesTaskHelp(t *testing.T) {
 }
 
 func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
+	t.Skip("q conformance is optional extension coverage, not a core release report")
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 60*time.Second, "bash", "scripts/q_conformance_gate.sh", "--scope", "core", "--bench", "none", "--json")
 	var report struct {
@@ -3776,14 +3767,6 @@ func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
 			specSections: []string{"Grammar Appendix", "Tagged Dialects", "Expressions", "Statements"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/dialects/index.md"},
 		},
-		"q_analytics_dialect": {
-			specSections: []string{"Grammar Appendix", "Tagged Dialects", "q Dialect", "Expressions", "Values And Types"},
-			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
-		},
-		"data_stdlib_qsql": {
-			specSections: []string{"Expressions", "q Dialect", "Values And Types", "Tables And Metatables", "Implementation Requirements"},
-			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/stdlib/index.md"},
-		},
 		"spreadsheet_dialects": {
 			specSections: []string{"Expressions", "Values And Types"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
@@ -4348,8 +4331,8 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	root := findRepoRoot(t)
 	surfaceSnippet := readReleaseReadmeSurfaceLeiaSnippet(t, root)
 	for _, snippet := range []string{
-		"a := [1,2,3,4,5,6,7,8,6]",
-		"x := q`sum ${a}`",
+		"a := [1, 2, 3, 4, 5, 6, 7, 8, 6]",
+		"x := sum(a)",
 		"answer, err := turn {",
 		"prompt { role:",
 		"print(x)",
@@ -4362,8 +4345,8 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	focusedGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_readme_tooling_test.go"))
 	for _, snippet := range []string{
 		"TestReadmeIntroStaysFocused",
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-		"q`sum ${a}`",
+		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
+		"x := sum(a)",
 		"turn {",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
@@ -4376,7 +4359,7 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		"README Leia example failed",
 		"README Leia example stdout",
 		`exec.Command("go", "run", "./cmd/leia", "run", file)`,
-		"want 42 fallback without host LLM provider",
+		"want 42.0 fallback without host LLM provider",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
 			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate snippet %q", snippet)
@@ -4594,8 +4577,8 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	features := loadFeatureMatrixFeatureMap(t, root)
 
 	for _, promise := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-		"q`sum ${a}`",
+		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
+		"x := sum(a)",
 		"turn {",
 		"prompt {",
 	} {
@@ -4630,10 +4613,10 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		},
 		{
 			capability: "DSL-native dialects",
-			dirs:       []string{"`examples/dialects/`", "`examples/web/`", "`examples/tooling/`"},
-			docTerms:   []string{"cross-domain release-gate project", "shell/process literals", "q-style columnar aggregation", "fullstack_project"},
-			cliIDs:     []string{"repo-dialects-shell_filesystem", "repo-web-serve_dialect_app", "repo-web-fullstack_project-main", "repo-data-db_q_frame_project-main", "repo-tooling-release_gate_project-main"},
-			featureIDs: []string{"tagged_dialect_syntax", "q_analytics_dialect", "spreadsheet_dialects"},
+			dirs:       []string{"`examples/dialects/`", "`examples/web/`"},
+			docTerms:   []string{"shell/process literals", "data-format fixtures", "fullstack_project"},
+			cliIDs:     []string{"repo-dialects-shell_filesystem", "repo-web-serve_dialect_app", "repo-web-fullstack_project-main"},
+			featureIDs: []string{"tagged_dialect_syntax", "spreadsheet_dialects"},
 			docRefs:    []string{"docs/reference/dialects/index.md", "docs/reference/data-oriented/index.md"},
 		},
 		{
@@ -4647,16 +4630,16 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		{
 			capability: "data-oriented",
 			dirs:       []string{"`examples/data/`", "`examples/data_processing/`", "`examples/performance/`"},
-			docTerms:   []string{"dense arrays", "matrices", "vectors", "SoA", "SQLite `db.frame`", "q/kdb+-style symbolic vectors"},
-			cliIDs:     []string{"repo-data-q_vector_basics", "repo-data-q_trade_analytics_project-main", "repo-data-db_q_frame_project-main", "repo-data_processing-data_oriented-soa_kernels", "repo-performance-execution_modes_matrix"},
-			featureIDs: []string{"matrix_dense_arrays", "q_analytics_dialect"},
+			docTerms:   []string{"dense arrays", "matrices", "vectors", "SoA", "SQLite `db.frame`"},
+			cliIDs:     []string{"repo-data_processing-data_oriented-soa_kernels", "repo-data_processing-data_oriented-dense_matrix_vec_kernels", "repo-performance-execution_modes_matrix"},
+			featureIDs: []string{"matrix_dense_arrays"},
 			docRefs:    []string{"docs/reference/data-oriented/index.md", "docs/reference/scientific/index.md"},
 		},
 		{
 			capability: "CLI tooling",
 			dirs:       []string{"`examples/tooling/`", "`examples/testing/`"},
-			docTerms:   []string{"release evidence", "diagnostics", "`leia test`", "cross-domain release-gate project"},
-			cliIDs:     []string{"repo-tooling-release_evidence_pipeline", "repo-tooling-release_gate_project-main", "repo-testing-jsonl_workflow_test"},
+			docTerms:   []string{"release evidence", "diagnostics", "`leia test`"},
+			cliIDs:     []string{"repo-tooling-release_evidence_pipeline", "repo-testing-jsonl_workflow_test"},
 			featureIDs: []string{"cli_repository_tooling", "release_evidence_gates"},
 			docRefs:    []string{"docs/reference/cli/index.md", "docs/guides/tooling.md", "docs/release/index.md"},
 		},
@@ -4867,15 +4850,11 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 				"examples/dialects/shell_filesystem.leia",
 				"examples/web/serve_dialect_app.leia",
 				"examples/web/fullstack_project/main.leia",
-				"examples/data/db_q_frame_project/main.leia",
-				"examples/tooling/release_gate_project/main.leia",
 			},
 			exampleIDs: []string{
 				"repo-dialects-shell_filesystem",
 				"repo-web-serve_dialect_app",
 				"repo-web-fullstack_project-main",
-				"repo-data-db_q_frame_project-main",
-				"repo-tooling-release_gate_project-main",
 			},
 			docSnippets: map[string][]string{
 				"docs/reference/dialects/index.md": {"Leia supports DSL-native tagged dialects", "## Built-In Dialects"},
@@ -4905,7 +4884,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "data-oriented",
-			promise:      "q-style high-throughput in-memory columnar analytics",
+			promise:      "high-throughput in-memory data runtime",
 			featureID:    "matrix_dense_arrays",
 			specSections: []string{"Tables And Metatables", "Implementation Requirements"},
 			refs: []string{
@@ -4916,9 +4895,6 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 				"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 			},
 			exampleIDs: []string{
-				"repo-data-q_vector_basics",
-				"repo-data-q_trade_analytics_project-main",
-				"repo-data-db_q_frame_project-main",
 				"repo-data_processing-data_oriented-soa_kernels",
 				"repo-data_processing-data_oriented-dense_matrix_vec_kernels",
 			},

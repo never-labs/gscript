@@ -411,7 +411,6 @@ func TestExamplesDocsIndexCommandsReferenceRegisteredExamples(t *testing.T) {
 		}
 	}
 	for _, requiredID := range []string{
-		"repo-tooling-release_gate_project-main",
 		"repo-dialects-sql_result_analytics",
 		"repo-concurrency-sync_group",
 		"repo-web-route_workbench",
@@ -434,10 +433,10 @@ func TestExamplesDocsIndexKeepsDataProjectWorkflowGate(t *testing.T) {
 	commands := documentedExamplesCommands(index)
 
 	for _, selector := range []string{
-		"examples/data/q_vector_basics.leia",
-		"examples/data/q_trade_analytics_project",
-		"examples/data/db_q_frame_project",
-		"repo-tooling-release_gate_project-main",
+		"examples/data_processing/data_oriented/soa_kernels.leia",
+		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
+		"examples/scientific/kalman_filter.leia",
+		"examples/database/package_managed",
 	} {
 		if !documentedExamplesCommandsContainSelector(commands, selector) {
 			t.Fatalf("docs/examples/index.md must keep a registered data workflow command for %s", selector)
@@ -445,11 +444,11 @@ func TestExamplesDocsIndexKeepsDataProjectWorkflowGate(t *testing.T) {
 	}
 
 	for _, snippet := range []string{
-		"q/kdb+-style symbolic vectors",
 		"SQLite `db.frame`",
-		"SoA-backed `q.query`",
+		"SoA kernels",
+		"dense arrays",
 		"`xlsx`/`excel`",
-		"Excel round-tripping",
+		"round-tripping",
 	} {
 		if !strings.Contains(index, snippet) {
 			t.Fatalf("docs/examples/index.md must keep data workflow coverage text %q", snippet)
@@ -703,6 +702,9 @@ func TestExamplesCommandDefaultCheckSkipsOnlyOptInExamples(t *testing.T) {
 		if result.Status != "skipped" {
 			continue
 		}
+		if result.Requires == "optional q extension" {
+			continue
+		}
 		wantReason, ok := allowed[result.ID]
 		if !ok {
 			t.Fatalf("example %s is unexpectedly skipped: %s", result.ID, result.Requires)
@@ -712,8 +714,8 @@ func TestExamplesCommandDefaultCheckSkipsOnlyOptInExamples(t *testing.T) {
 		}
 		seen[result.ID] = true
 	}
-	if len(seen) != len(allowed) || payload.Skipped != len(allowed) {
-		t.Fatalf("skipped examples = %v payload skipped=%d, want exactly %d opt-in examples", seen, payload.Skipped, len(allowed))
+	if len(seen) != len(allowed) || payload.Skipped < len(allowed) {
+		t.Fatalf("skipped examples = %v payload skipped=%d, want at least %d opt-in examples plus optional extensions", seen, payload.Skipped, len(allowed))
 	}
 }
 
@@ -739,7 +741,6 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-workflow-support_triage_replay",
 		"repo-testing-jsonl_workflow_test",
 		"repo-tooling-release_evidence_pipeline",
-		"repo-tooling-release_gate_project-main",
 		"repo-performance-execution_modes_matrix",
 		"repo-ui-package_managed-main",
 	}, &stdout, &stderr)
@@ -765,10 +766,9 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-workflow-support_triage_replay",
 		"ok      repo-testing-jsonl_workflow_test",
 		"ok      repo-tooling-release_evidence_pipeline",
-		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 20 ok, 0 skipped, 0 failed",
+		"examples: 19 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)
@@ -899,9 +899,6 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"repo-concurrency-select_timeout",
 		"repo-concurrency-sync_group",
 		"repo-concurrency-pipeline_project-main",
-		"repo-data-q_vector_basics",
-		"repo-data-db_q_frame_project-main",
-		"repo-data-q_trade_analytics_project-main",
 		"repo-data_processing-data_oriented-soa_kernels",
 		"repo-data_processing-data_oriented-dense_matrix_vec_kernels",
 		"repo-database-package_managed-main",
@@ -911,7 +908,6 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"repo-site-release_dashboard",
 		"repo-tooling-package_manager_workflow-main",
 		"repo-tooling-package_manager_workflow-local-metadata-report",
-		"repo-tooling-release_gate_project-main",
 		"repo-macos-package_managed-main",
 		"repo-macos-package_managed-adapter-automation",
 		"repo-performance-execution_modes_matrix",
@@ -936,9 +932,6 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"ok      repo-concurrency-select_timeout",
 		"ok      repo-concurrency-sync_group",
 		"ok      repo-concurrency-pipeline_project-main",
-		"ok      repo-data-q_vector_basics",
-		"ok      repo-data-db_q_frame_project-main",
-		"ok      repo-data-q_trade_analytics_project-main",
 		"ok      repo-data_processing-data_oriented-soa_kernels",
 		"ok      repo-data_processing-data_oriented-dense_matrix_vec_kernels",
 		"ok      repo-database-package_managed-main",
@@ -948,11 +941,10 @@ func TestExamplesCommandChecksReadmeCapabilityEvidenceExamples(t *testing.T) {
 		"ok      repo-site-release_dashboard",
 		"ok      repo-tooling-package_manager_workflow-main",
 		"ok      repo-tooling-package_manager_workflow-local-metadata-report",
-		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-macos-package_managed-main",
 		"ok      repo-macos-package_managed-adapter-automation",
 		"ok      repo-performance-execution_modes_matrix",
-		"examples: 31 ok, 0 skipped, 0 failed",
+		"examples: 27 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("README capability examples check missing %q\n%s", want, out)

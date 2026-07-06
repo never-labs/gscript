@@ -34,28 +34,9 @@ tag! { fields }
 Tagged blocks use normal Leia block/table syntax at the outer boundary. The
 dialect owns the meaning of the fields inside its registered block contract.
 
-The q dialect also accepts a raw source block:
-
-```text
-q {
-    select avg price by sym from trades
-}
-q! {
-    +/1 2 3
-}
-```
-
-In this form the text inside the braces is q source, not Leia fields. It may
-span lines. The outer lexer matches balanced braces and skips braces inside
-quoted strings and comments. Raw q blocks support `${expr}` interpolation with
-the same binding semantics as tagged raw strings:
-
-```text
-q`sum ${xs}`
-q {
-    sum ${xs}
-}
-```
+An extension may define additional tagged block contracts, but such contracts
+must still enter the runtime through the registered dialect boundary. Core Leia
+does not assign domain-specific meaning to a tag name by itself.
 
 ## Interpolation
 
@@ -66,7 +47,7 @@ For each interpolation segment, Leia evaluates `expr` in the surrounding
 lexical scope before the dialect receives the body. The dialect receives the raw
 body plus the evaluated values. The dialect decides whether an interpolated
 value is escaped as text, encoded as JSON, bound as a parameter, converted to a
-q value, or rejected.
+domain value, or rejected.
 
 Literal source text and interpolated values are distinct at the dialect
 boundary. Source text is preserved byte-for-byte; only `${expr}` results pass
@@ -137,7 +118,7 @@ implementation is installed, evaluation fails.
 
 Leia's standard dialect families include:
 
-- `q`, the core high-performance in-memory columnar analytics dialect;
+- optional data dialects for high-throughput in-memory analytics;
 - data and protocol dialects such as `json`, `yaml`, `csv`, `urlquery`, and
   `headers`;
 - host automation dialects such as `sh`, `$`, `cmd`, `glob`, and `env`;

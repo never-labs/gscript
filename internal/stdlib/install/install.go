@@ -125,7 +125,6 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	registerDefaultAliases(installer, "math", math)
 	installer.RegisterTable("ode", stdbind.BuildODE(opts.ScriptCaller))
 	installer.RegisterTable("path", stdbind.BuildPath())
-	installer.RegisterTable("q", stdbind.BuildQ())
 	rand := stdbind.BuildRand()
 	installer.RegisterTable("rand", rand)
 	registerDefaultAliases(installer, "rand", rand)

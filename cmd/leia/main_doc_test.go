@@ -35,7 +35,7 @@ func TestDocGenerateWritesReferenceFiles(t *testing.T) {
 	if !bytes.Contains(stdlibDoc, []byte("`json`")) || !bytes.Contains(stdlibDoc, []byte("JSON encode/decode")) || !bytes.Contains(stdlibDoc, []byte("Safe default")) || !bytes.Contains(stdlibDoc, []byte("## Default Imports")) || !bytes.Contains(stdlibDoc, []byte("| `mat` | `linalg.matrix` |")) {
 		t.Fatalf("stdlib.md = %q, want stdlib inventory", string(stdlibDoc))
 	}
-	if !bytes.Contains(dialectDoc, []byte("`sh`")) || !bytes.Contains(dialectDoc, []byte("`agent`")) || !bytes.Contains(dialectDoc, []byte("Built-In Dialects")) || !bytes.Contains(dialectDoc, []byte("Standard-library helpers such as `q.sql` and `q.query`")) {
+	if !bytes.Contains(dialectDoc, []byte("`sh`")) || !bytes.Contains(dialectDoc, []byte("`agent`")) || !bytes.Contains(dialectDoc, []byte("Built-In Dialects")) || !bytes.Contains(dialectDoc, []byte("data-format")) {
 		t.Fatalf("dialects.md = %q, want dialect reference", string(dialectDoc))
 	}
 }

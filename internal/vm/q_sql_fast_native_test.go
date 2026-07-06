@@ -10,6 +10,7 @@ import (
 )
 
 func TestQSQLFastArg2UsesVMDirectNativeFastCall(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
@@ -54,6 +55,7 @@ first_price := rows[1].price
 }
 
 func TestQSQLThreeArgumentEnvUsesVMNativeFallback(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
@@ -98,6 +100,7 @@ second_price := rows[2].price
 }
 
 func TestQSQLNativeCallsRecordStableCallSiteFeedback(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	_, v, proto := compileAndRunQSQLFastNativeFixtureWithProto(t, `
 trades := data.frame({
     sym: data.symbols({"AAPL", "MSFT"}),

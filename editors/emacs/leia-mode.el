@@ -67,7 +67,7 @@
     "compress" "container" "context" "control" "crypto" "csv" "data" "db"
     "debug" "encoding" "fs" "hash" "history" "http" "io" "json" "linalg"
     "llm" "log" "loop" "math" "matrix" "msg" "net" "os" "ode" "path"
-    "process" "q" "rand" "regexp" "script" "serve" "soa" "sort" "stats"
+    "process" "rand" "regexp" "script" "serve" "soa" "sort" "stats"
     "string" "sync" "table" "testkit" "time" "url" "utf8" "uuid" "vec"))
 
 (defconst leia--primitive-types

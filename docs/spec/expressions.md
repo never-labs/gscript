@@ -274,9 +274,9 @@ assert(holder["child"] == child)
 
 Tagged dialect forms are expressions. The generic syntax, interpolation rules,
 bang behavior, registration model, and runtime boundary are specified in
-[Tagged Dialects](dialects.md). The core q analytics dialect is specified in
-[q Dialect](q-dialect.md). The optional standard AI dialect family is specified
-in [AI Dialect Syntax](ai-dialect.md).
+[Tagged Dialects](dialects.md). The optional standard AI dialect family is
+specified in [AI Dialect Syntax](ai-dialect.md). Other dialects may be provided
+by standard-library packages, host applications, or external extensions.
 
 ## Evaluation Order
 

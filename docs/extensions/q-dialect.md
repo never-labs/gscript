@@ -1,17 +1,17 @@
 # q Dialect
 
-The `q` dialect is Leia's core dialect for high-performance in-memory columnar
-analytics. It provides q-style concise syntax for vectors, dictionaries, tables,
+The `q` dialect is an optional Leia extension for q-style in-memory columnar
+analytics. It provides concise syntax for vectors, dictionaries, tables,
 adverbs, qSQL, and columnar query plans while remaining an implementation over
 ordinary Leia values and runtime helpers.
 
 Leia does not aim to be a byte-for-byte kdb+/q clone. The stable goal is a
-native Leia analytics dialect with q-like density, predictable embedding in Go,
+Leia extension with q-like density, predictable embedding in Go,
 and runtime/JIT paths that can specialize columnar shapes.
 
 ## Scope
 
-The stable q dialect surface includes:
+The q extension surface includes:
 
 - scalar atoms, symbols, strings, and temporal values supported by the runtime;
 - homogeneous and mixed vectors;
@@ -125,7 +125,7 @@ assert(frame_sum == 6)
 
 ## qSQL
 
-qSQL is part of the q dialect, not a separate language runtime. qSQL forms
+qSQL is part of the q extension, not a separate language runtime. qSQL forms
 lower to query plans over frame-like values. The implementation may execute a
 plan with interpreter helpers, typed runtime kernels, cached shape plans, or JIT
 handoff, but the visible result must be the same for supported shapes.

@@ -150,9 +150,6 @@ func dialectInterpolateValue(tag string, rawParts, values *Table) (Value, error)
 	if rawCount != valueCount+1 {
 		return NilValue(), fmt.Errorf("bad arguments to 'dialect.interpolate' (raw parts must contain exactly one more entry than values)")
 	}
-	if tag == "q" || tag == "qsql" {
-		return dialectQInterpolate(rawParts, values)
-	}
 	var b strings.Builder
 	for i := 1; i <= rawCount; i++ {
 		raw := rawParts.RawGetInt(int64(i))
@@ -232,8 +229,6 @@ func dialectQInterpolate(rawParts, values *Table) (Value, error) {
 
 func dialectInterpolationPart(tag string, part Value) (string, error) {
 	switch tag {
-	case "q", "qsql":
-		return dialectQInterpolationValue(part)
 	default:
 		return part.String(), nil
 	}
@@ -608,7 +603,7 @@ func builtinDialectCategory(name string) string {
 		return "protocol"
 	case "serve":
 		return "web"
-	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "qsql", "pem", "xlsx", "excel":
+	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem", "xlsx", "excel":
 		return "data"
 	case "sql":
 		return "database"

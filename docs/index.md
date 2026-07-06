@@ -6,13 +6,23 @@ title: Leia
 # Leia
 
 Leia is an efficient, embeddable scripting language for Go, combining a
-LuaJIT-class execution model, q-style high-throughput in-memory columnar
-analytics, and first-class extensible domain dialects.
+LuaJIT-class execution model, high-throughput in-memory data runtime, and
+first-class extensible domain dialects.
 
 ````leia
-trades := q```flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)```
-leader := q.sql(trades, "select qty:sum qty, avg_px:avg px by sym from trades order by qty desc")
-print(leader[1].sym, leader[1].qty, leader[1].avg_px)
+rows := [
+    {sym: "AAPL", px: 100.0, qty: 10},
+    {sym: "MSFT", px: 101.5, qty: 12},
+    {sym: "AAPL", px: 100.75, qty: 8},
+]
+
+total := 0
+for _, r := range ipairs(rows) {
+    if r.sym == "AAPL" {
+        total += r.qty
+    }
+}
+print(total)
 ````
 
 ## What It Is
@@ -20,8 +30,8 @@ print(leader[1].sym, leader[1].qty, leader[1].avg_px)
 - A Go-embedded scripting runtime with Go-shaped syntax and a small host API.
 - Native DSL extension through tagged dialects, so domain syntax can live
   beside Leia code without expanding the core grammar.
-- A q-style in-memory analytics layer with vectors, qSQL, typed kernels, and
-  columnar runtime/JIT work.
+- High-throughput in-memory data primitives for vectors, frames, matrices, and
+  typed runtime/JIT work.
 - A practical automation language for services, tools, data pipelines, and
   embedded application logic.
 
@@ -50,7 +60,6 @@ print(leader[1].sym, leader[1].qty, leader[1].avg_px)
 - [Tagged dialects](reference/dialects/index.md)
 - [Data-oriented programming](reference/data-oriented/index.md)
 - [Scientific numeric programming](reference/scientific/index.md)
-- [q conformance](design/q-conformance.md)
 - [Performance and benchmarks](reference/performance/index.md)
 - [Evaluate reference](reference/evaluate/index.md)
 - [Optional LLM dialect reference](reference/ai/index.md)

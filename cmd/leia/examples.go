@@ -576,8 +576,28 @@ func cliExampleModuleRoot(path string) (string, bool) {
 	}
 }
 
+func exampleUsesOptionalQExtension(path string) bool {
+	slash := filepath.ToSlash(path)
+	switch {
+	case strings.Contains(slash, "/data/q_"),
+		strings.Contains(slash, "/data/qsql_"),
+		strings.Contains(slash, "/data/db_q_frame_project/"),
+		strings.Contains(slash, "/data_processing/column_query/"),
+		strings.Contains(slash, "/tooling/release_gate_project/"):
+		return true
+	default:
+		return false
+	}
+}
+
 func applyCLIExampleRunner(example *cliExample) {
 	switch {
+	case exampleUsesOptionalQExtension(example.Path):
+		example.Runnable = false
+		example.Checkable = false
+		example.Runner = "playground"
+		example.Requires = "optional q extension"
+		return
 	case strings.Contains(example.Path, "/evaluate/"):
 		if cliExampleCompanionRecordsExist(example.Path) {
 			example.Runnable = true
@@ -635,19 +655,13 @@ func applyCLIExampleRunner(example *cliExample) {
 		strings.Contains(example.Path, "/web/tiny_fullstack_app.leia"),
 		strings.Contains(example.Path, "/web/serve_dialect_app.leia"),
 		strings.Contains(example.Path, "/web/route_workbench.leia"),
-		strings.Contains(example.Path, "/tooling/release_gate_project/"),
 		strings.Contains(example.Path, "/concurrency/pipeline_project/"),
 		strings.Contains(example.Path, "/concurrency/context_process.leia"),
 		strings.Contains(example.Path, "/concurrency/goroutine_errors.leia"),
-		strings.Contains(example.Path, "/data/db_q_frame_project/"),
 		strings.Contains(example.Path, "/dialects/shell_filesystem.leia"):
 		example.Runnable = true
 		example.Checkable = true
-		if strings.Contains(example.Path, "/tooling/release_gate_project/") {
-			example.Runner = "release-gate-project"
-		} else {
-			example.Runner = "host-vm"
-		}
+		example.Runner = "host-vm"
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/data_processing/data_oriented/particle_integration.leia"),

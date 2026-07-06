@@ -64,12 +64,6 @@ func TestRunCommandDialectExamples(t *testing.T) {
 			}
 		})
 	}
-	t.Run("data/q_vector_basics.leia", func(t *testing.T) {
-		stdout := execExampleProjectGlobal(root, filepath.Join("examples", "data", "q_vector_basics.leia"), "q_vector_basics_summary")(t)
-		if !strings.Contains(stdout, "q vector total=") {
-			t.Fatalf("summary = %q, want q vector summary", stdout)
-		}
-	})
 }
 
 func TestPracticalExampleProjects(t *testing.T) {
@@ -85,7 +79,6 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"api-offline-client", execExampleProjectGlobal(root, filepath.Join("examples", "api", "offline_client.leia"), "api_client_summary"), "prj-7 2 tickets"},
 		{"local-ops-report", execExampleProjectGlobal(root, filepath.Join("examples", "operations", "local_ops_report.leia"), "local_ops_report_summary"), "services=4 events=12 requests=12 errors=3 slow=3 backup_alerts=3 top_service=billing top_owner=platform"},
 		{"data-quality-report", execExampleProjectGlobal(root, filepath.Join("examples", "workflow", "service_quality_report.leia"), "workflow_report_summary"), "services=3 requests=8 errors=3 breaches=2 over_budget=2"},
-		{"column-query-analytics", execExampleProjectGlobal(root, filepath.Join("examples", "data_processing", "column_query", "trade_analytics.leia"), "trade_analytics_summary"), "rows=18 channels=4 best_channel=email roas=10.35 top_day=4 top_roas=15.75 risk_segments=4 enterprise_revenue=29100"},
 		{"supply-chain-audit", execExampleProjectGlobal(root, filepath.Join("examples", "security", "supply_chain_audit.leia"), "supply_chain_audit_summary"), "release=2026.06.05 deps=6 direct=3 vulns=4 blockers=2 disallowed=1 fixable=3 risk=27"},
 		{"vendor-onboarding-audit", execExampleProjectGlobal(root, filepath.Join("examples", "security", "vendor_onboarding_audit.leia"), "vendor_onboarding_audit_summary"), "evidence=9 expired_certs=1 missing_controls=3 open_findings=4 reviewer=security@example.test stale_evidence=3 top_score=185 top_vendor=V-103 vendors=4"},
 		{"release-ci-regression", testExampleProject(root, filepath.Join("examples", "testing")), "release_ci_regression_workflow_test.leia"},
@@ -95,9 +88,6 @@ func TestPracticalExampleProjects(t *testing.T) {
 		{"web-route-workbench", execExampleProjectGlobal(root, filepath.Join("examples", "web", "route_workbench.leia"), "web_route_workbench_summary"), "routes=5 events=6 created=bk-303 updated_stock=8 deleted=bk-202 method_status=405 html=200"},
 		{"web-serve-dialect-app", execExampleProjectGlobal(root, filepath.Join("examples", "web", "serve_dialect_app.leia"), "serve_dialect_app_summary"), "serve routes=3 events=4 status=delivered method_status=405 html=200"},
 		{"web-tiny-fullstack-app", execExampleProjectGlobal(root, filepath.Join("examples", "web", "tiny_fullstack_app.leia"), "tiny_fullstack_summary"), "tiny_fullstack posts=4 published=2 json=3 form=4 static=200 method=405"},
-		{"db-q-frame-project", execExampleProjectGlobal(root, filepath.Join("examples", "data", "db_q_frame_project", "main.leia"), "db_q_frame_summary"), "db_q_frame rows=4 channels=3 best=1 revenue=550 excel_rows=3"},
-		{"q-trade-analytics-project", execExampleProjectGlobal(root, filepath.Join("examples", "data", "q_trade_analytics_project", "main.leia"), "q_trade_analytics_summary"), "trades=5 symbols=3 leader=MSFT notional=21360.0 total_size=540 large=3"},
-		{"release-gate-project", runCLIExampleByID("repo-tooling-release_gate_project-main"), "release_gate_project checks=6 domains=6 top=performance ms=3770 excel_rows=6 web=200 agent=done shell=release-gate cmd=cmd-ok"},
 		{"ai-agent-composition", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "agent_replay.leia"), filepath.Join("examples", "evaluate", "agent_replay.records.json")), "agent consumes replay"},
 		{"ai-project-regression", evaluateReplayExampleProject(root, filepath.Join("examples", "evaluate", "project_agent_regression.leia"), filepath.Join("examples", "evaluate", "project_agent_regression.records.json")), "project agent regression consumes replay"},
 		{"concurrency-pipeline", runCLIExampleByID("repo-concurrency-pipeline_project-main"), "pipeline_project incidents=6 sev1=1 checkout=3 edge=3 score=249 top=INC-103 top_score=77 audit_sent=1 audit_dropped=5 timeout=timeout cancel_failures=1 cancel_sleep=cancelled"},
@@ -832,7 +822,7 @@ func approvedBuiltinDialectTags() []string {
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
 		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport", "serve",
-		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel", "sql",
+		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem", "xlsx", "excel", "sql",
 		"prompt", "quote", "model", "turn", "tool", "agent",
 	}
 }
@@ -873,7 +863,6 @@ func collectDialectExampleTags(t *testing.T, root string) map[string]bool {
 		approved[tag] = true
 	}
 	paths := []string{filepath.Join(root, "examples", "hello", "dialects.leia")}
-	paths = append(paths, filepath.Join(root, "examples", "data", "q_vector_basics.leia"))
 	dialectDir := filepath.Join(root, "examples", "dialects")
 	entries, err := os.ReadDir(dialectDir)
 	if err != nil {

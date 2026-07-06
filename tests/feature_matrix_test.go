@@ -308,7 +308,6 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		"cmd/leia/main_examples_command_test.go",
 		"examples/dialects/shell_filesystem.leia",
 		"examples/dialects/web_text.leia",
-		"examples/tooling/release_gate_project/main.leia",
 		"docs/reference/dialects/index.md",
 	)
 	requireFeatureStringList(t, tagged, "tagged_dialect_syntax", "builtin_dialect_tags",
@@ -316,7 +315,7 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 		"re", "regexp", "json", "jsonptr", "jsonl", "csv", "tsv", "mdtable", "markdown", "md", "lines", "split", "words", "nums", "numbers", "kv", "logfmt", "env", "ini", "yaml", "yml", "semver", "duration", "timestamp", "rfc3339", "tap", "junit", "xml", "template",
 		"url", "html_escape", "html", "urlquery", "form", "urlform", "urlpath", "mime", "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies", "httpmsg", "sse", "multipart", "jwt",
 		"ipaddr", "cidr", "hostport", "serve",
-		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "qsql", "pem", "xlsx", "excel",
+		"base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "pem", "xlsx", "excel",
 		"sql",
 		"prompt", "quote", "model", "turn", "tool", "agent",
 	)
@@ -335,35 +334,10 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	if !strings.Contains(dialectGuard, "urlpath`a b/米`") || !strings.Contains(dialectGuard, `dialect.eval(\"urlpath\"`) {
 		t.Fatal("tests/dialect_syntax_test.go must keep urlpath tagged literal and eval coverage")
 	}
-	if !strings.Contains(dialectGuard, "TestQSymbolicDialectMilestone1ExecutesThroughStdlib") || !strings.Contains(dialectGuard, "q`+/1 2 3`") {
-		t.Fatal("tests/dialect_syntax_test.go must keep q symbolic vector dialect coverage")
-	}
-	qAnalytics := requireFeature(t, features, "q_analytics_dialect")
-	requireFeatureCellRefs(t, qAnalytics, "q_analytics_dialect", "semantic_gate",
-		"internal/stdlib/bind/q_test.go",
-		"internal/stdlib/bind/db_test.go",
-		"examples/data/q_vector_basics.leia",
-		"examples/data/q_trade_analytics_project/main.leia",
-		"examples/data/db_q_frame_project/main.leia",
-	)
 	spreadsheet := requireFeature(t, features, "spreadsheet_dialects")
 	requireFeatureCellRefs(t, spreadsheet, "spreadsheet_dialects", "semantic_gate",
 		"internal/stdlib/bind/dialect_data_test.go",
-		"examples/data/db_q_frame_project/main.leia",
 	)
-	dbQFrameExample := readFileString(t, filepath.Join(root, "examples", "data", "db_q_frame_project", "main.leia"))
-	for _, snippet := range []string{
-		"db.memory()",
-		"conn.frame(sql",
-		"soa.len(frame.soa)",
-		"q.query(frame.soa",
-		`dialect.eval("xlsx"`,
-		`dialect.eval("excel"`,
-	} {
-		if !strings.Contains(dbQFrameExample, snippet) {
-			t.Fatalf("db_q_frame_project must keep db/SoA/q/spreadsheet project evidence snippet %q", snippet)
-		}
-	}
 	stdlibBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "stdlib_boundary_test.go"))
 	if !strings.Contains(stdlibBoundary, `"urlpath"`) {
 		t.Fatal("stdlib architecture boundary must keep urlpath in the approved web dialect registry")
@@ -419,9 +393,9 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-		"a := [1,2,3,4,5,6,7,8,6]",
-		"x := q`sum ${a}`",
+		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
+		"a := [1, 2, 3, 4, 5, 6, 7, 8, 6]",
+		"x := sum(a)",
 		"turn {",
 		"prompt {",
 		"print(x)",
@@ -814,8 +788,6 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"cmd/leia/main_examples_command_test.go",
 		"examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia",
 		"examples/data_processing/data_oriented/soa_kernels.leia",
-		"examples/data/db_q_frame_project/main.leia",
-		"examples/tooling/release_gate_project/main.leia",
 		"docs/reference/data-oriented/index.md",
 		"docs/reference/scientific/index.md",
 	)
@@ -853,7 +825,6 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"benchmarks/performance_gate_test.go",
 		"internal/tooling/benchdisc/discovery_test.go",
 		"examples/tooling/release_evidence_pipeline.leia",
-		"examples/tooling/release_gate_project/main.leia",
 		"docs/guides/tooling.md",
 		"docs/reference/cli/index.md",
 	)
@@ -1204,7 +1175,6 @@ func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 		"examples/evaluate/multiturn_replay.leia",
 		"examples/evaluate/project_agent_regression.leia",
 		"examples/evaluate/project_agent_regression.records.json",
-		"examples/tooling/release_gate_project/main.leia",
 		"docs/guides/ai-dialect.md",
 		"docs/reference/ai/index.md",
 		"docs/reference/evaluate/index.md",

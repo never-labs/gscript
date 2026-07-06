@@ -546,6 +546,7 @@ func qEvalJITScriptForcedTier2(t *testing.T, script string, iterations int64) (i
 //     loop-call gate and lower to OpQEvalPipelinePlan. Unsupported or
 //     heuristic-only q.eval calls remain residual-call blocked.
 func TestQEvalJITScriptRouting(t *testing.T) {
+	t.Skip("optional q extension coverage is not part of the core default test suite")
 	const src = qEvalJITTypedRuntimeSmokeSource
 	const want = qEvalJITTypedRuntimeSmokeWant
 

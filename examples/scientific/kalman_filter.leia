@@ -21,14 +21,12 @@ innovation_rmse := stats.rms(innovations)
 position := state.x.position
 velocity := state.x.velocity
 uncertainty_trace := trace(state.P)
-q_state_sum := q {
-+/${state.x}
-}
+state_sum := sum([position, velocity])
 
 assert(near(position, 5.0, 0.15))
 assert(near(velocity, 1.0, 0.15))
 assert(innovation_rmse < 0.20)
 assert(#innovations == #measurements)
-assert(near(q_state_sum, position + velocity, 0.000000001))
+assert(near(state_sum, position + velocity, 0.000000001))
 
 print(string.format("ok kalman n=%d position=%.3f velocity=%.3f rmse=%.3f trace=%.4f", #measurements, position, velocity, innovation_rmse, uncertainty_trace))

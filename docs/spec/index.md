@@ -14,9 +14,8 @@ preserve.
 Leia uses Go-like syntax with dynamic values, Lua-compatible table and
 multi-return behavior where useful, explicit host capabilities, Go-native
 embedding, source-level hot reload, and a generic tagged-dialect mechanism for
-domain-specific syntax. `q` is the core high-performance in-memory columnar
-analytics dialect; shell/data/web forms, spreadsheets, and optional AI
-workflows use the same dialect boundary.
+domain-specific syntax. Shell/data/web forms, spreadsheets, optional AI
+workflows, and host-defined extensions use the same dialect boundary.
 
 ## Version
 
@@ -52,8 +51,6 @@ The chapter files remain the editable sources for each section, and the
   cancellation, and host scheduling boundaries.
 - [Tagged Dialects](dialects.md): generic DSL extension syntax, interpolation,
   bang forms, runtime boundaries, registration, and standard dialect families.
-- [q Dialect](q-dialect.md): q-style vectors, dictionaries, tables, qSQL,
-  functional query forms, and columnar runtime/JIT contracts.
 - [AI Dialect Syntax](ai-dialect.md): model, tool, agent, and turn dialects as
   one optional standard-library dialect implementation; messages, budgets,
   output validation, providers, trace, replay, and evaluation. AI is not a
@@ -1446,9 +1443,9 @@ assert(holder["child"] == child)
 
 Tagged dialect forms are expressions. The generic syntax, interpolation rules,
 bang behavior, registration model, and runtime boundary are specified in
-[Tagged Dialects](dialects.md). The core q analytics dialect is specified in
-[q Dialect](q-dialect.md). The optional standard AI dialect family is specified
-in [AI Dialect Syntax](ai-dialect.md).
+[Tagged Dialects](dialects.md). The optional standard AI dialect family is
+specified in [AI Dialect Syntax](ai-dialect.md). Other dialects may be provided
+by standard-library packages, host applications, or external extensions.
 
 ### Evaluation Order
 
@@ -2984,28 +2981,9 @@ tag! { fields }
 Tagged blocks use normal Leia block/table syntax at the outer boundary. The
 dialect owns the meaning of the fields inside its registered block contract.
 
-The q dialect also accepts a raw source block:
-
-```text
-q {
-    select avg price by sym from trades
-}
-q! {
-    +/1 2 3
-}
-```
-
-In this form the text inside the braces is q source, not Leia fields. It may
-span lines. The outer lexer matches balanced braces and skips braces inside
-quoted strings and comments. Raw q blocks support `${expr}` interpolation with
-the same binding semantics as tagged raw strings:
-
-```text
-q`sum ${xs}`
-q {
-    sum ${xs}
-}
-```
+An extension may define additional tagged block contracts, but such contracts
+must still enter the runtime through the registered dialect boundary. Core Leia
+does not assign domain-specific meaning to a tag name by itself.
 
 ### Interpolation
 
@@ -3016,7 +2994,7 @@ For each interpolation segment, Leia evaluates `expr` in the surrounding
 lexical scope before the dialect receives the body. The dialect receives the raw
 body plus the evaluated values. The dialect decides whether an interpolated
 value is escaped as text, encoded as JSON, bound as a parameter, converted to a
-q value, or rejected.
+domain value, or rejected.
 
 Literal source text and interpolated values are distinct at the dialect
 boundary. Source text is preserved byte-for-byte; only `${expr}` results pass
@@ -3087,7 +3065,7 @@ implementation is installed, evaluation fails.
 
 Leia's standard dialect families include:
 
-- `q`, the core high-performance in-memory columnar analytics dialect;
+- optional data dialects for high-throughput in-memory analytics;
 - data and protocol dialects such as `json`, `yaml`, `csv`, `urlquery`, and
   `headers`;
 - host automation dialects such as `sh`, `$`, `cmd`, `glob`, and `env`;
@@ -3117,219 +3095,6 @@ Adding a new standard dialect family requires:
   surface.
 
 
-## q Dialect
-
-The `q` dialect is Leia's core dialect for high-performance in-memory columnar
-analytics. It provides q-style concise syntax for vectors, dictionaries, tables,
-adverbs, qSQL, and columnar query plans while remaining an implementation over
-ordinary Leia values and runtime helpers.
-
-Leia does not aim to be a byte-for-byte kdb+/q clone. The stable goal is a
-native Leia analytics dialect with q-like density, predictable embedding in Go,
-and runtime/JIT paths that can specialize columnar shapes.
-
-### Scope
-
-The stable q dialect surface includes:
-
-- scalar atoms, symbols, strings, and temporal values supported by the runtime;
-- homogeneous and mixed vectors;
-- dictionaries and keyed dictionaries;
-- flipped tables and keyed tables;
-- q-style unary and dyadic verbs implemented by the current runtime;
-- adverbs and scans covered by the q conformance matrix;
-- qSQL select, exec, update, delete, joins, grouping, ordering, and projection
-  forms covered by the q conformance matrix;
-- functional query forms that lower to the same query plan representation;
-- SoA-backed query plans used by `q.query` and data-oriented libraries.
-
-Unsupported or intentionally different kdb+/q behavior must fail explicitly or
-be documented as implementation-defined. A construct is not stable merely
-because a parser accepts part of its spelling.
-
-### Values
-
-q dialect values cross the dialect boundary as ordinary Leia values:
-
-| q concept | Leia-visible shape |
-|---|---|
-| Atom | Boolean, integer, float, string, symbol, temporal, or null-like value. |
-| Vector | Dense or ordinary sequence value, depending on element kind and runtime path. |
-| Dictionary | Table-like key/value mapping with q symbol keys when applicable. |
-| Table | Frame value with named columns and a stable schema. |
-| Keyed table | Frame plus key metadata. |
-| Parse tree | Ordinary list/dictionary structure accepted by functional query helpers. |
-
-Implementations may use internal typed carriers, frames, vectors, masks, and
-runtime kernels. Those carriers are implementation details unless exposed by a
-documented standard-library API.
-
-### Tagged Forms
-
-The q dialect uses the generic tagged dialect syntax:
-
-```text
-q`1 2 3`
-q```flip `sym`px!(`AAPL`MSFT;100 101.5)```
-```
-
-The fenced form is preferred for q source that contains symbol backticks,
-queries, or multiline tables. The short form is useful for simple expressions
-that do not contain backticks inside the body.
-
-`dialect.eval("q", body, opts)` is equivalent to invoking the registered q
-dialect implementation directly. Hosts may use it when the q source is dynamic
-or when the tag spelling would be inconvenient.
-
-```leia
-v := q`1 2 3`
-assert(v[1] == 1)
-assert(v[3] == 3)
-
-trades := dialect.eval("q", "flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)")
-leader := q.sql(trades, "select qty:sum qty, avg_px:avg px by sym from trades order by qty desc")
-assert(leader[1].sym == "AAPL")
-assert(leader[1].qty == 18)
-assert(leader[1].avg_px == 100.375)
-```
-
-### Interpolation
-
-q tagged strings and raw q blocks use the generic dialect interpolation boundary
-with a q-aware encoder for `${expr}` values. Literal q source remains raw q
-text. Interpolated values are either encoded inline as q source fragments or
-bound into the q environment when preserving runtime shape is required.
-
-Stable q interpolation encodings are:
-
-| Leia value | q representation |
-|---|---|
-| Integer or float | Numeric literal. |
-| Boolean | `1b` or `0b`. |
-| String | q string literal with escapes. |
-| `nil` | `0N`. |
-| Dense sequential list/table | Space-separated q list, recursively encoded. |
-| Dense array | Space-separated q list. |
-| Dense matrix or linalg matrix | Bound q matrix value. |
-| Frame or keyed frame | Bound q table value. |
-| String-keyed dictionary | Bound q dictionary value. |
-
-Non-sequential tables are not implicitly stringified for q interpolation.
-Implementations must reject them with a diagnostic instead of emitting pointer
-text such as `table: ...`.
-
-```leia
-a := [1,2,3,4,5,6,7,8,6]
-x := q`sum ${a}`
-assert(x == 42)
-
-name := "abc"
-n := q`count ${name}`
-assert(n == 3)
-
-flag := true
-choice := q`$[${flag};10;20]`
-assert(choice == 10)
-
-m := mat([[1.0, 2.0], [3.0, 4.0]])
-matrix_sum := q`+/raze ${m}`
-assert(matrix_sum == 10)
-
-rows := data.frame({x: data.i64([1, 2, 3])})
-frame_sum := q {
-sum ${rows}.x
-}
-assert(frame_sum == 6)
-```
-
-### qSQL
-
-qSQL is part of the q dialect, not a separate language runtime. qSQL forms
-lower to query plans over frame-like values. The implementation may execute a
-plan with interpreter helpers, typed runtime kernels, cached shape plans, or JIT
-handoff, but the visible result must be the same for supported shapes.
-
-Stable qSQL behavior includes:
-
-- `select` projections over table columns;
-- `where` filters and typed comparison masks;
-- aggregate projections such as `sum`, `avg`, `min`, `max`, and `count`;
-- `by` grouping for supported key and expression shapes;
-- ordering and limiting for supported table values;
-- update and delete forms covered by conformance tests;
-- joins, as-of joins, and keyed operations covered by conformance tests.
-
-qSQL may also be invoked through standard helper APIs such as `q.sql(table,
-query)` when a Leia value already holds the input frame.
-
-### Functional Query Forms
-
-Functional query forms such as `?[t;c;b;a]` and `![t;c;b;a]` are supported when
-their operands can be represented as stable q values or parse-tree structures.
-They lower to the same internal query plan family as qSQL.
-
-Callable q values, host functions, and arbitrary Leia closures are not
-implicitly bridgeable into functional q parse trees. Implementations must reject
-unbridgeable operands with a diagnostic instead of silently falling back to a
-different meaning.
-
-### Columnar Runtime Contract
-
-The q dialect is allowed to use specialized runtime and JIT paths. Stable
-columnar optimizations include, when implemented for a shape:
-
-- typed column loads;
-- typed comparison masks;
-- boolean mask combination;
-- `where` index extraction;
-- gather/filter operations;
-- select projection;
-- grouped aggregate kernels;
-- join and as-of join kernels;
-- schema-stable plan caching.
-
-These optimizations are not independent semantics. A typed kernel, cached plan,
-or JIT handoff must preserve:
-
-- result values and column order;
-- null and missing-value behavior;
-- error messages for unsupported stable shapes where specified;
-- resource-budget and capability behavior;
-- fallback observability for unsupported or unoptimized shapes.
-
-Fallback must be explainable. Runtime statistics should distinguish typed
-kernel hits, cache hits, JIT handoffs, and fallback reasons so unsupported paths
-can be reduced without changing q semantics.
-
-### Compatibility
-
-The q dialect follows q/kdb+ spelling where doing so serves concise analytics
-inside Leia. Full kdb+ compatibility, IPC wire compatibility, remote execution,
-and every q system command are not language goals unless a future release marks
-them stable.
-
-The q conformance matrix defines the current supported, rejected, and extended
-surfaces. Stable q features must have language tests or examples and, for hot
-paths, benchmark coverage.
-
-### Conformance
-
-Stable q behavior requires:
-
-- a row in the q conformance matrix;
-- at least one q language test or runnable example for accepted behavior;
-- an explicit rejected test for intentionally unsupported q/kdb+ spelling when
-  the parser could otherwise accept it ambiguously;
-- benchmark coverage for public hot paths such as qSQL filters, groupings,
-  joins, projections, typed comparisons, and vector/adverb pipelines;
-- release notes for user-visible compatibility changes.
-
-The q conformance matrix is descriptive of the current stable surface. It must
-not be used to justify test-specific optimizations. Runtime and JIT
-specialization must be driven by general shape recognition, type information,
-and schema-stable plans.
-
-
 ## AI Dialect Syntax
 
 Leia's AI dialect is an optional standard-library runtime exposed through
@@ -3350,7 +3115,7 @@ tagged forms for common AI workflows, yet the language core does not gain
 model-specific evaluation rules, hidden prompt state, or a privileged AI
 scheduler. Every AI dialect form must lower to ordinary runtime helpers and
 ordinary values before provider I/O occurs. This is the same extension boundary
-used by other dialects, including `q` for columnar analytics.
+used by other standard and host-defined dialects.
 
 This principle has four consequences:
 

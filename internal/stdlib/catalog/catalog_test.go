@@ -49,7 +49,7 @@ func TestRegistryLayerQueries(t *testing.T) {
 	cases := map[string][]string{
 		LayerLLM:    {"chat", "history", "llm", "loop", "msg"},
 		LayerCompat: {"bit32"},
-		LayerData:   {"array", "binary", "control", "csv", "data", "linalg", "matrix", "ode", "q", "soa", "stats", "vec"},
+		LayerData:   {"array", "binary", "control", "csv", "data", "linalg", "matrix", "ode", "soa", "stats", "vec"},
 		LayerHost:   {"db", "debug", "fs", "http", "io", "log", "net", "os", "process", "script", "serve", "testkit"},
 		LayerVendor: nil,
 	}

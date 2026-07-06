@@ -19,8 +19,8 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 	}
 	readme := string(data)
 	for _, want := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-		"q`sum ${a}`",
+		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
+		"x := sum(a)",
 		"turn {",
 		"prompt {",
 	} {
@@ -81,7 +81,7 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if snippet == "" {
 		t.Fatal("README must contain a Leia example")
 	}
-	for _, want := range []string{"a := [1,2,3,4,5,6,7,8,6]", "x := q`sum ${a}`", "turn {", "prompt {", "print(x)"} {
+	for _, want := range []string{"a := [1, 2, 3, 4, 5, 6, 7, 8, 6]", "x := sum(a)", "turn {", "prompt {", "print(x)"} {
 		if !strings.Contains(snippet, want) {
 			t.Fatalf("README Leia example missing %q:\n%s", want, snippet)
 		}
@@ -98,8 +98,8 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("README Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
-	if strings.TrimSpace(stdout.String()) != "42" {
-		t.Fatalf("README Leia example stdout = %q, want 42 fallback without host LLM provider", stdout.String())
+	if strings.TrimSpace(stdout.String()) != "42.0" {
+		t.Fatalf("README Leia example stdout = %q, want 42.0 fallback without host LLM provider", stdout.String())
 	}
 }
 
@@ -113,7 +113,7 @@ func TestDocsHomeMainLeiaExampleStaysRunnable(t *testing.T) {
 	if snippet == "" {
 		t.Fatal("docs/index.md must contain a Leia example")
 	}
-	for _, want := range []string{"trades := q```", "q.sql(", "print(leader[1].sym"} {
+	for _, want := range []string{"rows := [", "total := 0", "print(total)"} {
 		if !strings.Contains(snippet, want) {
 			t.Fatalf("docs home Leia example missing %q:\n%s", want, snippet)
 		}
@@ -130,8 +130,8 @@ func TestDocsHomeMainLeiaExampleStaysRunnable(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("docs home Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
-	if got := strings.TrimSpace(stdout.String()); got != "AAPL\t18\t100.375" {
-		t.Fatalf("docs home Leia example stdout = %q, want qSQL rollup", stdout.String())
+	if got := strings.TrimSpace(stdout.String()); got != "18" {
+		t.Fatalf("docs home Leia example stdout = %q, want core data loop result", stdout.String())
 	}
 }
 
@@ -196,8 +196,7 @@ func TestReferenceDataOrientedExamplesStayRunnable(t *testing.T) {
 	}
 	source := strings.Join(blocks, "\n\n") + `
 assert(#roundtrip == 1)
-assert(total[1].channel_id == 1)
-assert(total[1].amount == 120.0)
+assert(total == 120.0)
 assert(sum == 90.0)
 assert(soa.len(window) == 3)
 `
@@ -233,8 +232,7 @@ func TestReferenceScientificNumericExampleStaysRunnable(t *testing.T) {
 		"stats.linear_predict",
 		"stats.linear_update",
 		"dot([state.x.position, state.x.velocity]",
-		"q {",
-		"+/${state.x}",
+		"checksum := sum([state.x.position, state.x.velocity])",
 		"assert(near(checksum, state.x.position + state.x.velocity, 0.000000001))",
 	} {
 		if !strings.Contains(blocks[0], want) {
