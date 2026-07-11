@@ -1068,7 +1068,7 @@ func TestBenchSubmitGuardSkipsMixedSourcesAndLeiaOnlyLuaJIT(t *testing.T) {
 	t.Chdir(root)
 	path := writeBenchTimingPayload(t, []benchTimingFixture{
 		{Name: "numeric/matmul_dense", Current: 0.02, LuaJIT: 0.01, CurrentSource: "wall_repeat", LuaJITSource: "script_repeat"},
-		{Name: "data/q_columnar_qsql_filter_project", Current: 0.42, LuaJITStatus: "missing", CurrentSource: "script_repeat"},
+		{Name: "data/columnar_filter_project", Current: 0.42, LuaJITStatus: "missing", CurrentSource: "script_repeat"},
 	})
 	var stdout, stderr bytes.Buffer
 	code := runBenchCommand([]string{"submit-guard", path, "--ratio-threshold", "0.8"}, &stdout, &stderr)

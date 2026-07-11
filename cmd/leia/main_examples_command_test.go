@@ -118,6 +118,9 @@ func TestExamplesCommandDiscoversPackageManagedProjectEntrypoints(t *testing.T) 
 		if err != nil {
 			return err
 		}
+		if exampleUsesOptionalQExtension(filepath.ToSlash(rel) + "/main.leia") {
+			return nil
+		}
 		projectRoots = append(projectRoots, rel)
 		return nil
 	}); err != nil {
@@ -169,7 +172,11 @@ func TestExamplesCommandVerifiesPackageManagedProjects(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		moduleRoots = append(moduleRoots, filepath.ToSlash(rel))
+		moduleRoot := filepath.ToSlash(rel)
+		if exampleUsesOptionalQExtension(moduleRoot + "/main.leia") {
+			return nil
+		}
+		moduleRoots = append(moduleRoots, moduleRoot)
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -284,6 +291,9 @@ func TestExamplesCommandDirectorySelectorsCoverExampleProjects(t *testing.T) {
 			continue
 		}
 		dir := filepath.ToSlash(filepath.Join("examples", entry.Name()))
+		if !directoryHasDefaultCLIExample(filepath.Join(root, dir)) {
+			continue
+		}
 		t.Run(dir, func(t *testing.T) {
 			matches, err := selectedCLIExamples([]string{dir})
 			if err != nil {
@@ -299,6 +309,31 @@ func TestExamplesCommandDirectorySelectorsCoverExampleProjects(t *testing.T) {
 			}
 		})
 	}
+}
+
+func directoryHasDefaultCLIExample(dir string) bool {
+	hasExample := false
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || hasExample {
+			return nil
+		}
+		if d.IsDir() {
+			if d.Name() == "testdata" || d.Name() == "vendor" || strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(path) != ".leia" {
+			return nil
+		}
+		rel, relErr := filepath.Rel(filepath.Dir(playgroundExamplesRoot()), path)
+		if relErr != nil || exampleUsesOptionalQExtension(filepath.ToSlash(rel)) {
+			return nil
+		}
+		hasExample = true
+		return nil
+	})
+	return hasExample
 }
 
 func TestExamplesCommandJSONCaptureBlocksProcessOutputLeaks(t *testing.T) {

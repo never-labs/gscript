@@ -1852,6 +1852,9 @@ func playgroundRepositoryExamples(root string) ([]playgroundExample, error) {
 			relPath = path
 		}
 		rel := "examples/" + filepath.ToSlash(relPath)
+		if exampleUsesOptionalQExtension(rel) {
+			return nil
+		}
 		section := "Examples"
 		if parts := strings.Split(rel, "/"); len(parts) >= 2 {
 			section = strings.ReplaceAll(parts[1], "_", " ")

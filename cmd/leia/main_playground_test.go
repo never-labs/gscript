@@ -673,6 +673,9 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 				if err != nil {
 					return err
 				}
+				if exampleUsesOptionalQExtension(filepath.ToSlash(filepath.Join("examples", rel))) {
+					return nil
+				}
 				id := "repo-" + strings.TrimSuffix(filepath.ToSlash(rel), ".leia")
 				id = strings.ReplaceAll(id, "/", "-")
 				example, ok := byID[id]
@@ -800,7 +803,6 @@ func TestPlaygroundRepositoryCoversDocumentedExampleDirectories(t *testing.T) {
 		"api",
 		"automation",
 		"concurrency",
-		"data",
 		"data_processing",
 		"database",
 		"dialects",

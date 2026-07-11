@@ -156,8 +156,7 @@ func (s editorSmoke) checkTextMate() error {
 		{"meta.import.group.leia", "import (\n  \"regexp\"\n  fs \"fs\"\n)"},
 		{"meta.dialect.tagged-string.leia", "rows := csv`a,b\\n1,2\\n`"},
 		{"meta.dialect.tagged-string.leia", "rows := csv!`a,b\\n1,2\\n`"},
-		{"meta.dialect.q.tagged-string.leia", "rows := q`select avg price by sym from trades`"},
-		{"meta.dialect.q.tagged-string.leia", "rows := qsql`select avg price by sym from trades`"},
+		{"meta.dialect.tagged-string.leia", "rows := custom`domain source`"},
 		{"meta.dialect.shell.tagged-string.leia", "out := $`printf ok`"},
 		{"meta.dialect.shell.tagged-string.leia", "out := $!`printf ok`"},
 		{"meta.dialect.tagged-block.leia", `prompt! { role: "system" }`},
@@ -187,10 +186,6 @@ func (s editorSmoke) checkTextMate() error {
 		{"entity.name.namespace.import.leia", `import p "path"`},
 		{"entity.name.tag.dialect.leia", "rows := csv`a,b\\n1,2\\n`"},
 		{"keyword.operator.raw.dialect.leia", "rows := csv!`a,b\\n1,2\\n`"},
-		{"entity.name.tag.dialect.q.leia", "rows := q`select avg price by sym from trades`"},
-		{"keyword.control.qsql.q.leia", "rows := q`select avg price by sym from trades`"},
-		{"support.function.q.leia", "rows := q`select avg price by sym from trades`"},
-		{"constant.other.symbol.q.leia", "rows := q`flip `sym`price!(`AAPL;100.5)`"},
 		{"entity.name.tag.shell.leia", "out := $`printf ok`"},
 		{"keyword.operator.raw.dialect.leia", "out := $!`printf ok`"},
 	} {
@@ -200,6 +195,17 @@ func (s editorSmoke) checkTextMate() error {
 	}
 	if hasEditorPattern(leia, "keyword.control.ai.leia") {
 		return errors.New("Leia TextMate grammar still exposes old AI dialect keyword scope")
+	}
+	for _, removed := range []string{
+		"meta.dialect.q.tagged-string.leia",
+		"entity.name.tag.dialect.q.leia",
+		"keyword.control.qsql.q.leia",
+		"support.function.q.leia",
+		"constant.other.symbol.q.leia",
+	} {
+		if hasEditorPattern(leia, removed) {
+			return fmt.Errorf("Leia TextMate grammar still exposes q-specific scope %s", removed)
+		}
 	}
 	for _, unsupported := range []string{"i8", "i16", "u8", "u16", "u32", "u64"} {
 		if err := assertEditorPatternNoMatch(leia, "support.type.primitive.leia", fmt.Sprintf("ids := [3]%s{1, 2, 3}", unsupported)); err != nil {

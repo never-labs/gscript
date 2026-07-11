@@ -8,14 +8,14 @@ title: Scientific Numeric Runtime
 Leia's scientific stack is built as a small set of reusable runtime layers. The
 goal is not to add one-off helpers for Kalman filters, particle filters, or
 control demos. Those programs should fall out of the same typed numeric,
-columnar, and dialect infrastructure used by ordinary Leia, q analytics, and
-host embeddings.
+columnar, and dialect infrastructure used by ordinary Leia programs, reusable
+standard-library modules, and host embeddings.
 
 ## Goals
 
 - Keep Leia's core language small and Go-shaped.
 - Treat dense numeric data as runtime values, not ad hoc tables.
-- Route Leia, q, and domain libraries through the same typed kernels.
+- Route Leia expressions and domain libraries through the same typed kernels.
 - Make fallback paths observable and removable.
 - Keep domain power in reusable stdlib modules and dialects.
 - Let examples double as conformance and performance regression tests.
@@ -29,7 +29,7 @@ base representation for scientific data:
 
 - `DenseArray[f64|i64|bool|string]` for vectors, masks, and typed columns.
 - `DenseMatrix[f64]` for dense numeric matrices with contiguous backing.
-- SoA frames for qSQL and columnar analytics.
+- SoA frames for columnar analytics.
 - Views are preferred over copies when a future operation can preserve aliasing
   safely.
 
@@ -51,8 +51,8 @@ to a future native/BLAS backend. All routes must preserve VM/runtime semantics.
 
 ### 3. Pipeline IR
 
-Leia expressions, q expressions, and domain helpers should lower to a shared
-pipeline shape before execution:
+Leia expressions and domain helpers should lower to a shared pipeline shape
+before execution:
 
 - `VectorPipeline`
 - `MatrixPipeline`
@@ -79,7 +79,6 @@ The public API is layered by domain:
 - `stats`: reductions, normalization, cumulative sums, resampling helpers;
 - `ode`: reusable integrators such as RK4;
 - `control`: control-system helpers such as saturation, angle wrapping, LQR;
-- `q`: q-style vector and columnar analytics, backed by the same kernels;
 - `plot`: future artifact-producing visualization module.
 
 Domain modules are facades over typed runtime values and kernels. They must not
@@ -93,36 +92,17 @@ The compatibility rule for the first implementation is:
 - legacy table metadata shapes are accepted as adapter inputs, not used as the
   primary storage format;
 - vector hot paths return typed dense arrays and matrix hot paths return
-  DenseMatrix-compatible values, so MethodJIT, q, and `matrix` can share the
+  DenseMatrix-compatible values, so MethodJIT and numeric modules can share the
   same backing data.
 
 The next cleanup step is to lower dense linalg operations through shared
-kernel descriptors so q, Leia, and future JIT routes can observe the same
-fallback and hit-rate diagnostics.
+kernel descriptors so Leia and future JIT routes can observe the same fallback
+and hit-rate diagnostics.
 
-### 5. q Integration
+### 5. JIT Integration
 
-q keeps its parser and semantics, but q runtime execution should call the same
-typed backend:
-
-- q vector verbs map to vector kernels;
-- q matrix verbs map to linalg kernels;
-- qSQL maps to frame pipelines;
-- tagged q interpolation converts Leia values to typed q values without string
-  re-parsing when possible.
-- q raw source blocks support top-level newline statement separators, so
-  multi-line q algorithms can be written as `q { ... }` instead of quoted
-  source strings.
-- q raw source blocks and q tagged strings share `${...}` interpolation and
-  Leia-to-q literal encoding for scalars, lists, and dense arrays.
-
-Leia-to-q bridges must support dense arrays, dense matrices, frames, ordinary
-lists, scalars, strings, booleans, and nil values.
-
-### 6. JIT Integration
-
-MethodJIT should recognize the shared pipeline IR rather than many q-specific
-special cases. The first supported routes are:
+MethodJIT should recognize the shared pipeline IR rather than many helper-
+specific special cases. The first supported routes are:
 
 - scalar numeric loops;
 - vector elementwise pipelines;
@@ -144,7 +124,7 @@ The scientific examples are acceptance tests:
 Each example must:
 
 - execute as ordinary Leia source;
-- use generic `linalg`, `stats`, `ode`, `control`, `q`, and `math` APIs;
+- use generic `linalg`, `stats`, `ode`, `control`, and `math` APIs;
 - print deterministic summary values;
 - avoid example-specific native helpers;
 - remain small enough to demonstrate the product direction.
@@ -168,8 +148,8 @@ same acceptance checks in the default and bytecode VM modes.
 
 The current standard-library surface intentionally favors computation
 primitives over whole-algorithm helpers. Scientific examples should stay close
-to a bare implementation: syntax, symbols, q blocks, and typed numeric
-primitives make the code concise, while the algorithm remains visible in Leia
+to a bare implementation: syntax, concise function calls, and typed numeric
+primitives make the code compact, while the algorithm remains visible in Leia
 source.
 
 - `math.near` for tolerance checks.

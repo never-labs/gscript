@@ -288,7 +288,7 @@ assert(iffoo == 7)
 func := "reserved"
 ```
 
-Dialect words such as `q`, `model`, `tool`, `turn`, `agent`, and `evaluate`
+Dialect words such as `model`, `tool`, `turn`, `agent`, and `evaluate`
 are contextual syntax words, not lexical keywords. They scan as identifiers
 outside grammar positions that assign them dialect meaning.
 
@@ -377,12 +377,13 @@ Backtick raw strings use Go raw-string behavior: they preserve their contents
 and do not process escapes or interpolation.
 
 The same raw delimiter syntax is also used by tagged dialect expressions. For
-example, a q dialect expression places the raw body immediately after `q`, and a
-shell dialect expression places the raw body immediately after `$`. Tagged raw
-bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both
-tagged forms may contain `${expr}` interpolation tokens that are evaluated by
-Leia and encoded according to the dialect contract. The fenced form is for
-embedded DSL source that contains single backticks or spans multiple lines.
+example, a shell dialect expression places the raw body immediately after `$`,
+and host-defined tags place their raw body immediately after the tag name.
+Tagged raw bodies may use one backtick delimiter or a fenced three-backtick
+delimiter. Both tagged forms may contain `${expr}` interpolation tokens that are
+evaluated by Leia and encoded according to the dialect contract. The fenced form
+is for embedded DSL source that contains single backticks or spans multiple
+lines.
 
 ```ebnf
 double_quoted_string = '"' { any_char_except_quote_newline_dollar_backslash
@@ -3058,7 +3059,7 @@ Registration defines:
 - whether bang fail-fast behavior is supported.
 
 Source syntax alone does not import or enable a dialect. A source tag such as
-`q`, `json`, `sh`, `turn`, or `agent` selects a registered implementation; if no
+`json`, `sh`, `turn`, or `agent` selects a registered implementation; if no
 implementation is installed, evaluation fails.
 
 ### Standard Dialect Families
@@ -4296,9 +4297,9 @@ source should prefer the alias-first form.
 
 Leia's module system is designed for Go embedding: scripts can name explicit
 host bindings, but the host owns registration, capability checks, sandboxing,
-and lifetime. Tagged dialects follow the same rule. A source tag such as `q`,
-`sh`, or `turn` selects a registered dialect implementation; it does not import
-ambient packages, grant host access, or create a private runtime.
+and lifetime. Tagged dialects follow the same rule. A source tag such as `sh`,
+`json`, or `turn` selects a registered dialect implementation; it does not
+import ambient packages, grant host access, or create a private runtime.
 
 The following declaration is host-only syntax, not a runnable local spec
 example:
@@ -4792,7 +4793,7 @@ specific architecture test and spec update authorize the dependency.
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Dialect tags such as q, sh, json, re, prompt, AI workflow tags, and
+   Dialect tags such as sh, json, re, prompt, AI workflow tags, and
    user-defined names are ordinary identifiers until they appear directly
    before a tagged string or tagged block.
 *)
@@ -4889,7 +4890,6 @@ primary        = identifier
                | func_lit
                | tagged_string
                | tagged_block
-               | q_raw_block
                | table_lit
                | list_lit
                | dense_lit ;
@@ -4897,9 +4897,6 @@ primary        = identifier
 func_lit       = "func" param_list block ;
 tagged_string  = ( identifier | "$" ) [ "!" ] tagged_raw_string_lit ;
 tagged_block   = identifier [ "!" ] config_block ;
-q_raw_block    = "q" [ "!" ] raw_source_block ;
-raw_source_block
-               = "{" raw_source_body "}" ;
 
 config_block   = "{" [ config_field { field_sep config_field } [ field_sep ] ] "}" ;
 config_field   = identifier ":" expr

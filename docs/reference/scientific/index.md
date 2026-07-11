@@ -7,7 +7,7 @@ title: Scientific Numeric Programming
 
 Leia keeps scientific code in ordinary Leia source. Numeric modules expose
 small reusable primitives over typed vectors, matrices, sample sets, state
-models, and q-compatible values; whole algorithms stay visible in user code.
+models, and columnar data values; whole algorithms stay visible in user code.
 
 ## Default Numeric Imports
 

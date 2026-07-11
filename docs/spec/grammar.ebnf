@@ -2,7 +2,7 @@
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Dialect tags such as q, sh, json, re, prompt, AI workflow tags, and
+   Dialect tags such as sh, json, re, prompt, AI workflow tags, and
    user-defined names are ordinary identifiers until they appear directly
    before a tagged string or tagged block.
 *)
@@ -99,7 +99,6 @@ primary        = identifier
                | func_lit
                | tagged_string
                | tagged_block
-               | q_raw_block
                | table_lit
                | list_lit
                | dense_lit ;
@@ -107,9 +106,6 @@ primary        = identifier
 func_lit       = "func" param_list block ;
 tagged_string  = ( identifier | "$" ) [ "!" ] tagged_raw_string_lit ;
 tagged_block   = identifier [ "!" ] config_block ;
-q_raw_block    = "q" [ "!" ] raw_source_block ;
-raw_source_block
-               = "{" raw_source_body "}" ;
 
 config_block   = "{" [ config_field { field_sep config_field } [ field_sep ] ] "}" ;
 config_field   = identifier ":" expr

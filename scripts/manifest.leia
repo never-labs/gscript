@@ -8,26 +8,6 @@ BENCHMARK_DOMAINS := [
     "numeric", "recursion", "table", "calls", "string",
     "concurrency", "data", "app", "control", "precision",
 ]
-Q_CASE_TYPES := {conformance: true, perf: true, smoke: true}
-Q_FEATURE_STATUSES := {supported: true, rejected: true, planned: true}
-Q_COVERAGE_KINDS := ["tests", "examples", "benchmarks"]
-Q_CORE_REQUIRED_FEATURES := {
-    adverbs: true, asof: true, join: true, keyed: true, mutation: true,
-    qsql: true, ["runtime-kernel"]: true, temporal: true, ["typed-null"]: true,
-    window: true,
-}
-Q_CORE_EXCLUDED_FEATURES := {
-    ipc: true, persistence: true, serialization: true, session: true,
-    ["session-workspace"]: true, ["storage-path"]: true, workspace: true,
-}
-Q_EXTENDED_TEST_MARKERS := {
-    q_boundaries_and_gap_closures_project: true,
-    q_columnar_partitioned_store_project: true,
-    q_ipc_codec_boundaries_project: true,
-    q_session_workspace_project: true,
-    q_workspace_session_project_example: true,
-}
-
 entryFile := process.entry().file
 entryAbs, entryAbsErr := path.abs(entryFile)
 if entryAbsErr != nil {
@@ -221,64 +201,11 @@ func iter_leia_cases(rootName) {
     return paths
 }
 
-func is_q_benchmark_path(absPath) {
-    rel := repo_rel(absPath)
-    name := path.base(absPath)
-    return starts_with(rel, "benchmarks/data/") &&
-        (starts_with(name, "q_") || starts_with(name, "qsql_") || starts_with(name, "frame_qsql_"))
-}
-
-func is_q_example_path(absPath) {
-    rel := split_path(repo_rel(absPath))
-    if #rel < 3 || rel[1] != "examples" || rel[2] != "data" { return false }
-    name := path.base(absPath)
-    if starts_with(name, "q_") || starts_with(name, "qsql_") { return true }
-    for i := 3; i <= #rel - 1; i++ {
-        part := rel[i]
-        if starts_with(part, "q_") || starts_with(part, "qsql_") || starts_with(part, "db_q_") {
-            return true
-        }
-    }
-    return false
-}
-
 func glob_sorted(pattern) {
     matches, err := fs.glob(pattern)
     if err != nil { return [] }
     table.sort(matches)
     return matches
-}
-
-func discover_q_benchmarks() {
-    base := path.join(ROOT, "benchmarks", "data")
-    out := []
-    if !fs.exists(base) { return out }
-    for _, p := range ipairs(glob_sorted(path.join(base, "*.leia"))) {
-        if is_q_benchmark_path(p) { append(out, p) }
-    }
-    return out
-}
-
-func discover_q_examples() {
-    base := path.join(ROOT, "examples", "data")
-    out := []
-    if !fs.exists(base) { return out }
-    all := []
-    walk_leia(base, all)
-    for _, p := range ipairs(all) {
-        if is_q_example_path(p) { append(out, p) }
-    }
-    table.sort(out)
-    return out
-}
-
-func discover_q_tests() {
-    base := path.join(ROOT, "tests", "language")
-    set := {}
-    for _, p := range ipairs(glob_sorted(path.join(base, "q_*.leia"))) { set[p] = true }
-    for _, p := range ipairs(glob_sorted(path.join(base, "qsql_*.leia"))) { set[p] = true }
-    out := sorted_values_from_set(set)
-    return out
 }
 
 func read_json_file(relPath) {
@@ -287,54 +214,6 @@ func read_json_file(relPath) {
     data, jsonErr := json.decode(text)
     if jsonErr != nil { return nil, tostring(jsonErr) }
     return data, nil
-}
-
-func load_q_sidecar_abs(absPath) {
-    errors := []
-    if !fs.exists(absPath) {
-        return [], [repo_rel(absPath) .. " is missing"]
-    }
-    text, readErr := fs.readfile(absPath)
-    if readErr != nil { return [], [repo_rel(absPath) .. ": " .. tostring(readErr)] }
-    data, jsonErr := json.decode(text)
-    if jsonErr != nil { return [], [repo_rel(absPath) .. ": invalid JSON: " .. tostring(jsonErr)] }
-    cases := data.cases
-    if type(cases) != "table" {
-        return [], [repo_rel(absPath) .. ": missing cases array"]
-    }
-    out := []
-    for i, c := range ipairs(cases) {
-        if type(c) != "table" {
-            append(errors, string.format("%s: cases[%d] is not an object", repo_rel(absPath), i - 1))
-        } else {
-            append(out, c)
-        }
-    }
-    return out, errors
-}
-
-func q_feature_matrix_abs(absPath) {
-    if !fs.exists(absPath) {
-        return [], [repo_rel(absPath) .. " is missing"]
-    }
-    text, readErr := fs.readfile(absPath)
-    if readErr != nil { return [], [repo_rel(absPath) .. ": " .. tostring(readErr)] }
-    data, jsonErr := json.decode(text)
-    if jsonErr != nil { return [], [repo_rel(absPath) .. ": invalid JSON: " .. tostring(jsonErr)] }
-    matrix := data.feature_matrix
-    if type(matrix) != "table" {
-        return [], [repo_rel(absPath) .. ": missing feature_matrix array"]
-    }
-    out := []
-    errors := []
-    for i, feature := range ipairs(matrix) {
-        if type(feature) != "table" {
-            append(errors, string.format("%s: feature_matrix[%d] is not an object", repo_rel(absPath), i - 1))
-        } else {
-            append(out, feature)
-        }
-    }
-    return out, errors
 }
 
 func discover_cases(rootName) {
@@ -535,264 +414,6 @@ func validate_manifest(rootName) {
     return errors
 }
 
-func validate_q_sidecar(sidecarRel, expectedPaths) {
-    sidecarPath := path.join(ROOT, sidecarRel)
-    errors := []
-    cases, loadErrors := load_q_sidecar_abs(sidecarPath)
-    for _, e := range ipairs(loadErrors) { append(errors, e) }
-    expectedRel := {}
-    for _, p := range ipairs(expectedPaths) { expectedRel[repo_rel(p)] = true }
-    byPath := {}
-    ids := {}
-    for i, c := range ipairs(cases) {
-        idv := c.id
-        pathv := c.path
-        if type(idv) != "string" || idv == "" {
-            append(errors, string.format("%s: cases[%d] has missing or non-string id", sidecarRel, i - 1))
-        } elseif ids[idv] {
-            append(errors, sidecarRel .. ": duplicate case id " .. idv)
-        } else {
-            ids[idv] = true
-        }
-        if type(pathv) != "string" {
-            append(errors, string.format("%s: cases[%d] has missing or non-string path", sidecarRel, i - 1))
-        } else {
-            if byPath[pathv] != nil { append(errors, sidecarRel .. ": duplicate case path " .. pathv) }
-            byPath[pathv] = c
-            if !fs.exists(path.join(ROOT, pathv)) { append(errors, sidecarRel .. ": listed q case does not exist: " .. pathv) }
-            if type(c.types) != "table" || #c.types == 0 {
-                append(errors, sidecarRel .. ": " .. pathv .. " has missing or invalid types")
-            } else {
-                unknown := []
-                for _, t := range ipairs(c.types) {
-                    if type(t) != "string" || !Q_CASE_TYPES[t] { append(unknown, tostring(t)) }
-                }
-                table.sort(unknown)
-                if #unknown > 0 { append(errors, sidecarRel .. ": " .. pathv .. " has unknown types: " .. table.concat(unknown, ", ")) }
-            }
-            scope := c.gate_scope
-            if scope == nil { scope = "core" }
-            if scope != "core" && scope != "extended" {
-                append(errors, sidecarRel .. ": " .. pathv .. " has invalid gate_scope " .. tostring(scope))
-            }
-            if type(c.features) != "table" || #c.features == 0 {
-                append(errors, sidecarRel .. ": " .. pathv .. " has missing or invalid features")
-            }
-        }
-    }
-    missing := []
-    extra := []
-    for p, _ := range pairs(expectedRel) { if byPath[p] == nil { append(missing, p) } }
-    for p, _ := range pairs(byPath) { if !expectedRel[p] { append(extra, p) } }
-    table.sort(missing)
-    table.sort(extra)
-    if #missing > 0 { append(errors, sidecarRel .. ": missing q cases: " .. table.concat(missing, ", ")) }
-    if #extra > 0 { append(errors, sidecarRel .. ": extra q cases: " .. table.concat(extra, ", ")) }
-    return errors
-}
-
-func q_sidecar_path(kind) {
-    if kind == "examples" { return "examples/data/q-cases.json" }
-    if kind == "benchmarks" { return "benchmarks/data/q-cases.json" }
-    return nil
-}
-
-func q_path_gate_scope(kind, p) {
-    if kind == "tests" {
-        stem := trim_suffix(path.base(p), path.ext(p))
-        if Q_EXTENDED_TEST_MARKERS[stem] { return "extended" }
-        return "core"
-    }
-    sidecar := q_sidecar_path(kind)
-    if sidecar == nil || !fs.exists(path.join(ROOT, sidecar)) { return "core" }
-    cases, _ := load_q_sidecar_abs(path.join(ROOT, sidecar))
-    for _, c := range ipairs(cases) {
-        if c.path == p {
-            if c.gate_scope == "extended" { return "extended" }
-            return "core"
-        }
-    }
-    return "core"
-}
-
-func valid_q_coverage_paths() {
-    out := {tests: {}, examples: {}, benchmarks: {}}
-    for _, p := range ipairs(discover_q_tests()) { out.tests[repo_rel(p)] = true }
-    for _, p := range ipairs(discover_q_examples()) { out.examples[repo_rel(p)] = true }
-    for _, p := range ipairs(discover_q_benchmarks()) { out.benchmarks[repo_rel(p)] = true }
-    return out
-}
-
-func validate_q_feature_matrix(sidecarRel) {
-    sidecarPath := path.join(ROOT, sidecarRel)
-    errors := []
-    matrix, matrixErrors := q_feature_matrix_abs(sidecarPath)
-    for _, e := range ipairs(matrixErrors) { append(errors, e) }
-    validPaths := valid_q_coverage_paths()
-    knownFeatures := {}
-    coveredPaths := {tests: {}, examples: {}, benchmarks: {}}
-    rowsByFeature := {}
-
-    for i, feature := range ipairs(matrix) {
-        featureID := feature.id
-        if type(featureID) != "string" || featureID == "" {
-            append(errors, string.format("%s: feature_matrix[%d] has missing or non-string id", sidecarRel, i - 1))
-        } else {
-            if knownFeatures[featureID] { append(errors, sidecarRel .. ": duplicate q feature id " .. featureID) }
-            knownFeatures[featureID] = true
-            rowsByFeature[featureID] = feature
-            if !Q_FEATURE_STATUSES[feature.status] { append(errors, sidecarRel .. ": " .. featureID .. " has invalid status " .. tostring(feature.status)) }
-            scope := feature.gate_scope
-            if scope == nil { scope = "core" }
-            if scope != "core" && scope != "extended" { append(errors, sidecarRel .. ": " .. featureID .. " has invalid gate_scope " .. tostring(scope)) }
-            if scope == "core" && Q_CORE_EXCLUDED_FEATURES[featureID] { append(errors, sidecarRel .. ": " .. featureID .. " must be extended, not core") }
-            coverage := feature.coverage
-            if type(coverage) != "table" {
-                append(errors, sidecarRel .. ": " .. featureID .. " has missing coverage object")
-                coverage = {}
-            }
-            coveredAny := false
-            for _, kind := range ipairs(Q_COVERAGE_KINDS) {
-                paths := coverage[kind]
-                if paths == nil { paths = [] }
-                if type(paths) != "table" {
-                    append(errors, sidecarRel .. ": " .. featureID .. " coverage." .. kind .. " must be a string array")
-                } else {
-                    seen := {}
-                    for _, cp := range ipairs(paths) {
-                        if type(cp) != "string" {
-                            append(errors, sidecarRel .. ": " .. featureID .. " coverage." .. kind .. " must be a string array")
-                        } else {
-                            coveredAny = true
-                            coveredPaths[kind][cp] = true
-                            if seen[cp] { append(errors, sidecarRel .. ": " .. featureID .. " coverage." .. kind .. " has duplicate paths") }
-                            seen[cp] = true
-                            if !validPaths[kind][cp] { append(errors, sidecarRel .. ": " .. featureID .. " coverage." .. kind .. " references unknown q case " .. cp) }
-                        }
-                    }
-                }
-            }
-            tests := coverage.tests
-            if tests == nil { tests = [] }
-            if (feature.status == "supported" || feature.status == "rejected") && (#tests == 0) {
-                append(errors, sidecarRel .. ": " .. featureID .. " status " .. tostring(feature.status) .. " requires at least one q language test")
-            }
-            if feature.status == "supported" && !coveredAny {
-                append(errors, sidecarRel .. ": " .. featureID .. " status supported requires coverage")
-            }
-            if feature.status == "supported" && scope == "core" {
-                ok := false
-                for _, tp := range ipairs(tests) {
-                    if type(tp) == "string" && q_path_gate_scope("tests", tp) == "core" { ok = true }
-                }
-                if !ok { append(errors, sidecarRel .. ": " .. featureID .. " core supported feature requires at least one core q language test") }
-            }
-        }
-    }
-
-    for _, featureID := range ipairs(sorted_values_from_set(Q_CORE_REQUIRED_FEATURES)) {
-        feature := rowsByFeature[featureID]
-        if feature == nil {
-            append(errors, sidecarRel .. ": missing required core q feature " .. featureID)
-        } else {
-            if feature.status != "supported" { append(errors, sidecarRel .. ": required core q feature " .. featureID .. " must be supported") }
-            scope := feature.gate_scope
-            if scope == nil { scope = "core" }
-            if scope != "core" { append(errors, sidecarRel .. ": required core q feature " .. featureID .. " must have core gate_scope") }
-        }
-    }
-    for _, kind := range ipairs(Q_COVERAGE_KINDS) {
-        for p, _ := range pairs(validPaths[kind]) {
-            if !coveredPaths[kind][p] {
-                append(errors, sidecarRel .. ": q " .. kind .. " case is not classified in feature_matrix coverage: " .. p)
-            }
-        }
-    }
-
-    for _, sidecar := range ipairs([sidecarRel, "benchmarks/data/q-cases.json"]) {
-        cases, loadErrors := load_q_sidecar_abs(path.join(ROOT, sidecar))
-        for _, e := range ipairs(loadErrors) { append(errors, e) }
-        kind := "benchmarks"
-        if sidecar == "examples/data/q-cases.json" { kind = "examples" }
-        for _, c := range ipairs(cases) {
-            p := c.path
-            if p == nil { p = "<unknown>" }
-            features := c.features
-            if type(features) == "table" {
-                scope := c.gate_scope
-                if scope == nil { scope = "core" }
-                if scope == "core" {
-                    for _, fid := range ipairs(features) {
-                        if Q_CORE_EXCLUDED_FEATURES[fid] { append(errors, sidecar .. ": core q case " .. p .. " must not include extended feature " .. fid) }
-                    }
-                }
-                for _, fid := range ipairs(features) {
-                    if type(fid) == "string" {
-                        row := rowsByFeature[fid]
-                        if row == nil {
-                            append(errors, sidecar .. ": " .. p .. " references unknown q feature " .. fid)
-                        } else {
-                            coverage := row.coverage
-                            paths := []
-                            if type(coverage) == "table" && type(coverage[kind]) == "table" { paths = coverage[kind] }
-                            if !list_has(paths, p) { append(errors, sidecarRel .. ": " .. fid .. " coverage." .. kind .. " is missing " .. p) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    table.sort(errors)
-    return errors
-}
-
-func validate_q_coverage(roots) {
-    if roots == nil { roots = {tests: true, benchmarks: true} }
-    errors := []
-    if roots.tests {
-        testsManifest, err := load_manifest("tests")
-        if err != nil {
-            append(errors, "tests/manifest.json: " .. err)
-        } else {
-            testsByPath := {}
-            for _, c := range ipairs(testsManifest.cases) { testsByPath[c.path] = c }
-            for _, p := range ipairs(discover_q_tests()) {
-                rel := repo_rel(p)
-                c := testsByPath[rel]
-                if c == nil {
-                    append(errors, "tests/manifest.json: missing q language case " .. rel)
-                } elseif c.domain != "language" || !list_has(c.tags, "conformance") {
-                    append(errors, "tests/manifest.json: q language case " .. rel .. " is not tagged language conformance")
-                }
-            }
-        }
-    }
-    if roots.benchmarks {
-        bm, err := load_manifest("benchmarks")
-        if err != nil {
-            append(errors, "benchmarks/manifest.json: " .. err)
-        } else {
-            cases := {}
-            workloads := {}
-            for _, c := range ipairs(bm.cases) { cases[c.path] = c }
-            for _, row := range ipairs(bm.workloads) { workloads[row.script] = row }
-            qbs := discover_q_benchmarks()
-            for _, p := range ipairs(qbs) {
-                rel := repo_rel(p)
-                if cases[rel] == nil { append(errors, "benchmarks/manifest.json: missing q benchmark case " .. rel) }
-                if workloads[rel] == nil { append(errors, "benchmarks/manifest.json: missing q benchmark workload " .. rel) }
-            }
-            for _, e := range ipairs(validate_q_sidecar("benchmarks/data/q-cases.json", qbs)) { append(errors, e) }
-        }
-    }
-    if roots.tests && roots.benchmarks {
-        for _, e := range ipairs(validate_q_sidecar("examples/data/q-cases.json", discover_q_examples())) { append(errors, e) }
-        for _, e := range ipairs(validate_q_feature_matrix("examples/data/q-cases.json")) { append(errors, e) }
-    }
-    table.sort(errors)
-    return errors
-}
-
 func json_quote(s) {
     return json.encode(s)
 }
@@ -918,13 +539,10 @@ if command != "check" {
 
 if #roots == 0 { roots = ["tests", "benchmarks"] }
 errors := []
-rootSet := {}
 for _, rootName := range ipairs(roots) {
     if rootName != "tests" && rootName != "benchmarks" { parser_error("check accepts only: tests, benchmarks") }
-    rootSet[rootName] = true
     for _, e := range ipairs(validate_manifest(rootName)) { append(errors, e) }
 }
-for _, e := range ipairs(validate_q_coverage(rootSet)) { append(errors, e) }
 if #errors > 0 {
     table.sort(errors)
     for _, e := range ipairs(errors) { print(e) }

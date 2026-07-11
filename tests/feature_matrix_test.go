@@ -832,7 +832,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	for _, snippet := range []string{
 		"TestReleaseMatrixToolingAuditCommandsStayRunnable",
 		"releaseToolingAuditCommands",
-		"data/q_operator_pipeline",
+		"numeric/mandelbrot",
 		"--runs",
 	} {
 		if !strings.Contains(toolingGate, snippet) {

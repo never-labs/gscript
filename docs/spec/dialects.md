@@ -111,7 +111,7 @@ Registration defines:
 - whether bang fail-fast behavior is supported.
 
 Source syntax alone does not import or enable a dialect. A source tag such as
-`q`, `json`, `sh`, `turn`, or `agent` selects a registered implementation; if no
+`json`, `sh`, `turn`, or `agent` selects a registered implementation; if no
 implementation is installed, evaluation fails.
 
 ## Standard Dialect Families

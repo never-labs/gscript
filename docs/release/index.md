@@ -49,10 +49,9 @@ gates from optional local checks without scraping command text.
 
 `leia ci release` delegates to the same production release profile. That
 profile is the release validation source of truth: correctness, documentation,
-performance, q conformance, language conformance, public blockers,
-distribution configuration, and local artifact installation evidence are all
-listed there. Documentation evidence is produced by `leia doc check --json`
-inside that profile.
+performance, language conformance, public blockers, distribution configuration,
+and local artifact installation evidence are all listed there. Documentation
+evidence is produced by `leia doc check --json` inside that profile.
 
 The release evidence should cite:
 

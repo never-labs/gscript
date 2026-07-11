@@ -252,7 +252,7 @@ iffoo <span class="tok-operator">:=</span> <span class="tok-number">7</span>
 <span class="tok-builtin">assert</span>(returning <span class="tok-operator">==</span> <span class="tok-constant">true</span>)
 <span class="tok-builtin">assert</span>(iffoo <span class="tok-operator">==</span> <span class="tok-number">7</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> <span class="tok-operator">:=</span> <span class="tok-string">&#34;reserved&#34;</span></code></pre>
-<p>Dialect words such as <code>q</code>, <code>model</code>, <code>tool</code>, <code>turn</code>, <code>agent</code>, and <code>evaluate</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them dialect meaning.</p>
+<p>Dialect words such as <code>model</code>, <code>tool</code>, <code>turn</code>, <code>agent</code>, and <code>evaluate</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them dialect meaning.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">agent <span class="tok-operator">:=</span> <span class="tok-string">&#34;identifier&#34;</span>
 tool <span class="tok-operator">:=</span> <span class="tok-string">&#34;identifier&#34;</span>
 turn <span class="tok-operator">:=</span> <span class="tok-number">1</span>
@@ -299,7 +299,7 @@ float <span class="tok-operator">:=</span> <span class="tok-number">1.25e2</span
 <pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-number">1</span>e_2</code></pre>
 <h4 id="introduction-string-literals">String Literals</h4>
 <p>String literals have three untagged source forms. Double-quoted strings process escapes and support <code>${expr}</code> interpolation. Single-quoted strings process escapes but do not interpolate; <code>${</code> has no special meaning inside them. Backtick raw strings use Go raw-string behavior: they preserve their contents and do not process escapes or interpolation.</p>
-<p>The same raw delimiter syntax is also used by tagged dialect expressions. For example, a q dialect expression places the raw body immediately after <code>q</code>, and a shell dialect expression places the raw body immediately after <code>$</code>. Tagged raw bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both tagged forms may contain <code>${expr}</code> interpolation tokens that are evaluated by Leia and encoded according to the dialect contract. The fenced form is for embedded DSL source that contains single backticks or spans multiple lines.</p>
+<p>The same raw delimiter syntax is also used by tagged dialect expressions. For example, a shell dialect expression places the raw body immediately after <code>$</code>, and host-defined tags place their raw body immediately after the tag name. Tagged raw bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both tagged forms may contain <code>${expr}</code> interpolation tokens that are evaluated by Leia and encoded according to the dialect contract. The fenced form is for embedded DSL source that contains single backticks or spans multiple lines.</p>
 <pre class="language-ebnf"><code class="language-ebnf">double_quoted_string = &#39;&#34;&#39; { any_char_except_quote_newline_dollar_backslash
                            | escape
                            | interpolation } &#39;&#34;&#39; ;
@@ -1874,7 +1874,7 @@ profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&#34
 <li>the result and error shape;</li>
 <li>whether bang fail-fast behavior is supported.</li>
 </ul>
-<p>Source syntax alone does not import or enable a dialect. A source tag such as <code>q</code>, <code>json</code>, <code>sh</code>, <code>turn</code>, or <code>agent</code> selects a registered implementation; if no implementation is installed, evaluation fails.</p>
+<p>Source syntax alone does not import or enable a dialect. A source tag such as <code>json</code>, <code>sh</code>, <code>turn</code>, or <code>agent</code> selects a registered implementation; if no implementation is installed, evaluation fails.</p>
 <h4 id="introduction-standard-dialect-families">Standard Dialect Families</h4>
 <p>Leia&#39;s standard dialect families include:</p>
 <ul>
@@ -2376,7 +2376,7 @@ module PATH VERSION TARGET h1:BASE64_SHA256</code></pre>
 <p>The stable package-management boundary is local-first. Module paths may be GitHub-style repository paths because current tooling can cache GitHub archives, but a GitHub-looking path is still only a string in <code>leia.mod</code> until tooling or the user has placed content in a local replace, vendor directory, or module cache. Leia does not require or define a central registry for basic module use.</p>
 <h4 id="introduction-go-host-imports">Go Host Imports</h4>
 <p><code>import name &#34;go:...&#34;</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use. The compatibility spelling <code>import &#34;go:...&#34; as name</code> is also accepted, but new source should prefer the alias-first form.</p>
-<p>Leia&#39;s module system is designed for Go embedding: scripts can name explicit host bindings, but the host owns registration, capability checks, sandboxing, and lifetime. Tagged dialects follow the same rule. A source tag such as <code>q</code>, <code>sh</code>, or <code>turn</code> selects a registered dialect implementation; it does not import ambient packages, grant host access, or create a private runtime.</p>
+<p>Leia&#39;s module system is designed for Go embedding: scripts can name explicit host bindings, but the host owns registration, capability checks, sandboxing, and lifetime. Tagged dialects follow the same rule. A source tag such as <code>sh</code>, <code>json</code>, or <code>turn</code> selects a registered dialect implementation; it does not import ambient packages, grant host access, or create a private runtime.</p>
 <p>The following declaration is host-only syntax, not a runnable local spec example:</p>
 <pre class="language-text"><code class="language-text">import http &#34;go:net/http&#34;</code></pre>
 <p>The declaration above is only valid when the embedder has allowlisted and registered the <code>go:net/http</code> binding. Source syntax alone never grants host access.</p>
@@ -2609,7 +2609,7 @@ fails(<span class="tok-keyword">func</span>() { coroutine.yield() })</code></pre
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Dialect tags such as q, sh, json, re, prompt, AI workflow tags, and
+   Dialect tags such as sh, json, re, prompt, AI workflow tags, and
    user-defined names are ordinary identifiers until they appear directly
    before a tagged string or tagged block.
 *)
@@ -2706,7 +2706,6 @@ primary        = identifier
                | func_lit
                | tagged_string
                | tagged_block
-               | q_raw_block
                | table_lit
                | list_lit
                | dense_lit ;
@@ -2714,9 +2713,6 @@ primary        = identifier
 func_lit       = &#34;func&#34; param_list block ;
 tagged_string  = ( identifier | &#34;$&#34; ) [ &#34;!&#34; ] tagged_raw_string_lit ;
 tagged_block   = identifier [ &#34;!&#34; ] config_block ;
-q_raw_block    = &#34;q&#34; [ &#34;!&#34; ] raw_source_block ;
-raw_source_block
-               = &#34;{&#34; raw_source_body &#34;}&#34; ;
 
 config_block   = &#34;{&#34; [ config_field { field_sep config_field } [ field_sep ] ] &#34;}&#34; ;
 config_field   = identifier &#34;:&#34; expr
@@ -2866,7 +2862,7 @@ iffoo <span class="tok-operator">:=</span> <span class="tok-number">7</span>
 <span class="tok-builtin">assert</span>(returning <span class="tok-operator">==</span> <span class="tok-constant">true</span>)
 <span class="tok-builtin">assert</span>(iffoo <span class="tok-operator">==</span> <span class="tok-number">7</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> <span class="tok-operator">:=</span> <span class="tok-string">&#34;reserved&#34;</span></code></pre>
-<p>Dialect words such as <code>q</code>, <code>model</code>, <code>tool</code>, <code>turn</code>, <code>agent</code>, and <code>evaluate</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them dialect meaning.</p>
+<p>Dialect words such as <code>model</code>, <code>tool</code>, <code>turn</code>, <code>agent</code>, and <code>evaluate</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them dialect meaning.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">agent <span class="tok-operator">:=</span> <span class="tok-string">&#34;identifier&#34;</span>
 tool <span class="tok-operator">:=</span> <span class="tok-string">&#34;identifier&#34;</span>
 turn <span class="tok-operator">:=</span> <span class="tok-number">1</span>
@@ -2913,7 +2909,7 @@ float <span class="tok-operator">:=</span> <span class="tok-number">1.25e2</span
 <pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-number">1</span>e_2</code></pre>
 <h3 id="lexical-elements-string-literals">String Literals</h3>
 <p>String literals have three untagged source forms. Double-quoted strings process escapes and support <code>${expr}</code> interpolation. Single-quoted strings process escapes but do not interpolate; <code>${</code> has no special meaning inside them. Backtick raw strings use Go raw-string behavior: they preserve their contents and do not process escapes or interpolation.</p>
-<p>The same raw delimiter syntax is also used by tagged dialect expressions. For example, a q dialect expression places the raw body immediately after <code>q</code>, and a shell dialect expression places the raw body immediately after <code>$</code>. Tagged raw bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both tagged forms may contain <code>${expr}</code> interpolation tokens that are evaluated by Leia and encoded according to the dialect contract. The fenced form is for embedded DSL source that contains single backticks or spans multiple lines.</p>
+<p>The same raw delimiter syntax is also used by tagged dialect expressions. For example, a shell dialect expression places the raw body immediately after <code>$</code>, and host-defined tags place their raw body immediately after the tag name. Tagged raw bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both tagged forms may contain <code>${expr}</code> interpolation tokens that are evaluated by Leia and encoded according to the dialect contract. The fenced form is for embedded DSL source that contains single backticks or spans multiple lines.</p>
 <pre class="language-ebnf"><code class="language-ebnf">double_quoted_string = &#39;&#34;&#39; { any_char_except_quote_newline_dollar_backslash
                            | escape
                            | interpolation } &#39;&#34;&#39; ;
@@ -4480,7 +4476,7 @@ profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&#34
 <li>the result and error shape;</li>
 <li>whether bang fail-fast behavior is supported.</li>
 </ul>
-<p>Source syntax alone does not import or enable a dialect. A source tag such as <code>q</code>, <code>json</code>, <code>sh</code>, <code>turn</code>, or <code>agent</code> selects a registered implementation; if no implementation is installed, evaluation fails.</p>
+<p>Source syntax alone does not import or enable a dialect. A source tag such as <code>json</code>, <code>sh</code>, <code>turn</code>, or <code>agent</code> selects a registered implementation; if no implementation is installed, evaluation fails.</p>
 <h3 id="tagged-dialects-standard-dialect-families">Standard Dialect Families</h3>
 <p>Leia&#39;s standard dialect families include:</p>
 <ul>
@@ -4980,7 +4976,7 @@ module PATH VERSION TARGET h1:BASE64_SHA256</code></pre>
 <p>The stable package-management boundary is local-first. Module paths may be GitHub-style repository paths because current tooling can cache GitHub archives, but a GitHub-looking path is still only a string in <code>leia.mod</code> until tooling or the user has placed content in a local replace, vendor directory, or module cache. Leia does not require or define a central registry for basic module use.</p>
 <h3 id="modules-and-loading-go-host-imports">Go Host Imports</h3>
 <p><code>import name &#34;go:...&#34;</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use. The compatibility spelling <code>import &#34;go:...&#34; as name</code> is also accepted, but new source should prefer the alias-first form.</p>
-<p>Leia&#39;s module system is designed for Go embedding: scripts can name explicit host bindings, but the host owns registration, capability checks, sandboxing, and lifetime. Tagged dialects follow the same rule. A source tag such as <code>q</code>, <code>sh</code>, or <code>turn</code> selects a registered dialect implementation; it does not import ambient packages, grant host access, or create a private runtime.</p>
+<p>Leia&#39;s module system is designed for Go embedding: scripts can name explicit host bindings, but the host owns registration, capability checks, sandboxing, and lifetime. Tagged dialects follow the same rule. A source tag such as <code>sh</code>, <code>json</code>, or <code>turn</code> selects a registered dialect implementation; it does not import ambient packages, grant host access, or create a private runtime.</p>
 <p>The following declaration is host-only syntax, not a runnable local spec example:</p>
 <pre class="language-text"><code class="language-text">import http &#34;go:net/http&#34;</code></pre>
 <p>The declaration above is only valid when the embedder has allowlisted and registered the <code>go:net/http</code> binding. Source syntax alone never grants host access.</p>
@@ -5209,7 +5205,7 @@ fails(<span class="tok-keyword">func</span>() { coroutine.yield() })</code></pre
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Dialect tags such as q, sh, json, re, prompt, AI workflow tags, and
+   Dialect tags such as sh, json, re, prompt, AI workflow tags, and
    user-defined names are ordinary identifiers until they appear directly
    before a tagged string or tagged block.
 *)
@@ -5306,7 +5302,6 @@ primary        = identifier
                | func_lit
                | tagged_string
                | tagged_block
-               | q_raw_block
                | table_lit
                | list_lit
                | dense_lit ;
@@ -5314,9 +5309,6 @@ primary        = identifier
 func_lit       = &#34;func&#34; param_list block ;
 tagged_string  = ( identifier | &#34;$&#34; ) [ &#34;!&#34; ] tagged_raw_string_lit ;
 tagged_block   = identifier [ &#34;!&#34; ] config_block ;
-q_raw_block    = &#34;q&#34; [ &#34;!&#34; ] raw_source_block ;
-raw_source_block
-               = &#34;{&#34; raw_source_body &#34;}&#34; ;
 
 config_block   = &#34;{&#34; [ config_field { field_sep config_field } [ field_sep ] ] &#34;}&#34; ;
 config_field   = identifier &#34;:&#34; expr

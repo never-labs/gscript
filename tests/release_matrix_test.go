@@ -338,7 +338,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				ciReleaseVersionListCmd,
 				productionFullCmd,
 				"profile is the release validation source of truth",
-				"q conformance",
+				"language conformance",
 				"local artifact installation evidence",
 				releaseDistributionCmd,
 				"feature coverage records under `tests/`",
@@ -1024,7 +1024,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		},
 		{
 			category:        "benchmarks",
-			command:         "go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
+			command:         "go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
 			evidencePath:    "cmd/leia/main_bench_test.go",
 			evidenceSnippet: "TestBenchCommandDispatchesCompareHarness",
 		},
@@ -4930,7 +4930,7 @@ func releaseToolingAuditCommands() []string {
 	return []string{
 		"go run ./cmd/leia eval 'print(1 + 2 + 3)'",
 		"go run ./cmd/leia examples check examples/hello/dialects.leia",
-		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
+		"go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
 		"go run ./cmd/leia doc check",
 	}
 }

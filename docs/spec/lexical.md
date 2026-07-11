@@ -84,7 +84,7 @@ assert(iffoo == 7)
 func := "reserved"
 ```
 
-Dialect words such as `q`, `model`, `tool`, `turn`, `agent`, and `evaluate`
+Dialect words such as `model`, `tool`, `turn`, `agent`, and `evaluate`
 are contextual syntax words, not lexical keywords. They scan as identifiers
 outside grammar positions that assign them dialect meaning.
 
@@ -173,12 +173,13 @@ Backtick raw strings use Go raw-string behavior: they preserve their contents
 and do not process escapes or interpolation.
 
 The same raw delimiter syntax is also used by tagged dialect expressions. For
-example, a q dialect expression places the raw body immediately after `q`, and a
-shell dialect expression places the raw body immediately after `$`. Tagged raw
-bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both
-tagged forms may contain `${expr}` interpolation tokens that are evaluated by
-Leia and encoded according to the dialect contract. The fenced form is for
-embedded DSL source that contains single backticks or spans multiple lines.
+example, a shell dialect expression places the raw body immediately after `$`,
+and host-defined tags place their raw body immediately after the tag name.
+Tagged raw bodies may use one backtick delimiter or a fenced three-backtick
+delimiter. Both tagged forms may contain `${expr}` interpolation tokens that are
+evaluated by Leia and encoded according to the dialect contract. The fenced form
+is for embedded DSL source that contains single backticks or spans multiple
+lines.
 
 ```ebnf
 double_quoted_string = '"' { any_char_except_quote_newline_dollar_backslash
