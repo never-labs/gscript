@@ -1,3 +1,5 @@
+//go:build qextension
+
 package main
 
 import (
@@ -143,7 +145,7 @@ func runBenchQReportCommand(args []string, outw, errw io.Writer) int {
 		}
 		return 2
 	}
-	root, err := qReportRepoRoot()
+	root, err := benchRepoRoot()
 	if err != nil {
 		fmt.Fprintf(errw, "leia bench q-report: %v\n", err)
 		return 1
@@ -352,25 +354,6 @@ func qReportSeenFlags(args []string) map[string]bool {
 		seen[strings.ReplaceAll(key, "-", "_")] = true
 	}
 	return seen
-}
-
-func qReportRepoRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
-			if info, benchErr := os.Stat(filepath.Join(dir, "benchmarks")); benchErr == nil && info.IsDir() {
-				return dir, nil
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("could not find repository root from %s", dir)
-		}
-		dir = parent
-	}
 }
 
 func qReportParseGoBenchmarks(output string) map[string]qReportBenchRow {

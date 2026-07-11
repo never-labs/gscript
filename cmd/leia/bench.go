@@ -82,20 +82,7 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if mode == "regression-guard" {
 		return runBenchRegressionGuardCommand(harnessArgs, outw, errw)
 	}
-	if mode == "q-report" || mode == "report" {
-		return runBenchQReportCommand(harnessArgs, outw, errw)
-	}
-	if mode == "q-suite" {
-		return runBenchShellScript("q_performance_suite.sh", harnessArgs, outw, errw)
-	}
-	if mode == "q-columnar" {
-		return runBenchShellScript("q_columnar_suite.sh", harnessArgs, outw, errw)
-	}
-	if mode == "q-general" {
-		return runBenchShellScript("q_general_compute_suite.sh", harnessArgs, outw, errw)
-	}
-
-	fmt.Fprintf(errw, "leia bench: unknown bench mode %q (want compare, strict, diagnose, triage, q-suite, q-columnar, q-general, q-report, audit, rank-luajit-gaps, debug-artifact, gate-validate, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)\n", mode)
+	fmt.Fprintf(errw, "leia bench: unknown bench mode %q (want compare, strict, diagnose, triage, audit, rank-luajit-gaps, debug-artifact, gate-validate, coverage, profile-exits, validate-lua-refs, submit-guard, jit-addr-map, or regression-guard)\n", mode)
 	return 2
 }
 
@@ -156,7 +143,7 @@ func isBenchmarkSelector(arg string) bool {
 		return false
 	}
 	switch arg {
-	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "gate-validate", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "q-suite", "q-columnar", "q-general", "compare", "timing", "strict", "diagnose", "triage", "q-report", "report", "help":
+	case "audit", "rank-luajit-gaps", "rank-luajit", "debug-artifact", "gate-validate", "coverage", "profile-exits", "exits", "validate-lua-refs", "lua-refs", "submit-guard", "jit-addr-map", "regression-guard", "compare", "timing", "strict", "diagnose", "triage", "help":
 		return false
 	default:
 		return true
@@ -165,7 +152,7 @@ func isBenchmarkSelector(arg string) bool {
 
 func findBenchmarkScript(name string) (string, error) {
 	if name == "" {
-		return "", errors.New("usage: leia bench [--quick|--full|--guard|BENCH|compare|strict|diagnose|triage|q-report] [benchmark-harness-flags...]")
+		return "", errors.New("usage: leia bench [--quick|--full|--guard|BENCH|compare|strict|diagnose|triage] [benchmark-harness-flags...]")
 	}
 	dir, err := os.Getwd()
 	if err != nil {

@@ -16,14 +16,10 @@ Tasks:
   editor               Run editor asset checks
   language-conformance Run translated language conformance cases
   manifest-check       Check test and benchmark manifests
-  manifest-list-q      List q manifest paths by scope
   perf                 Run performance gate
   production           Run production readiness gate
   module-path          Check repository module path
   public-blockers      Check public release blocker decisions
-  q                    Run q conformance gate
-  q-baseline           Run q LuaJIT and hand-written Go baseline report
-  q-perf               Run q performance report gate
   release-artifacts    Build local release artifacts
   release-artifacts-gate
                        Run release artifact gate with release-profile defaults
@@ -80,54 +76,6 @@ run_leia_task() {
     exec leia run "$repo_root/$script" "$@"
   fi
   exec go run ./cmd/leia run "$repo_root/$script" "$@"
-}
-
-run_q_perf_task() {
-  local output_dir=""
-  local suite_args=()
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --output)
-        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
-          echo "scripts/run.sh q-perf: --output requires a directory" >&2
-          exit 2
-        fi
-        output_dir="$2"
-        shift 2
-        ;;
-      --output=*)
-        output_dir="${1#--output=}"
-        shift
-        ;;
-      -h|--help)
-        cat <<'USAGE'
-Usage: scripts/run.sh q-perf [--output DIR] [q-suite args...]
-
-Runs the q performance suite, captures its output, and checks the q performance
-report. The output directory receives output.txt, q_perf_report.json, and
-q_perf_report.md.
-USAGE
-        return
-        ;;
-      *)
-        suite_args+=("$1")
-        shift
-        ;;
-    esac
-  done
-  if [ -z "$output_dir" ]; then
-    output_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-q-perf-gate.XXXXXX")"
-  fi
-  mkdir -p "$output_dir"
-  set -o pipefail
-  LEIA_SKIP_TIMING_COMPARE="${LEIA_SKIP_TIMING_COMPARE:-1}" \
-    go run ./cmd/leia bench q-suite "${suite_args[@]}" | tee "$output_dir/output.txt"
-  go run ./cmd/leia bench q-report \
-    --from-output "$output_dir/output.txt" \
-    --check \
-    --json "$output_dir/q_perf_report.json" \
-    --markdown "$output_dir/q_perf_report.md"
-  echo "q performance evidence: $output_dir/q_perf_report.json $output_dir/q_perf_report.md"
 }
 
 run_release_artifacts_gate_task() {
@@ -334,19 +282,6 @@ USAGE
   run_leia_task scripts/manifest.leia check "$@"
 }
 
-run_manifest_list_q_task() {
-  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-    cat <<'USAGE'
-Usage: scripts/run.sh manifest-list-q [--scope SCOPE] KIND
-
-Lists q manifest paths using scripts/manifest.leia. KIND is tests, examples,
-or benchmarks. SCOPE defaults to core.
-USAGE
-    return
-  fi
-  run_leia_task scripts/manifest.leia list-q "$@"
-}
-
 run_module_path_task() {
   if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
     cat <<'USAGE'
@@ -464,9 +399,6 @@ case "$task" in
   manifest|manifest-check|manifest-coverage)
     run_manifest_check_task "$@"
     ;;
-  manifest-list-q|q-manifest-list)
-    run_manifest_list_q_task "$@"
-    ;;
   perf|performance|performance-gate)
     run_shell_task scripts/performance_gate.sh "$@"
     ;;
@@ -478,15 +410,6 @@ case "$task" in
     ;;
   public-blockers|public-release-blockers|public-release-blockers-check)
     run_shell_task scripts/public_release_blockers_check.sh "$@"
-    ;;
-  q|q-conformance)
-    run_shell_task scripts/q_conformance_gate.sh "$@"
-    ;;
-  q-baseline|q-performance-baseline)
-    exec bash "$repo_root/benchmarks/q_baseline_suite.sh" "$@"
-    ;;
-  q-perf|q-performance|q-performance-gate)
-    run_q_perf_task "$@"
     ;;
   release-artifacts)
     run_shell_task scripts/release_artifacts.sh "$@"

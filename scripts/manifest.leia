@@ -11,8 +11,6 @@ BENCHMARK_DOMAINS := [
 Q_CASE_TYPES := {conformance: true, perf: true, smoke: true}
 Q_FEATURE_STATUSES := {supported: true, rejected: true, planned: true}
 Q_COVERAGE_KINDS := ["tests", "examples", "benchmarks"]
-Q_LIST_KINDS := Q_COVERAGE_KINDS
-Q_GATE_SCOPES := {all: true, core: true, extended: true}
 Q_CORE_REQUIRED_FEATURES := {
     adverbs: true, asof: true, join: true, keyed: true, mutation: true,
     qsql: true, ["runtime-kernel"]: true, temporal: true, ["typed-null"]: true,
@@ -795,25 +793,6 @@ func validate_q_coverage(roots) {
     return errors
 }
 
-func q_paths(kind, scope) {
-    paths := []
-    if kind == "tests" {
-        for _, p := range ipairs(discover_q_tests()) { append(paths, repo_rel(p)) }
-    } elseif kind == "examples" {
-        for _, p := range ipairs(discover_q_examples()) { append(paths, repo_rel(p)) }
-    } elseif kind == "benchmarks" {
-        for _, p := range ipairs(discover_q_benchmarks()) { append(paths, repo_rel(p)) }
-    } else {
-        error("unknown q list kind: " .. kind)
-    }
-    if scope == "all" { return paths }
-    out := []
-    for _, p := range ipairs(paths) {
-        if q_path_gate_scope(kind, p) == scope { append(out, p) }
-    }
-    return out
-}
-
 func json_quote(s) {
     return json.encode(s)
 }
@@ -898,34 +877,11 @@ func parse_args() {
     for i := 1; i <= #raw; i++ {
         append(args, raw[i])
     }
-    scope := "all"
     cleaned := []
-    skipNext := false
     for i := 2; i <= #args; i++ {
-        if skipNext {
-            skipNext = false
-            continue
-        }
-        a := args[i]
-        if a == "--scope" {
-            if i + 1 > #args {
-                print("--scope requires a value")
-                process.exit(2)
-            }
-            scope = args[i + 1]
-            skipNext = true
-        } elseif starts_with(a, "--scope=") {
-            scope = string.sub(a, #"--scope=" + 1)
-        } else {
-            append(cleaned, a)
-        }
+        append(cleaned, args[i])
     }
-    if !Q_GATE_SCOPES[scope] {
-        keys := sorted_values_from_set(Q_GATE_SCOPES)
-        print("--scope must be one of: " .. table.concat(keys, ", "))
-        process.exit(2)
-    }
-    return args[1], cleaned, scope
+    return args[1], cleaned
 }
 
 func parser_error(msg) {
@@ -933,19 +889,9 @@ func parser_error(msg) {
     process.exit(2)
 }
 
-command, roots, scope := parse_args()
+command, roots := parse_args()
 if command == nil || command == "" {
-    parser_error("usage: manifest.leia <generate|check|list|list-q> [roots...]")
-}
-
-if command == "list-q" {
-    kinds := roots
-    if #kinds == 0 { kinds = Q_LIST_KINDS }
-    for _, kind := range ipairs(kinds) {
-        if !list_has(Q_LIST_KINDS, kind) { parser_error("list-q accepts only: tests, examples, benchmarks") }
-        for _, p := range ipairs(q_paths(kind, scope)) { print(p) }
-    }
-    process.exit(0)
+    parser_error("usage: manifest.leia <generate|check|list> [roots...]")
 }
 
 if command == "generate" {

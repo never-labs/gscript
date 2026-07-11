@@ -12,17 +12,6 @@ func TestLeiaManifestScriptCheckPasses(t *testing.T) {
 	runCommand(t, root, 60*time.Second, "scripts/run.sh", "manifest-check", "tests", "benchmarks")
 }
 
-func TestLeiaManifestScriptListQScope(t *testing.T) {
-	root := findRepoRoot(t)
-	out := runCommand(t, root, 30*time.Second, "scripts/run.sh", "manifest-list-q", "--scope", "core", "tests")
-	if !strings.Contains(out, "tests/language/q_conformance_golden_project.leia") {
-		t.Fatalf("list-q core output missing q conformance golden case:\n%s", out)
-	}
-	if strings.Contains(out, "tests/language/q_session_workspace_project.leia") {
-		t.Fatalf("list-q core output includes extended session workspace case:\n%s", out)
-	}
-}
-
 func TestLeiaManifestScriptListEmitsJSONLines(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "run", "scripts/manifest.leia", "list", "tests")

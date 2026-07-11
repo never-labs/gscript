@@ -40,7 +40,7 @@ func runBenchDiagnoseCommand(args []string, outw, errw io.Writer) int {
 		}
 		return 2
 	}
-	root, err := qReportRepoRoot()
+	root, err := benchRepoRoot()
 	if err != nil {
 		fmt.Fprintf(errw, "leia bench diagnose: %v\n", err)
 		return 1
@@ -505,7 +505,7 @@ func runBenchTriageCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "leia bench triage: at least one --bench is required")
 		return 2
 	}
-	root, err := qReportRepoRoot()
+	root, err := benchRepoRoot()
 	if err != nil {
 		fmt.Fprintf(errw, "leia bench triage: %v\n", err)
 		return 1

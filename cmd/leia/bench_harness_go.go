@@ -159,7 +159,7 @@ func runBenchGoHarness(mode string, args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
 		return 2
 	}
-	root, err := qReportRepoRoot()
+	root, err := benchRepoRoot()
 	if err != nil {
 		fmt.Fprintf(errw, "leia bench %s: %v\n", mode, err)
 		return 1
