@@ -61,10 +61,10 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 
-	mutated := *fn
+	mutated := cloneProtoForConcurrentCall(fn)
 	mutated.Code = nil
-	rejectRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(&mutated), "nested_int_recurrence")
-	diag = requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(&mutated), "nested_int_recurrence")
+	rejectRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(mutated), "nested_int_recurrence")
+	diag = requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(mutated), "nested_int_recurrence")
 	if diag.Recognized || diag.Reason != runtimeSpecializationReasonShapeMismatch {
 		t.Fatalf("mutated diagnostic = %+v, want shape mismatch", diag)
 	}

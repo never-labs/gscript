@@ -371,33 +371,30 @@ func cloneProtoForConcurrentCall(src *FuncProto) *FuncProto {
 	if src == nil {
 		return nil
 	}
-	dst := *src
-	dst.GlobalCache = nil
-	dst.FieldCache = nil
-	dst.FieldPolyCache = nil
-	dst.ResumePayloadCache = nil
-	dst.RuntimeSpecs = FuncProtoRuntimeSpecializations{}
-	dst.FuncProtoFeedbackState = FuncProtoFeedbackState{}
-	dst.FeedbackMu = sync.Mutex{}
-	dst.CallCount = 0
-	dst.CompiledCodePtr = 0
-	dst.DirectEntryPtr = 0
-	dst.Tier2DirectEntryPtr = 0
-	dst.Tier2LeafEntryPtr = 0
-	dst.DirectEntryVersion = 0
-	dst.Tier2NumericEntryPtr = 0
-	dst.Tier2TypedEntryPtr = 0
-	dst.Tier2TypedClobberEntryPtr = 0
-	dst.Tier2TypedEntryABI = 0
-	dst.GlobalValCachePtr = 0
-	dst.GlobalValCacheGen = 0
-	dst.Tier2GlobalCachePtr = 0
-	dst.Tier2GlobalCacheGenPtr = 0
-	dst.Tier2GlobalIndexPtr = 0
-	dst.Tier2Promoted = false
-	dst.NeedsTier2 = false
-	dst.EnteredTier2 = 0
-	dst.TableStringKeyCache = nil
+	// Compiled program data is immutable and may be shared. Runtime caches,
+	// profiling state, mutexes, and native entry points intentionally start at
+	// their zero values in the concurrent clone.
+	dst := FuncProto{
+		Name:               src.Name,
+		Source:             src.Source,
+		LineDefined:        src.LineDefined,
+		NumParams:          src.NumParams,
+		IsVarArg:           src.IsVarArg,
+		UsesVarargBytecode: src.UsesVarargBytecode,
+		MaxStack:           src.MaxStack,
+		Code:               src.Code,
+		Constants:          src.Constants,
+		TableCtors2:        src.TableCtors2,
+		TableCtorsN:        src.TableCtorsN,
+		Upvalues:           src.Upvalues,
+		ReadOnlyLocals:     src.ReadOnlyLocals,
+		LineInfo:           src.LineInfo,
+		HasSelfCalls:       src.HasSelfCalls,
+		LeafNoCall:         src.LeafNoCall,
+		Tier2LeafNoCall:    src.Tier2LeafNoCall,
+		NoGlobalOps:        src.NoGlobalOps,
+		JITDisabled:        src.JITDisabled,
+	}
 	if len(src.Protos) > 0 {
 		dst.Protos = make([]*FuncProto, len(src.Protos))
 		for i, child := range src.Protos {

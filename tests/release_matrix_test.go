@@ -494,9 +494,9 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
-		"x := sum(a)",
-		"turn {",
+		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
+		"func greet(name)",
+		"total += n",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README.md must keep language contract snippet %q", snippet)
@@ -517,8 +517,8 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	featureMatrixGate := readFileString(t, filepath.Join(root, "tests", "feature_matrix_test.go"))
 	for _, snippet := range []string{
 		"TestFeatureMatrixCoversReadmeStableContract",
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
-		"x := sum(a)",
+		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
+		"total += n",
 		`requireFeature(t, features, "release_evidence_gates")`,
 		`requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate"`,
 		`"scripts/docs_check.sh"`,
@@ -2266,7 +2266,14 @@ Each archive includes leia and leia-lsp.
 	if incompleteReport.Status != "issues" || incompleteReport.Version != incompleteVersion || !stringSliceContains(incompleteReport.Failures, "docs/release/notes/"+incompleteVersion+".md still contains template placeholder: - Platform support:") {
 		t.Fatalf("incomplete release notes report = %+v, want Platform support placeholder failure", incompleteReport)
 	}
-	if !stringSliceContains(incompleteReport.FailureKinds, "placeholder") || len(incompleteReport.FailureDetails) == 0 || incompleteReport.FailureDetails[0].Kind != "placeholder" || incompleteReport.FailureDetails[0].Path != "docs/release/notes/"+incompleteVersion+".md" {
+	foundPlatformPlaceholder := false
+	for _, detail := range incompleteReport.FailureDetails {
+		if detail.Kind == "placeholder" && detail.Path == "docs/release/notes/"+incompleteVersion+".md" && detail.Value == "- Platform support:" {
+			foundPlatformPlaceholder = true
+			break
+		}
+	}
+	if !stringSliceContains(incompleteReport.FailureKinds, "placeholder") || !foundPlatformPlaceholder {
 		t.Fatalf("incomplete release notes failure details = %+v, want placeholder detail", incompleteReport)
 	}
 
@@ -2284,15 +2291,17 @@ None known
 
 ## Checksums And Artifacts
 
-| Artifact | SHA256 |
+Final checksums are in the published `+"`SHA256SUMS`"+` release asset.
+
+| Artifact | Checksum source |
 |---|---|
-| leia_%[1]s_darwin_amd64.tar.gz | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
-| leia_%[1]s_darwin_arm64.tar.gz | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
-| leia_%[1]s_linux_amd64.tar.gz | missing |
-| leia_%[1]s_linux_arm64.tar.gz | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
-| leia_%[1]s_windows_amd64.zip | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
-| leia_%[1]s_windows_arm64.zip | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
-| SHA256SUMS | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef |
+| leia_%[1]s_darwin_amd64.tar.gz | published SHA256SUMS |
+| leia_%[1]s_darwin_arm64.tar.gz | published SHA256SUMS |
+| linux amd64 archive omitted | published SHA256SUMS |
+| leia_%[1]s_linux_arm64.tar.gz | published SHA256SUMS |
+| leia_%[1]s_windows_amd64.zip | published SHA256SUMS |
+| leia_%[1]s_windows_arm64.zip | published SHA256SUMS |
+| SHA256SUMS | GitHub Release asset |
 
 Each archive includes leia and leia-lsp.
 
@@ -2315,7 +2324,7 @@ Each archive includes leia and leia-lsp.
 	}()
 	badChecksumOut := runCommandResult(root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json", "--require-ready", "--version", badChecksumVersion)
 	if badChecksumOut.err == nil {
-		t.Fatalf("release notes with missing archive checksum unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", badChecksumOut.stdout, badChecksumOut.stderr)
+		t.Fatalf("release notes with a missing archive contract unexpectedly passed:\nstdout:\n%s\nstderr:\n%s", badChecksumOut.stdout, badChecksumOut.stderr)
 	}
 	var badChecksumReport struct {
 		Status                  string `json:"status"`
@@ -2340,12 +2349,12 @@ Each archive includes leia and leia-lsp.
 	if err := json.Unmarshal([]byte(badChecksumOut.stdout), &badChecksumReport); err != nil {
 		t.Fatalf("bad-checksum release notes JSON failed to decode: %v\n%s", err, badChecksumOut.stdout)
 	}
-	wantChecksumFailure := "docs/release/notes/" + badChecksumVersion + ".md must include a 64-hex SHA256 checksum for leia_" + badChecksumVersion + "_linux_amd64.tar.gz"
+	wantChecksumFailure := "docs/release/notes/" + badChecksumVersion + ".md must list release artifact leia_" + badChecksumVersion + "_linux_amd64.tar.gz"
 	if badChecksumReport.Status != "issues" || badChecksumReport.Version != badChecksumVersion || !stringSliceContains(badChecksumReport.Failures, wantChecksumFailure) {
 		t.Fatalf("bad-checksum release notes report = %+v, want %q", badChecksumReport, wantChecksumFailure)
 	}
 	if badChecksumReport.RequiredArtifactCount != 7 || badChecksumReport.ArtifactChecksumCount != 6 {
-		t.Fatalf("bad-checksum artifact counts = %d/%d, want 6 valid checksums across 7 required artifacts", badChecksumReport.ArtifactChecksumCount, badChecksumReport.RequiredArtifactCount)
+		t.Fatalf("bad-artifact counts = %d/%d, want 6 listed artifacts across 7 required artifacts", badChecksumReport.ArtifactChecksumCount, badChecksumReport.RequiredArtifactCount)
 	}
 	if badChecksumReport.RequiredArtifactCount != len(badChecksumReport.RequiredArtifactDetails) {
 		t.Fatalf("bad-checksum required artifact details = %d/%d", badChecksumReport.RequiredArtifactCount, len(badChecksumReport.RequiredArtifactDetails))
@@ -2361,14 +2370,14 @@ Each archive includes leia and leia-lsp.
 		}
 	}
 	if checksumPresentCount != badChecksumReport.ArtifactChecksumCount || !foundMissingArtifactDetail {
-		t.Fatalf("bad-checksum required artifact details = %+v, want one missing linux amd64 checksum", badChecksumReport.RequiredArtifactDetails)
+		t.Fatalf("bad-artifact required artifact details = %+v, want one missing linux amd64 artifact", badChecksumReport.RequiredArtifactDetails)
 	}
-	if badChecksumReport.FailureKindCount != len(badChecksumReport.FailureKinds) || !stringSliceContains(badChecksumReport.FailureKinds, "missing_checksum") {
-		t.Fatalf("bad-checksum failure kinds = %+v, want missing_checksum", badChecksumReport)
+	if badChecksumReport.FailureKindCount != len(badChecksumReport.FailureKinds) || !stringSliceContains(badChecksumReport.FailureKinds, "missing_artifact") {
+		t.Fatalf("bad-artifact failure kinds = %+v, want missing_artifact", badChecksumReport)
 	}
 	var foundChecksumDetail bool
 	for _, detail := range badChecksumReport.FailureDetails {
-		if detail.Kind == "missing_checksum" && detail.Value == "leia_"+badChecksumVersion+"_linux_amd64.tar.gz" {
+		if detail.Kind == "missing_artifact" && detail.Value == "leia_"+badChecksumVersion+"_linux_amd64.tar.gz" {
 			foundChecksumDetail = true
 			break
 		}
@@ -4233,11 +4242,10 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	root := findRepoRoot(t)
 	surfaceSnippet := readReleaseReadmeSurfaceLeiaSnippet(t, root)
 	for _, snippet := range []string{
-		"a := [1, 2, 3, 4, 5, 6, 7, 8, 6]",
-		"x := sum(a)",
-		"answer, err := turn {",
-		"prompt { role:",
-		"print(x)",
+		"func greet(name)",
+		"numbers := [1, 2, 3, 4, 5]",
+		"total += n",
+		`print(greet("Leia"))`,
 	} {
 		if !strings.Contains(surfaceSnippet, snippet) {
 			t.Fatalf("README.md Example snippet changed or lost product surface %q:\n%s", snippet, surfaceSnippet)
@@ -4247,21 +4255,21 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	focusedGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_readme_tooling_test.go"))
 	for _, snippet := range []string{
 		"TestReadmeIntroStaysFocused",
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
-		"x := sum(a)",
-		"turn {",
+		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
+		"func greet(name)",
+		"total += n",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
 			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README focused positioning gate snippet %q", snippet)
 		}
 	}
 	for _, snippet := range []string{
-		"TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
+		"TestReadmeMainLeiaExampleStaysRunnable",
 		"readmeFirstLeiaSnippet",
 		"README Leia example failed",
 		"README Leia example stdout",
 		`exec.Command("go", "run", "./cmd/leia", "run", file)`,
-		"want 42.0 fallback without host LLM provider",
+		"want greeting and sum",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
 			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate snippet %q", snippet)
@@ -4479,10 +4487,10 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	features := loadFeatureMatrixFeatureMap(t, root)
 
 	for _, promise := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
-		"x := sum(a)",
-		"turn {",
-		"prompt {",
+		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
+		"func greet(name)",
+		"total += n",
+		`print(greet("Leia"))`,
 	} {
 		if !strings.Contains(readme, promise) {
 			t.Fatalf("README.md concise surface must keep documented capability entry %q", promise)
@@ -4743,7 +4751,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "DSL-native dialects",
-			promise:      "first-class extensible domain dialects",
+			promise:      "opt-in domain dialects",
 			featureID:    "tagged_dialect_syntax",
 			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
 			refs: []string{
@@ -4786,7 +4794,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "data-oriented",
-			promise:      "high-throughput in-memory data runtime",
+			promise:      "Data-oriented libraries",
 			featureID:    "matrix_dense_arrays",
 			specSections: []string{"Tables And Metatables", "Implementation Requirements"},
 			refs: []string{

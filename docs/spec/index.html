@@ -1257,11 +1257,11 @@ x, y <span class="tok-operator">:=</span> triple()    <span class="tok-comment">
 <span class="tok-keyword">func</span> forward() {
     <span class="tok-keyword">return</span> triple()
 }
-p, q, r <span class="tok-operator">:=</span> forward()
+first, second, third <span class="tok-operator">:=</span> forward()
 
 <span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> b <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> c <span class="tok-operator">==</span> <span class="tok-number">30</span>)
 <span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> y <span class="tok-operator">==</span> <span class="tok-number">20</span>)
-<span class="tok-builtin">assert</span>(p <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> q <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> r <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
+<span class="tok-builtin">assert</span>(first <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> second <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> third <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
 <p>A parenthesized call is no longer in an expanding position and contributes exactly one value.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
     <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>
@@ -3862,11 +3862,11 @@ x, y <span class="tok-operator">:=</span> triple()    <span class="tok-comment">
 <span class="tok-keyword">func</span> forward() {
     <span class="tok-keyword">return</span> triple()
 }
-p, q, r <span class="tok-operator">:=</span> forward()
+first, second, third <span class="tok-operator">:=</span> forward()
 
 <span class="tok-builtin">assert</span>(a <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> b <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> c <span class="tok-operator">==</span> <span class="tok-number">30</span>)
 <span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> y <span class="tok-operator">==</span> <span class="tok-number">20</span>)
-<span class="tok-builtin">assert</span>(p <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> q <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> r <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
+<span class="tok-builtin">assert</span>(first <span class="tok-operator">==</span> <span class="tok-number">10</span> <span class="tok-operator">&amp;&amp;</span> second <span class="tok-operator">==</span> <span class="tok-number">20</span> <span class="tok-operator">&amp;&amp;</span> third <span class="tok-operator">==</span> <span class="tok-number">30</span>)</code></pre>
 <p>A parenthesized call is no longer in an expanding position and contributes exactly one value.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> triple() {
     <span class="tok-keyword">return</span> <span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>

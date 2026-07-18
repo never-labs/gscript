@@ -212,8 +212,8 @@ func TestQSQLSourceCarrierUsesLegacyNativePayloadAsRuntimeCarrier(t *testing.T) 
 	if carrier.rows != frame.Len() {
 		t.Fatalf("frame carrier rows = %d, want %d", carrier.rows, frame.Len())
 	}
-	if !qLooksLikeFrame(frameTable) || qIsKeyedFrameTable(frameTable) {
-		t.Fatalf("legacy native frame classification looksLikeFrame=%v keyed=%v, want true false", qLooksLikeFrame(frameTable), qIsKeyedFrameTable(frameTable))
+	if !looksLikeFrame(frameTable) || qIsKeyedFrameTable(frameTable) {
+		t.Fatalf("legacy native frame classification looksLikeFrame=%v keyed=%v, want true false", looksLikeFrame(frameTable), qIsKeyedFrameTable(frameTable))
 	}
 
 	keyed, err := data.KeyBy(frame, "sym")
@@ -233,8 +233,8 @@ func TestQSQLSourceCarrierUsesLegacyNativePayloadAsRuntimeCarrier(t *testing.T) 
 	if keyedCarrier.rows != frame.Len() {
 		t.Fatalf("keyed carrier rows = %d, want %d", keyedCarrier.rows, frame.Len())
 	}
-	if qLooksLikeFrame(keyedTable) || !qIsKeyedFrameTable(keyedTable) {
-		t.Fatalf("legacy native keyed classification looksLikeFrame=%v keyed=%v, want false true", qLooksLikeFrame(keyedTable), qIsKeyedFrameTable(keyedTable))
+	if looksLikeFrame(keyedTable) || !qIsKeyedFrameTable(keyedTable) {
+		t.Fatalf("legacy native keyed classification looksLikeFrame=%v keyed=%v, want false true", looksLikeFrame(keyedTable), qIsKeyedFrameTable(keyedTable))
 	}
 	roundTrip, err := qKeyedFrameFromValue(TableValue(keyedTable))
 	if err != nil {
@@ -1150,7 +1150,7 @@ func TestQFrameKindPrefersNativePayloadInfoOverMarkers(t *testing.T) {
 		Columns:    len(frame.Schema().Names()),
 		SchemaHash: frame.SchemaFingerprint(),
 	})
-	if qLooksLikeFrame(keyedTable) {
+	if looksLikeFrame(keyedTable) {
 		t.Fatal("keyed native frame with data frame marker resolved as plain frame")
 	}
 	if !qIsKeyedFrameTable(keyedTable) {
@@ -1168,7 +1168,7 @@ func TestQFrameKindPrefersNativePayloadInfoOverMarkers(t *testing.T) {
 		Columns:    len(frame.Schema().Names()),
 		SchemaHash: frame.SchemaFingerprint(),
 	})
-	if !qLooksLikeFrame(frameTable) {
+	if !looksLikeFrame(frameTable) {
 		t.Fatal("native data frame with keyed marker did not resolve as frame")
 	}
 	if qIsKeyedFrameTable(frameTable) {
@@ -1183,7 +1183,7 @@ func TestQFrameKindPrefersNativePayloadInfoOverMarkers(t *testing.T) {
 		Columns:    len(frame.Schema().Names()),
 		SchemaHash: frame.SchemaFingerprint(),
 	})
-	if qLooksLikeFrame(columnTable) {
+	if looksLikeFrame(columnTable) {
 		t.Fatal("typed data column payload resolved as frame via concrete payload fallback")
 	}
 	if qIsKeyedFrameTable(columnTable) {
@@ -1211,8 +1211,8 @@ func TestQNativeFramePayloadKindMismatchFailsClosed(t *testing.T) {
 		Columns:    len(frame.Schema().Names()),
 		SchemaHash: frame.SchemaFingerprint(),
 	})
-	if qLooksLikeFrame(frameAsKeyed) || !qIsKeyedFrameTable(frameAsKeyed) {
-		t.Fatalf("frame payload with keyed kind classification looksLikeFrame=%v keyed=%v, want false true", qLooksLikeFrame(frameAsKeyed), qIsKeyedFrameTable(frameAsKeyed))
+	if looksLikeFrame(frameAsKeyed) || !qIsKeyedFrameTable(frameAsKeyed) {
+		t.Fatalf("frame payload with keyed kind classification looksLikeFrame=%v keyed=%v, want false true", looksLikeFrame(frameAsKeyed), qIsKeyedFrameTable(frameAsKeyed))
 	}
 	if _, err := qSQLSourceCarrierFromValue(TableValue(frameAsKeyed), "trades"); err == nil || !strings.Contains(err.Error(), "native keyed frame payload is invalid") {
 		t.Fatalf("frame payload with keyed kind carrier err = %v, want invalid keyed payload", err)
@@ -1231,8 +1231,8 @@ func TestQNativeFramePayloadKindMismatchFailsClosed(t *testing.T) {
 		Columns:    len(frame.Schema().Names()),
 		SchemaHash: frame.SchemaFingerprint(),
 	})
-	if !qLooksLikeFrame(keyedAsFrame) || qIsKeyedFrameTable(keyedAsFrame) {
-		t.Fatalf("keyed payload with frame kind classification looksLikeFrame=%v keyed=%v, want true false", qLooksLikeFrame(keyedAsFrame), qIsKeyedFrameTable(keyedAsFrame))
+	if !looksLikeFrame(keyedAsFrame) || qIsKeyedFrameTable(keyedAsFrame) {
+		t.Fatalf("keyed payload with frame kind classification looksLikeFrame=%v keyed=%v, want true false", looksLikeFrame(keyedAsFrame), qIsKeyedFrameTable(keyedAsFrame))
 	}
 	if _, err := qSQLSourceCarrierFromValue(TableValue(keyedAsFrame), "trades"); err == nil || !strings.Contains(err.Error(), "native data frame payload is invalid") {
 		t.Fatalf("keyed payload with frame kind carrier err = %v, want invalid data frame payload", err)

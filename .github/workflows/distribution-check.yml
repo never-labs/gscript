@@ -43,6 +43,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Verify Go installs from checkout
+        shell: bash
+        run: |
+          install_bin="$(mktemp -d)"
+          trap 'rm -rf "$install_bin"' EXIT
+          GOBIN="$install_bin" go install ./cmd/leia ./cmd/leia-lsp
+          "$install_bin/leia" version
+          "$install_bin/leia-lsp" --help
       - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
       - run: '"$(go env GOPATH)/bin/goreleaser" --version'
       - run: scripts/run.sh release-notes

@@ -1789,7 +1789,7 @@ func qDictionaryValues(v Value) (Value, bool) {
 		return NilValue(), false
 	}
 	tbl := v.Table()
-	if qLooksLikeFrame(tbl) || qIsKeyedFrameTable(tbl) {
+	if looksLikeFrame(tbl) || qIsKeyedFrameTable(tbl) {
 		return NilValue(), false
 	}
 	if keys, ok := qDictionaryKeyOrder(tbl); ok {
@@ -3426,7 +3426,7 @@ func qExplainUnavailableBridge(value Value) string {
 		return "unsupported_source"
 	}
 	tbl := value.Table()
-	if kind, ok := qNativeFrameRuntimeKind(tbl); ok {
+	if kind, ok := nativeFrameRuntimeKind(tbl); ok {
 		switch kind {
 		case NativePayloadKeyedFrame:
 			return "keyed_frame_unavailable"
@@ -3438,7 +3438,7 @@ func qExplainUnavailableBridge(value Value) string {
 	if qIsKeyedFrameTable(tbl) {
 		return "keyed_frame_unavailable"
 	}
-	if qLooksLikeFrame(tbl) {
+	if looksLikeFrame(tbl) {
 		return "frame_wrapper_unavailable"
 	}
 	return "row_table_unavailable"
@@ -3468,15 +3468,15 @@ func qCanResolveSQLSourceFromTable(v Value) bool {
 		return false
 	}
 	tbl := v.Table()
-	if _, ok := qNativeFrameRuntimeKind(tbl); ok {
+	if _, ok := nativeFrameRuntimeKind(tbl); ok {
 		return false
 	}
-	return !qLooksLikeFrame(tbl) && !qIsKeyedFrameTable(tbl)
+	return !looksLikeFrame(tbl) && !qIsKeyedFrameTable(tbl)
 }
 
 func qSQLSourceCarrierFromResolvedValue(v Value) (qSQLSourceCarrier, error) {
 	if v.IsSoA() {
-		frame, err := qDataFrameFromSoA(v.SoA())
+		frame, err := dataLibFrameFromSoA(v.SoA())
 		if err != nil {
 			return qSQLSourceCarrier{}, err
 		}
@@ -3498,7 +3498,7 @@ func qSQLSourceCarrierFromResolvedValue(v Value) (qSQLSourceCarrier, error) {
 		}
 		info, hasInfo := qFramePayloadInfo(tbl, NativePayloadKeyedFrame)
 		native := false
-		if qNativeFrameRuntimeKindMatches(tbl, NativePayloadKeyedFrame) {
+		if nativeFrameRuntimeKindMatches(tbl, NativePayloadKeyedFrame) {
 			native = true
 		}
 		bridge := "keyed_frame_wrapper"
@@ -3522,10 +3522,10 @@ func qSQLSourceCarrierFromResolvedValue(v Value) (qSQLSourceCarrier, error) {
 	bridge := "row_table"
 	native := false
 	info, hasInfo := qFramePayloadInfo(tbl, NativePayloadDataFrame)
-	if qNativeFrameRuntimeKindMatches(tbl, NativePayloadDataFrame) {
+	if nativeFrameRuntimeKindMatches(tbl, NativePayloadDataFrame) {
 		bridge = "frame_native"
 		native = true
-	} else if qLooksLikeFrame(tbl) {
+	} else if looksLikeFrame(tbl) {
 		bridge = "frame_wrapper"
 	}
 	frame, err := qDataFrameFromValue(v, "")
@@ -3540,7 +3540,7 @@ func qSQLNativeSourceCarrierFromTable(tbl *Table) (qSQLSourceCarrier, bool, erro
 	if tbl == nil {
 		return qSQLSourceCarrier{}, false, nil
 	}
-	kind, ok := qNativeFrameRuntimeKind(tbl)
+	kind, ok := nativeFrameRuntimeKind(tbl)
 	if !ok {
 		return qSQLSourceCarrier{}, false, nil
 	}
@@ -3638,7 +3638,7 @@ func qTypedNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
 	case *lazySoAFramePayload:
 		return native.frame, true, nil
 	case *SoA:
-		frame, err := qDataFrameFromSoA(native)
+		frame, err := dataLibFrameFromSoA(native)
 		if err != nil {
 			return data.Frame{}, false, err
 		}
@@ -7582,7 +7582,7 @@ func qSQLScalarBindingsFromValue(v Value) map[data.Symbol]any {
 			// bindings; without this check their facades (plain length 0)
 			// would register as nil scalars and force the per-call plan
 			// clone + rebind path for every query in the environment.
-			if _, isFrame := qNativeFrameRuntimeKind(val.Table()); isFrame {
+			if _, isFrame := nativeFrameRuntimeKind(val.Table()); isFrame {
 				return true
 			}
 		}
@@ -8075,13 +8075,13 @@ func qDataFrameFromValue(v Value, sourceName string) (data.Frame, error) {
 		return keyed.Frame(), nil
 	}
 	if v.IsSoA() {
-		return qDataFrameFromSoA(v.SoA())
+		return dataLibFrameFromSoA(v.SoA())
 	}
 	if !v.IsTable() {
 		return data.Frame{}, fmt.Errorf("argument 1 must be a frame table or soa")
 	}
 	tbl := v.Table()
-	if qNativeFrameRuntimeKindMatches(tbl, NativePayloadKeyedFrame) {
+	if nativeFrameRuntimeKindMatches(tbl, NativePayloadKeyedFrame) {
 		keyed, ok, err := qNativeKeyedFramePayload(tbl)
 		if err != nil {
 			return data.Frame{}, err
@@ -8102,7 +8102,7 @@ func qDataFrameFromValue(v Value, sourceName string) (data.Frame, error) {
 		}
 	}
 	if soa := tbl.RawGetString("soa"); soa.IsSoA() {
-		return qDataFrameFromSoA(soa.SoA())
+		return dataLibFrameFromSoA(soa.SoA())
 	}
 	return qDataFrameFromRowTable(tbl)
 }
@@ -8401,7 +8401,7 @@ func qDictFromValue(v Value) (stdq.Dict, bool, error) {
 		return stdq.Dict{}, false, nil
 	}
 	tbl := v.Table()
-	if qLooksLikeFrame(tbl) || qIsKeyedFrameTable(tbl) || qIsSymbolVector(v) {
+	if looksLikeFrame(tbl) || qIsKeyedFrameTable(tbl) || qIsSymbolVector(v) {
 		return stdq.Dict{}, false, nil
 	}
 	keys, ok := qDictionaryKeyOrder(tbl)
@@ -8509,7 +8509,7 @@ func qDataFrameFromSoABorrowedCached(s *SoA) (data.Frame, error) {
 		return frame, nil
 	}
 	qQueryKernelSupportCacheMu.Unlock()
-	frame, err := qDataFrameFromSoABorrowed(s)
+	frame, err := dataLibFrameFromSoABorrowed(s)
 	if err != nil {
 		return data.Frame{}, err
 	}

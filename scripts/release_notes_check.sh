@@ -262,29 +262,29 @@ require_release_archive_names() {
   done < <(release_archive_names "$archive_version")
 }
 
-require_archive_checksum() {
-  local file="$1"
-  local artifact="$2"
-  required_artifact_count=$((required_artifact_count + 1))
-  required_artifact_paths+=("$file")
-  required_artifact_names+=("$artifact")
-  if grep -E "\\|[[:space:]]*\`?${artifact}\`?[[:space:]]*\\|[[:space:]]*[[:xdigit:]]{64}[[:space:]]*\\|" "$file" >/dev/null; then
-    artifact_checksum_count=$((artifact_checksum_count + 1))
-    required_artifact_checksum_present+=("true")
-  else
-    required_artifact_checksum_present+=("false")
-    add_failure "$file must include a 64-hex SHA256 checksum for $artifact" "missing_checksum" "$file" "$artifact"
-  fi
+record_release_artifact() {
+	local file="$1"
+	local artifact="$2"
+	required_artifact_count=$((required_artifact_count + 1))
+	required_artifact_paths+=("$file")
+	required_artifact_names+=("$artifact")
+	if grep -F "$artifact" "$file" >/dev/null; then
+		artifact_checksum_count=$((artifact_checksum_count + 1))
+		required_artifact_checksum_present+=("true")
+	else
+		required_artifact_checksum_present+=("false")
+		add_failure "$file must list release artifact $artifact" "missing_artifact" "$file" "$artifact"
+	fi
 }
 
-require_release_archive_checksums() {
-  local file="$1"
-  local archive_version="$2"
-  local archive
-  while IFS= read -r archive; do
-    require_archive_checksum "$file" "$archive"
-  done < <(release_archive_names "$archive_version")
-  require_archive_checksum "$file" "SHA256SUMS"
+record_release_artifacts() {
+	local file="$1"
+	local archive_version="$2"
+	local archive
+	while IFS= read -r archive; do
+		record_release_artifact "$file" "$archive"
+	done < <(release_archive_names "$archive_version")
+	record_release_artifact "$file" "SHA256SUMS"
 }
 
 check_template() {
@@ -296,9 +296,10 @@ check_template() {
   fi
   require_contains "$template" "scripts/run.sh release-check --build --require-clean --require-tag --version vX.Y.Z"
   require_contains "$template" "List known issues, or write \`None known\` after release validation."
-  require_contains "$template" "## Checksums And Artifacts"
-  require_contains "$template" "## Release Decisions"
-  require_release_archive_names "$template" "vX.Y.Z"
+	require_contains "$template" "## Checksums And Artifacts"
+	require_contains "$template" "## Release Decisions"
+	require_contains "$template" 'published `SHA256SUMS`'
+	require_release_archive_names "$template" "vX.Y.Z"
   require_contains "$template" "Each archive includes \`leia\` and \`leia-lsp\`."
 }
 
@@ -318,10 +319,8 @@ check_version() {
   require_contains "$notes" "leia-lsp"
   require_release_archive_names "$notes" "$version"
 
-  if ! grep -Eq '[[:xdigit:]]{64}' "$notes"; then
-    add_failure "$notes must include at least one 64-hex SHA256 checksum" "missing_checksum" "$notes"
-  fi
-  require_release_archive_checksums "$notes" "$version"
+	require_contains "$notes" 'published `SHA256SUMS`'
+	record_release_artifacts "$notes" "$version"
 
   for placeholder in \
     "vX.Y.Z" \

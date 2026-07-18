@@ -791,7 +791,7 @@ func dataNativeFramePayload(frame *Table) (stddata.Frame, bool, error) {
 		case *lazySoAFramePayload:
 			return native.frame, true, nil
 		case *SoA:
-			out, err := qDataFrameFromSoA(native)
+			out, err := dataLibFrameFromSoA(native)
 			if err != nil {
 				return stddata.Frame{}, false, err
 			}
@@ -1378,7 +1378,7 @@ func dataFrameRows(frame *Table) (*Table, error) {
 		case *lazySoAFramePayload:
 			return dataRowsFromNativeFrame(native.frame)
 		case *SoA:
-			libFrame, err := qDataFrameFromSoA(native)
+			libFrame, err := dataLibFrameFromSoA(native)
 			if err != nil {
 				return nil, err
 			}

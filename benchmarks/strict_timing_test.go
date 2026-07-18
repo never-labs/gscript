@@ -513,12 +513,23 @@ func TestTimingCompareDiscoveryMatchesDomainManifestBenchmarkIDs(t *testing.T) {
 		got[spec.ID()] = true
 	}
 	for _, workload := range manifest.Workloads {
+		parts := strings.SplitN(workload.ID, "/", 2)
+		if len(parts) == 2 && !benchdisc.EnabledInBuild(parts[0], parts[1]) {
+			continue
+		}
 		if !got[workload.ID] {
 			t.Fatalf("discovery missing manifest workload %s", workload.ID)
 		}
 	}
-	if len(got) != len(manifest.Workloads) {
-		t.Fatalf("discovery count = %d, manifest workloads = %d", len(got), len(manifest.Workloads))
+	var enabledWorkloads int
+	for _, workload := range manifest.Workloads {
+		parts := strings.SplitN(workload.ID, "/", 2)
+		if len(parts) == 2 && benchdisc.EnabledInBuild(parts[0], parts[1]) {
+			enabledWorkloads++
+		}
+	}
+	if len(got) != enabledWorkloads {
+		t.Fatalf("discovery count = %d, enabled manifest workloads = %d", len(got), enabledWorkloads)
 	}
 }
 

@@ -90,12 +90,10 @@ run_release_artifacts_gate_task() {
           exit 2
         fi
         version="$2"
-        require_tag=1
         shift 2
         ;;
       --version=*)
         version="${1#--version=}"
-        require_tag=1
         shift
         ;;
       --require-tag)
@@ -107,8 +105,9 @@ run_release_artifacts_gate_task() {
 Usage: scripts/run.sh release-artifacts-gate [--version VERSION] [--require-tag]
 
 Runs the release artifact gate with release-profile defaults. The gate builds
-artifacts and requires a clean worktree. A version argument, --require-tag, or
-LEIA_RELEASE_REQUIRE_TAG=1 adds exact-tag validation.
+artifacts and requires a clean worktree. Use --require-tag or
+LEIA_RELEASE_REQUIRE_TAG=1 for exact-tag validation; a version alone supports
+pre-tag release-candidate validation.
 USAGE
         return
         ;;

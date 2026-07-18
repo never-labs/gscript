@@ -24,7 +24,7 @@ func dataArrayHasNull(array data.Array) bool {
 	return false
 }
 
-func qDataFrameFromSoA(s *SoA) (data.Frame, error) {
+func dataLibFrameFromSoA(s *SoA) (data.Frame, error) {
 	if s == nil {
 		return data.Frame{}, fmt.Errorf("soa is nil")
 	}
@@ -34,7 +34,7 @@ func qDataFrameFromSoA(s *SoA) (data.Frame, error) {
 		if !ok {
 			return data.Frame{}, fmt.Errorf("soa column %q not found", name)
 		}
-		array, err := qDataArrayFromDense(col)
+		array, err := dataLibArrayFromDense(col)
 		if err != nil {
 			return data.Frame{}, fmt.Errorf("column %q: %w", name, err)
 		}
@@ -43,7 +43,7 @@ func qDataFrameFromSoA(s *SoA) (data.Frame, error) {
 	return data.NewFrame(cols...)
 }
 
-func qDataFrameFromSoABorrowed(s *SoA) (data.Frame, error) {
+func dataLibFrameFromSoABorrowed(s *SoA) (data.Frame, error) {
 	if s == nil {
 		return data.Frame{}, fmt.Errorf("soa is nil")
 	}
@@ -54,7 +54,7 @@ func qDataFrameFromSoABorrowed(s *SoA) (data.Frame, error) {
 		if !ok {
 			return data.Frame{}, fmt.Errorf("soa column %q not found", name)
 		}
-		array, err := qDataArrayFromDenseBorrowed(col)
+		array, err := dataLibArrayFromDenseBorrowed(col)
 		if err != nil {
 			return data.Frame{}, fmt.Errorf("column %q: %w", name, err)
 		}
@@ -63,7 +63,7 @@ func qDataFrameFromSoABorrowed(s *SoA) (data.Frame, error) {
 	return data.NewFrame(cols...)
 }
 
-func qDataArrayFromDenseBorrowed(col *DenseArray) (data.Array, error) {
+func dataLibArrayFromDenseBorrowed(col *DenseArray) (data.Array, error) {
 	if col == nil {
 		return nil, fmt.Errorf("dense array is nil")
 	}
@@ -97,7 +97,7 @@ func qDataArrayFromDenseBorrowed(col *DenseArray) (data.Array, error) {
 	}
 }
 
-func qDataArrayFromDense(col *DenseArray) (data.Array, error) {
+func dataLibArrayFromDense(col *DenseArray) (data.Array, error) {
 	switch col.DType() {
 	case DenseArrayF64:
 		xs := make([]float64, col.Len())
@@ -162,11 +162,11 @@ func qPlainStringDictionaryKeyOrder(tbl *Table) ([]data.Symbol, bool) {
 	return keys, true
 }
 
-func qLooksLikeFrame(tbl *Table) bool {
+func looksLikeFrame(tbl *Table) bool {
 	if tbl == nil {
 		return false
 	}
-	if kind, ok := qNativeFrameRuntimeKind(tbl); ok {
+	if kind, ok := nativeFrameRuntimeKind(tbl); ok {
 		return kind == NativePayloadDataFrame
 	}
 	return isDataFrameTable(tbl) || qLooksLikeScriptDataFrameFacade(tbl)
@@ -189,13 +189,13 @@ func qIsKeyedFrameTable(tbl *Table) bool {
 	if tbl == nil {
 		return false
 	}
-	if kind, ok := qNativeFrameRuntimeKind(tbl); ok {
+	if kind, ok := nativeFrameRuntimeKind(tbl); ok {
 		return kind == NativePayloadKeyedFrame
 	}
 	return tbl.RawGetString(qKeyedFrameMarker).Truthy()
 }
 
-func qNativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
+func nativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
 	if tbl == nil {
 		return NativePayloadNone, false
 	}
@@ -205,8 +205,8 @@ func qNativeFrameRuntimeKind(tbl *Table) (NativePayloadKind, bool) {
 	return qLegacyNativeFramePayloadKind(tbl)
 }
 
-func qNativeFrameRuntimeKindMatches(tbl *Table, want NativePayloadKind) bool {
-	kind, ok := qNativeFrameRuntimeKind(tbl)
+func nativeFrameRuntimeKindMatches(tbl *Table, want NativePayloadKind) bool {
+	kind, ok := nativeFrameRuntimeKind(tbl)
 	return ok && kind == want
 }
 

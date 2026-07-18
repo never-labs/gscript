@@ -19,10 +19,10 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 	}
 	readme := string(data)
 	for _, want := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
-		"x := sum(a)",
-		"turn {",
-		"prompt {",
+		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
+		"func greet(name)",
+		"total += n",
+		`print(greet("Leia"))`,
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("README missing focused positioning snippet %q", want)
@@ -71,7 +71,7 @@ func readFileString(t *testing.T, path string) string {
 	return string(data)
 }
 
-func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
+func TestReadmeMainLeiaExampleStaysRunnable(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "README.md"))
 	if err != nil {
@@ -81,7 +81,7 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if snippet == "" {
 		t.Fatal("README must contain a Leia example")
 	}
-	for _, want := range []string{"a := [1, 2, 3, 4, 5, 6, 7, 8, 6]", "x := sum(a)", "turn {", "prompt {", "print(x)"} {
+	for _, want := range []string{"func greet(name)", "numbers := [1, 2, 3, 4, 5]", "total += n", `print(greet("Leia"))`} {
 		if !strings.Contains(snippet, want) {
 			t.Fatalf("README Leia example missing %q:\n%s", want, snippet)
 		}
@@ -98,8 +98,8 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("README Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
-	if strings.TrimSpace(stdout.String()) != "42.0" {
-		t.Fatalf("README Leia example stdout = %q, want 42.0 fallback without host LLM provider", stdout.String())
+	if strings.TrimSpace(stdout.String()) != "Hello, Leia!\nsum:\t15" {
+		t.Fatalf("README Leia example stdout = %q, want greeting and sum", stdout.String())
 	}
 }
 

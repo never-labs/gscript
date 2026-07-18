@@ -2032,11 +2032,11 @@ x, y := triple()    // 10, 20
 func forward() {
     return triple()
 }
-p, q, r := forward()
+first, second, third := forward()
 
 assert(a == 10 && b == 20 && c == 30)
 assert(x == 10 && y == 20)
-assert(p == 10 && q == 20 && r == 30)
+assert(first == 10 && second == 20 && third == 30)
 ```
 
 A parenthesized call is no longer in an expanding position and contributes

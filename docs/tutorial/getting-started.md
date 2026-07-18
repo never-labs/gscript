@@ -9,12 +9,23 @@ go run ./cmd/leia eval 'print("hello from leia")'
 go run ./cmd/leia run tests/smoke/01_basic.leia
 ```
 
-Install from the module path when you want local development binaries:
+Install the latest published CLI and language server from their explicit
+command paths:
 
 ```bash
 go install github.com/never-labs/leia/cmd/leia@latest
 go install github.com/never-labs/leia/cmd/leia-lsp@latest
 leia version
+leia-lsp --help
+```
+
+From a checkout, install the current source into an isolated or configured
+`GOBIN` without depending on a published tag:
+
+```bash
+GOBIN=/tmp/leia-bin go install ./cmd/leia ./cmd/leia-lsp
+/tmp/leia-bin/leia version
+/tmp/leia-bin/leia-lsp --help
 ```
 
 After public binary releases exist, `scripts/install.sh` can install a

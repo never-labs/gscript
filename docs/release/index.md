@@ -188,11 +188,14 @@ Every public tag must have release notes. The notes must identify:
 
 `scripts/run.sh release-notes --json --version vX.Y.Z` reports
 `checked_file_count`, `required_artifact_count`, `artifact_checksum_count`,
-`failure_kind_count`, and `failure_count`. Its `checked_file_details` and
-`required_artifact_details` fields expose checked file roles, existence, and
-artifact checksum status. Its `failure_kinds` and `failure_details` fields make
-missing files, missing required text, template placeholders, and missing
-checksums machine-groupable.
+`failure_kind_count`, and `failure_count`. Candidate notes must list every
+archive and point users to the published `SHA256SUMS` asset; final hashes cannot
+be embedded before the tagged commit is built. The legacy
+`artifact_checksum_count` and `checksum_present` JSON names therefore report
+artifact checksum-source coverage for compatibility with existing report
+consumers. Its `failure_kinds` and `failure_details` fields make missing files,
+missing artifact declarations, missing required text, and template placeholders
+machine-groupable.
 
 ## Public Release Blockers
 

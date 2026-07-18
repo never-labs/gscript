@@ -153,6 +153,9 @@ func DomainSpecs(root, group string) ([]Benchmark, error) {
 
 	specs := make([]Benchmark, 0, len(names))
 	for _, name := range names {
+		if !EnabledInBuild(group, name) {
+			continue
+		}
 		luajit := filepath.Join(root, "benchmarks", "lua_ref", group, name+".lua")
 		if !fileExists(luajit) {
 			luajit = ""

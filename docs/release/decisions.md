@@ -57,9 +57,15 @@ Release evidence must identify the distribution channels and artifacts that are
 official for the tag.
 
 Official initial public channels are GitHub Releases, `scripts/install.sh`,
-and `go install github.com/never-labs/leia/...@TAG`. Package managers are not
-official release channels until a later decision records owner, workflow, and
-validation evidence.
+and these explicit Go install targets:
+
+```bash
+go install github.com/never-labs/leia/cmd/leia@TAG
+go install github.com/never-labs/leia/cmd/leia-lsp@TAG
+```
+
+Package managers are not official release channels until a later decision
+records owner, workflow, and validation evidence.
 
 ## Artifact Signing
 
@@ -76,13 +82,13 @@ The specification, feature matrix, conformance gates, and release notes define
 the compatibility surface. Optimizations, JIT availability, typed kernels, and provider integrations are not compatibility guarantees unless the release notes say so explicitly.
 
 Before v1.0, compatibility is best-effort and release-note-bound. The
-spec-covered language core, q semantics covered by conformance gates, stdlib
-APIs documented in reference pages, embedding API, CLI behavior, module
-resolution, and tagged dialect contracts are the intended stable surface for a
-given tag. Experimental surfaces include AI provider integration, live
-providers, JIT internals, typed runtime kernels, diagnostics formats not marked
-as release evidence, and newly added dialect extensions. User-visible changes
-must be listed in release notes with migration guidance.
+spec-covered language core, stdlib APIs documented in reference pages,
+embedding API, CLI behavior, module resolution, and tagged dialect contracts
+are the intended stable surface for a given tag. Experimental surfaces include
+AI provider integration, live providers, JIT internals, typed runtime kernels,
+diagnostics formats not marked as release evidence, optional extension
+semantics, and newly added dialect extensions. User-visible changes must be
+listed in release notes with migration guidance.
 
 ## Branch Policy
 

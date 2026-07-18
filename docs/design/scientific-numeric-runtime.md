@@ -190,7 +190,8 @@ source.
 - `ode.solve(..., {state_names: {...}, named_state: true})` for optional
   named state tables in dynamics, projection, and observation hooks while the
   default dense-vector hot path remains unchanged.
-- `q { ... }` raw blocks for compact q snippets without quoted source strings.
+- Optional extension dialects can provide compact domain-specific snippets
+  without expanding the default language surface.
 
 ## Redundancy Audit
 
@@ -203,7 +204,7 @@ The design target is:
   syntax as the user-facing surface;
 - make scientific values carry enough metadata that APIs do not repeat
   `state_names`, `named_state`, `wrap_angles`, shape, and trajectory plumbing;
-- strengthen vector, matrix, sample-set, state-space, ODE, control, and q
+- strengthen vector, matrix, sample-set, state-space, ODE, and control
   primitives so examples read as model code rather than adapter code;
 - avoid whole-algorithm facades such as Kalman-filter, particle-filter, or
   closed-loop-control wrappers in the core examples; such programs should be
@@ -216,8 +217,8 @@ Current sources of avoidable code are:
   observed columns;
 - explicit dense/vector/matrix coercions when APIs should accept the same
   numeric value shapes consistently;
-- q evaluator coverage gaps that force some vector/list operations back into
-  Leia code.
+- optional extension evaluator coverage gaps that force some vector/list
+  operations back into Leia code.
 
 The next work should harden those existing primitives and value contracts before
 adding new syntax or broadening the language boundary.

@@ -25,7 +25,7 @@ Use this template for release candidates and public tags.
 
 - Go embedding:
 - Data-oriented programming:
-- q analytics:
+- Optional extensions:
 - DSL/dialect changes:
 - Performance:
 - Concurrency:
@@ -69,15 +69,20 @@ List known issues, or write `None known` after release validation.
 
 ## Checksums And Artifacts
 
-| Artifact | SHA256 |
+Final checksums are generated from the tagged commit and distributed in the
+published `SHA256SUMS` release asset. Verify that file before installing an
+archive. Candidate notes list the complete artifact contract without embedding
+pre-tag hashes that would change when the release commit changes.
+
+| Artifact | Checksum source |
 |---|---|
-| `leia_vX.Y.Z_darwin_amd64.tar.gz` | |
-| `leia_vX.Y.Z_darwin_arm64.tar.gz` | |
-| `leia_vX.Y.Z_linux_amd64.tar.gz` | |
-| `leia_vX.Y.Z_linux_arm64.tar.gz` | |
-| `leia_vX.Y.Z_windows_amd64.zip` | |
-| `leia_vX.Y.Z_windows_arm64.zip` | |
-| `SHA256SUMS` | |
+| `leia_vX.Y.Z_darwin_amd64.tar.gz` | published `SHA256SUMS` |
+| `leia_vX.Y.Z_darwin_arm64.tar.gz` | published `SHA256SUMS` |
+| `leia_vX.Y.Z_linux_amd64.tar.gz` | published `SHA256SUMS` |
+| `leia_vX.Y.Z_linux_arm64.tar.gz` | published `SHA256SUMS` |
+| `leia_vX.Y.Z_windows_amd64.zip` | published `SHA256SUMS` |
+| `leia_vX.Y.Z_windows_arm64.zip` | published `SHA256SUMS` |
+| `SHA256SUMS` | GitHub Release asset |
 
 Each archive includes `leia` and `leia-lsp`.
 

@@ -14,8 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pr:
+  linux:
+    name: Linux / full PR gate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -23,3 +25,54 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go run ./cmd/leia ci pr --no-luajit
+
+  macos:
+    name: macOS / smoke
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Report runner architecture
+        run: go env GOOS GOARCH
+      - run: go run ./cmd/leia ci smoke
+
+  vet:
+    name: Go vet (except audited unsafeptr paths)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      # The runtime has audited unsafe hot paths. Keep every other vet analyzer enabled.
+      - run: go vet -unsafeptr=false ./...
+
+  race:
+    name: Race detector / smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: scripts/run.sh test race-smoke
+
+  q-extension:
+    name: Optional extension / q (experimental)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -tags leia_q ./... -count=1

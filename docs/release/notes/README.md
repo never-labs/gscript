@@ -4,7 +4,9 @@ Public tag notes live in this directory as `vX.Y.Z.md`.
 
 `scripts/run.sh release-notes --require-ready --version vX.Y.Z` validates
 that the candidate notes are filled in before the release workflow publishes
-artifacts.
+artifacts. Candidate notes list the artifact contract; final per-archive hashes
+are generated from the tagged commit and shipped in the published
+`SHA256SUMS` asset.
 
 Each candidate note must list:
 

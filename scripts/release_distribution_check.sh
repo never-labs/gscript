@@ -381,6 +381,15 @@ require_file .goreleaser.yaml
 require_file scripts/install.sh
 require_file scripts/release_snapshot_install_check.sh
 
+if [[ -f docs/release/decisions.md || -f docs/tutorial/getting-started.md ]]; then
+  require_file docs/release/decisions.md
+  require_file docs/tutorial/getting-started.md
+  require_contains docs/release/decisions.md "go install github.com/never-labs/leia/cmd/leia@TAG"
+  require_contains docs/release/decisions.md "go install github.com/never-labs/leia/cmd/leia-lsp@TAG"
+  require_contains docs/tutorial/getting-started.md "go install github.com/never-labs/leia/cmd/leia@latest"
+  require_contains docs/tutorial/getting-started.md "go install github.com/never-labs/leia/cmd/leia-lsp@latest"
+fi
+
 optional_workflow() {
   local file="$1"
   if [[ -f "$file" ]]; then
@@ -409,6 +418,9 @@ fi
 
 if [[ -f .github/workflows/distribution-check.yml ]]; then
   require_contains .github/workflows/distribution-check.yml "- scripts/run.sh"
+  require_contains .github/workflows/distribution-check.yml 'GOBIN="$install_bin" go install ./cmd/leia ./cmd/leia-lsp'
+  require_contains .github/workflows/distribution-check.yml '"$install_bin/leia" version'
+  require_contains .github/workflows/distribution-check.yml '"$install_bin/leia-lsp" --help'
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
   require_contains .github/workflows/distribution-check.yml "scripts/run.sh release-snapshot --dist-dir dist --bin-dir /tmp/leia-snapshot-bin"
 fi

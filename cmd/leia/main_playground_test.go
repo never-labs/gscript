@@ -388,8 +388,8 @@ func TestPlaygroundAIExamplesCoverReadmeAIDialectSurface(t *testing.T) {
 	}
 	readmeText := string(readme)
 	for _, claim := range []string{
-		"turn {",
-		"prompt { role: \"user\"",
+		"provider-backed AI",
+		"experimental: AI providers",
 	} {
 		if !strings.Contains(readmeText, claim) {
 			t.Fatalf("README missing AI playground claim %q", claim)
@@ -965,11 +965,11 @@ func TestReadmeFacingFeatureMatrixClaimsKeepRunnableExamples(t *testing.T) {
 		featureID     string
 		exampleRef    string
 	}{
-		{"embeddable scripting language for Go", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
-		{"turn {", "ai_dialect_integration", "examples/llm/agent.leia"},
-		{"first-class extensible domain dialects", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
-		{"high-throughput in-memory data runtime", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
-		{"LuaJIT-class execution model", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
+		{"inside Go applications", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
+		{"provider-backed AI", "ai_dialect_integration", "examples/llm/agent.leia"},
+		{"opt-in domain dialects", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
+		{"Data-oriented libraries", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
+		{"LuaJIT references", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
 	}
 
 	for _, claim := range claims {

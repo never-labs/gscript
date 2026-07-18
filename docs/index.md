@@ -5,9 +5,9 @@ title: Leia
 
 # Leia
 
-Leia is an efficient, embeddable scripting language for Go, combining a
-LuaJIT-class execution model, high-throughput in-memory data runtime, and
-first-class extensible domain dialects.
+Leia is a general-purpose scripting language designed to run standalone or
+inside Go applications. It combines a compact, Go-shaped syntax with dynamic
+values, modules, concurrency, an embeddable VM, and opt-in domain dialects.
 
 ````leia
 rows := [

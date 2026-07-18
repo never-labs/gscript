@@ -32,9 +32,9 @@ func TestReadmeAndSpecStableContractStayAligned(t *testing.T) {
 	stability := markdownSection(t, specIndex, "Stability Contract")
 
 	for _, snippet := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
-		"x := sum(a)",
-		"turn {",
+		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
+		"func greet(name)",
+		"total += n",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README.md stable contract must keep snippet %q", snippet)

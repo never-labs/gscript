@@ -317,7 +317,7 @@ func dialectDataBoundValue(v Value) (any, error) {
 	case v.IsString():
 		return v.Str(), nil
 	case v.IsDenseArray():
-		return qDataArrayFromDense(v.DenseArray())
+		return dataLibArrayFromDense(v.DenseArray())
 	case v.IsTable():
 		return dialectDataBoundTable(v.Table())
 	default:
@@ -338,7 +338,7 @@ func dialectDataBoundTable(t *Table) (any, error) {
 			case *lazySoAFramePayload:
 				return native.frame, nil
 			case *SoA:
-				return qDataFrameFromSoA(native)
+				return dataLibFrameFromSoA(native)
 			}
 		case NativePayloadKeyedFrame:
 			if keyed, ok := payload.(stddata.KeyedFrame); ok {
@@ -414,7 +414,7 @@ func dialectQInterpolationNeedsBinding(v Value) bool {
 		return false
 	}
 	t := v.Table()
-	if qLooksLikeFrame(t) || qIsKeyedFrameTable(t) {
+	if looksLikeFrame(t) || qIsKeyedFrameTable(t) {
 		return true
 	}
 	_, ok := qPlainStringDictionaryKeyOrder(t)

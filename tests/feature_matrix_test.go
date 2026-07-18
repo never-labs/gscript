@@ -399,12 +399,11 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, high-throughput in-memory data runtime, and first-class extensible domain dialects.",
-		"a := [1, 2, 3, 4, 5, 6, 7, 8, 6]",
-		"x := sum(a)",
-		"turn {",
-		"prompt {",
-		"print(x)",
+		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
+		"func greet(name)",
+		"numbers := [1, 2, 3, 4, 5]",
+		"total += n",
+		`print(greet("Leia"))`,
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README concise surface changed or missing expected snippet %q", snippet)
@@ -1141,15 +1140,15 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	)
 }
 
-func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
+func TestReadmeExperimentalAIDialectHasExplicitGates(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"turn {",
-		"prompt { role: \"user\"",
+		"provider-backed AI",
+		"experimental: AI providers",
 	} {
 		if !strings.Contains(readme, snippet) {
-			t.Fatalf("README AI dialect contract missing %q", snippet)
+			t.Fatalf("README experimental AI boundary missing %q", snippet)
 		}
 	}
 
