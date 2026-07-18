@@ -111,7 +111,7 @@ func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
 		`const leiaDialectTags = new Set([`,
 		`"sh", "cmd", "shellwords", "glob", "path", "re", "regexp", "json", "jsonptr",`,
 		`"httpmsg", "sse", "multipart", "jwt", "ipaddr", "cidr", "hostport", "serve",`,
-		`"binary", "q", "pem", "xlsx", "excel", "sql", "prompt", "quote", "model",`,
+		`"binary", "pem", "xlsx", "excel", "sql", "prompt", "quote", "model",`,
 		`"turn", "tool", "agent"`,
 		`const bt = String.fromCharCode(96);`,
 		`ch === "$" && (next === bt || (next === "!" && text[i + 2] === bt))`,
@@ -654,12 +654,10 @@ func TestPlaygroundRepositoryCoreExampleCoverage(t *testing.T) {
 		"repo-concurrency-pipeline_project-main":                  "host VM concurrency runner",
 		"repo-concurrency-context_process":                        "process host access",
 		"repo-concurrency-goroutine_errors":                       "debug event sink host access",
-		"repo-data-db_q_frame_project-main":                       "optional q extension",
-		"repo-data_processing-column_query-trade_analytics":       "optional q extension",
 		"repo-data_processing-data_oriented-particle_integration": "higher playground step budget",
 		"repo-dialects-shell_filesystem":                          "process shell and filesystem host access",
 	}
-	for _, dir := range []string{"hello", "concurrency", "data_processing", "dialects"} {
+	for _, dir := range []string{"hello", "concurrency", "data_processing", "dialects", "scientific"} {
 		dir := dir
 		t.Run(dir, func(t *testing.T) {
 			err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d os.DirEntry, err error) error {

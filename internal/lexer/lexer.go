@@ -190,7 +190,7 @@ func (l *Lexer) nextTokenInternal() (Token, error) {
 }
 
 func isRawSourceBlockTag(tag string) bool {
-	return tag == "q" || tag == "qsql"
+	return false
 }
 
 func (l *Lexer) rawSourceBlockAllowedHere() bool {

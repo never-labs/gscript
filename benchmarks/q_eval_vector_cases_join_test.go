@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package benchmarks
 
 // qEvalVectorJoinCases covers the canonical `,` join verb family: dense

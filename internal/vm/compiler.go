@@ -57,7 +57,7 @@ var predeclaredGlobalNames = []string{
 	"array", "base64", "binary", "bit32", "bytes", "channel", "cmd",
 	"context", "crypto", "csv", "debug", "dialect", "encoding", "eval", "fs",
 	"http", "io", "json", "llm", "math", "matrix", "os", "path", "process",
-	"q", "rand", "regexp", "runtime", "serve", "soa", "string", "sync",
+	"rand", "regexp", "runtime", "serve", "soa", "string", "sync",
 	"table", "testkit", "time", "utf8",
 }
 

@@ -49,7 +49,7 @@ go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernel
 go run ./cmd/leia examples run examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia
 ```
 
-Leia's larger examples emphasize DSLs: shell/data/web dialects, spreadsheets,
+Leia's larger examples include DSLs: shell/data/web dialects, spreadsheets,
 data-oriented runtime paths, and optional AI workflows. AI examples require a host
 provider or replay fixture; keep API keys in environment variables, not source
 files.

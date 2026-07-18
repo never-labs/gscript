@@ -506,40 +506,55 @@ func TestTripleBacktickRawStringAllowsNewlines(t *testing.T) {
 	})
 }
 
-func TestQRawSourceBlockAllowsEmbeddedQSyntax(t *testing.T) {
+func TestQBlockTokenizesAsOrdinaryTaggedBlock(t *testing.T) {
 	input := "x := q {\n+/1 2 3\ncount `AAPL`MSFT\n}\ny := 1"
 	expectTokens(t, input, []Token{
 		{Type: TOKEN_IDENT, Value: "x"},
 		{Type: TOKEN_DECLARE, Value: ":="},
 		{Type: TOKEN_IDENT, Value: "q"},
-		{Type: TOKEN_RAW_BLOCK, Value: "+/1 2 3\ncount `AAPL`MSFT"},
+		{Type: TOKEN_LBRACE, Value: "{"},
+		{Type: TOKEN_PLUS, Value: "+"},
+		{Type: TOKEN_SLASH, Value: "/"},
+		{Type: TOKEN_NUMBER, Value: "1"},
+		{Type: TOKEN_NUMBER, Value: "2"},
+		{Type: TOKEN_NUMBER, Value: "3"},
+		{Type: TOKEN_IDENT, Value: "count"},
+		{Type: TOKEN_STRING, Value: "AAPL"},
+		{Type: TOKEN_IDENT, Value: "MSFT"},
+		{Type: TOKEN_RBRACE, Value: "}"},
 		{Type: TOKEN_IDENT, Value: "y"},
 		{Type: TOKEN_DECLARE, Value: ":="},
 		{Type: TOKEN_NUMBER, Value: "1"},
 	})
 }
 
-func TestQRawSourceBlockAllowsNestedQForms(t *testing.T) {
+func TestQBlockNestedFormsAreNotRawSource(t *testing.T) {
 	input := "x := q {\nf:{\n x+y\n}\n.[f;(\n 2;\n 3\n)]\ncount `AAPL`MSFT\n}\ny := 1"
-	expectTokens(t, input, []Token{
-		{Type: TOKEN_IDENT, Value: "x"},
-		{Type: TOKEN_DECLARE, Value: ":="},
-		{Type: TOKEN_IDENT, Value: "q"},
-		{Type: TOKEN_RAW_BLOCK, Value: "f:{\n x+y\n}\n.[f;(\n 2;\n 3\n)]\ncount `AAPL`MSFT"},
-		{Type: TOKEN_IDENT, Value: "y"},
-		{Type: TOKEN_DECLARE, Value: ":="},
-		{Type: TOKEN_NUMBER, Value: "1"},
-	})
+	tokens, err := New(input).Tokenize()
+	if err != nil {
+		t.Fatalf("Tokenize returned error: %v", err)
+	}
+	for _, tok := range tokens {
+		if tok.Type == TOKEN_RAW_BLOCK {
+			t.Fatalf("q block tokenized as raw source block: %#v", tok)
+		}
+	}
 }
 
-func TestQFailFastRawSourceBlockAllowsEmbeddedQSyntax(t *testing.T) {
+func TestQFailFastBlockTokenizesAsOrdinaryBlock(t *testing.T) {
 	input := "x := q! {+/1 2 3}"
 	expectTokens(t, input, []Token{
 		{Type: TOKEN_IDENT, Value: "x"},
 		{Type: TOKEN_DECLARE, Value: ":="},
 		{Type: TOKEN_IDENT, Value: "q"},
 		{Type: TOKEN_NOT, Value: "!"},
-		{Type: TOKEN_RAW_BLOCK, Value: "+/1 2 3"},
+		{Type: TOKEN_LBRACE, Value: "{"},
+		{Type: TOKEN_PLUS, Value: "+"},
+		{Type: TOKEN_SLASH, Value: "/"},
+		{Type: TOKEN_NUMBER, Value: "1"},
+		{Type: TOKEN_NUMBER, Value: "2"},
+		{Type: TOKEN_NUMBER, Value: "3"},
+		{Type: TOKEN_RBRACE, Value: "}"},
 	})
 }
 
@@ -569,14 +584,16 @@ func TestQIdentifierBeforeControlFlowBlockIsNotRawSourceBlock(t *testing.T) {
 	})
 }
 
-func TestQRawSourceBlockIgnoresQLineCommentBraces(t *testing.T) {
+func TestQBlockDoesNotUseRawSourceCommentScanning(t *testing.T) {
 	input := "x := q {\n/ comment with }\n/* block comment with } */\n+/1 2 3\n}"
-	expectTokens(t, input, []Token{
-		{Type: TOKEN_IDENT, Value: "x"},
-		{Type: TOKEN_DECLARE, Value: ":="},
-		{Type: TOKEN_IDENT, Value: "q"},
-		{Type: TOKEN_RAW_BLOCK, Value: "/ comment with }\n/* block comment with } */\n+/1 2 3"},
-	})
+	tokens, err := New(input).Tokenize()
+	if err == nil {
+		for _, tok := range tokens {
+			if tok.Type == TOKEN_RAW_BLOCK {
+				t.Fatalf("q block tokenized as raw source block: %#v", tok)
+			}
+		}
+	}
 }
 
 func TestUnterminatedTripleBacktickRawString(t *testing.T) {

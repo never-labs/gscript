@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package bind
 
 // qSQL benchmark matrix: table-driven qSQL cases that pair every query with a

@@ -2301,7 +2301,7 @@ const leiaDialectTags = new Set([
   "mailaddr", "emailaddr", "headers", "http_headers", "cookie", "cookies",
   "httpmsg", "sse", "multipart", "jwt", "ipaddr", "cidr", "hostport", "serve",
   "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate",
-  "binary", "q", "pem", "xlsx", "excel", "sql", "prompt", "quote", "model",
+  "binary", "pem", "xlsx", "excel", "sql", "prompt", "quote", "model",
   "turn", "tool", "agent"
 ]);
 

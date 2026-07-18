@@ -1,4 +1,4 @@
-//go:build qextension
+//go:build qextension && leia_q
 
 package methodjit
 

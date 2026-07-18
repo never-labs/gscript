@@ -749,8 +749,8 @@ func TestExamplesCommandDefaultCheckSkipsOnlyOptInExamples(t *testing.T) {
 		}
 		seen[result.ID] = true
 	}
-	if len(seen) != len(allowed) || payload.Skipped < len(allowed) {
-		t.Fatalf("skipped examples = %v payload skipped=%d, want at least %d opt-in examples plus optional extensions", seen, payload.Skipped, len(allowed))
+	if len(seen) != len(allowed) {
+		t.Fatalf("skipped non-extension examples = %v, want %d opt-in examples", seen, len(allowed))
 	}
 }
 

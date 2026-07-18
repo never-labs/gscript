@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package bind
 
 // Stress tests for the q bind-boundary value-scope lifetime discipline:

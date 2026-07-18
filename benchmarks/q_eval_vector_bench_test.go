@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package benchmarks
 
 import (

@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
-	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
 const dataFrameMarker = "__data_frame"
@@ -1451,7 +1450,7 @@ func dataNativeRowValue(kind stddata.Kind, v any) Value {
 	switch kind {
 	case stddata.KindMonth, stddata.KindDate, stddata.KindTime, stddata.KindDateTime, stddata.KindTimespan,
 		stddata.KindMinute, stddata.KindSecond, stddata.KindTimestamp:
-		if text, ok := stdq.FormatTemporal(v); ok {
+		if text, ok := stddata.FormatTemporal(v); ok {
 			return StringValue(text)
 		}
 	}

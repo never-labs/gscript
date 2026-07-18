@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package benchmarks
 
 // Coverage gate for q.eval verbs: the set of supported verbs is extracted

@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package benchmarks
 
 // Dual-route differential fuzzing for q.eval.

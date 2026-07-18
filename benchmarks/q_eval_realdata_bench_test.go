@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package benchmarks
 
 // Realistic-data annex for the q.eval performance suite.

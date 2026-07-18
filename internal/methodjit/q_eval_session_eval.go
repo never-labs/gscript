@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package methodjit
 
 // q_eval_session_eval.go lowers typed-runtime constant-source q session eval

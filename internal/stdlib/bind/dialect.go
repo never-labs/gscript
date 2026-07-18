@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
 // BuildDialect creates the "dialect" standard library table. Dialects are a
@@ -299,7 +301,90 @@ func dialectQInterpolationTable(t *Table) (string, error) {
 }
 
 func dialectQInterpolationBoundValue(v Value) (any, error) {
-	return qWireValueFromValue(v)
+	return dialectDataBoundValue(v)
+}
+
+func dialectDataBoundValue(v Value) (any, error) {
+	switch {
+	case v.IsNil():
+		return nil, nil
+	case v.IsBool():
+		return v.Bool(), nil
+	case v.IsInt():
+		return v.Int(), nil
+	case v.IsFloat():
+		return v.Float(), nil
+	case v.IsString():
+		return v.Str(), nil
+	case v.IsDenseArray():
+		return qDataArrayFromDense(v.DenseArray())
+	case v.IsTable():
+		return dialectDataBoundTable(v.Table())
+	default:
+		return nil, fmt.Errorf("unsupported value type %v", v.Type())
+	}
+}
+
+func dialectDataBoundTable(t *Table) (any, error) {
+	if t == nil {
+		return nil, nil
+	}
+	if payload, info, ok := t.NativeFramePayload(); ok {
+		switch info.Kind {
+		case NativePayloadDataFrame:
+			switch native := payload.(type) {
+			case stddata.Frame:
+				return native, nil
+			case *lazySoAFramePayload:
+				return native.frame, nil
+			case *SoA:
+				return qDataFrameFromSoA(native)
+			}
+		case NativePayloadKeyedFrame:
+			if keyed, ok := payload.(stddata.KeyedFrame); ok {
+				return keyed, nil
+			}
+		}
+	}
+	if rows, cols, values, ok, err := linalgMatrixValue("q interpolation", TableValue(t)); err != nil {
+		return nil, err
+	} else if ok {
+		out := make([]any, rows)
+		for r := 0; r < rows; r++ {
+			row := make([]float64, cols)
+			copy(row, values[r*cols:(r+1)*cols])
+			out[r] = stddata.NewF64(row)
+		}
+		return stddata.InferArray(out), nil
+	}
+	if t.Length() > 0 {
+		values := make([]any, t.Length())
+		for i := range values {
+			item := t.RawGetInt(int64(i + 1))
+			if item.IsNil() {
+				return nil, fmt.Errorf("sequence table missing index %d", i+1)
+			}
+			wire, err := dialectDataBoundValue(item)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = wire
+		}
+		return stddata.InferArray(values), nil
+	}
+	keys, ok := qPlainStringDictionaryKeyOrder(t)
+	if !ok {
+		return nil, fmt.Errorf("unsupported table value")
+	}
+	out := make(map[string]any, len(keys))
+	for _, key := range keys {
+		value, err := dialectDataBoundValue(t.RawGetString(string(key)))
+		if err != nil {
+			return nil, err
+		}
+		out[string(key)] = value
+	}
+	return out, nil
 }
 
 func dialectQConsumeDotField(raw string) (string, string, bool) {

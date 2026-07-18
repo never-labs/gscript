@@ -1,4 +1,4 @@
-//go:build darwin && arm64
+//go:build darwin && arm64 && leia_q
 
 // q_eval_jit_script_bench_test.go measures "Leia script under JIT calling the
 // q evaluator in a hot loop" against the hand-written Go baselines

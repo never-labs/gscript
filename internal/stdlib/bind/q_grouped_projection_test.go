@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package bind
 
 // Regression coverage for grouped NON-aggregate projections (window verbs

@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package benchmarks
 
 // Complex-combination q.eval benchmark cases: depth>=3 pipelines, mixed-type

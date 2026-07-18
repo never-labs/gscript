@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package benchmarks
 
 // Per-type x null matrix and compound-predicate-depth q.eval cases.

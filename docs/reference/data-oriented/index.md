@@ -2,8 +2,7 @@
 
 Leia includes data-oriented standard libraries for numeric scripts that need
 columnar layout, typed dense arrays, vectors, matrices, masks, and hot-loop
-kernels. This is a language feature area, not only a library convenience:
-runtime and JIT paths can specialize these shapes while preserving normal script
+kernels. Runtime and JIT paths can specialize these shapes while preserving normal script
 semantics.
 
 ## Dense Arrays
@@ -58,9 +57,9 @@ boundaries but usually less efficient.
 
 ## Database Frames And Data Projects
 
-The built-in `db` module can bridge host-facing SQLite workflows into the same
-columnar data path. `db.frame(sql, params)` returns a result object with normal
-row tables for compatibility and column-oriented fields for analysis:
+The built-in `db` module can bridge host-facing SQLite workflows into the
+data runtime. `db.frame(sql, params)` returns a result object with normal row
+tables for compatibility and column-oriented fields for analysis:
 
 ```leia
 conn := db.open(":memory:")

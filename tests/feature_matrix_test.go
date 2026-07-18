@@ -292,6 +292,7 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	root := findRepoRoot(t)
 	features := loadFeatureMatrixFeatureMap(t, root)
+	assertGenericFeatureMatrixRefsDoNotUseQExamples(t, features)
 
 	tagged := features["tagged_dialect_syntax"]
 	if tagged == nil {
@@ -337,6 +338,11 @@ func TestFeatureMatrixCoversTaggedDialectAndModpkgReleaseGuards(t *testing.T) {
 	spreadsheet := requireFeature(t, features, "spreadsheet_dialects")
 	requireFeatureCellRefs(t, spreadsheet, "spreadsheet_dialects", "semantic_gate",
 		"internal/stdlib/bind/dialect_data_test.go",
+	)
+	requireFeatureCellRefs(t, tagged, "tagged_dialect_syntax", "semantic_gate",
+		"examples/automation/release_fixture_matrix.leia",
+		"examples/dialects/data_aggregation_report.leia",
+		"examples/dialects/sql_result_analytics.leia",
 	)
 	stdlibBoundary := readFileString(t, filepath.Join(root, "tests", "architecture", "stdlib_boundary_test.go"))
 	if !strings.Contains(stdlibBoundary, `"urlpath"`) {
@@ -1251,6 +1257,61 @@ func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 	}
 }
 
+func assertGenericFeatureMatrixRefsDoNotUseQExamples(t *testing.T, features map[string]map[string]json.RawMessage) {
+	t.Helper()
+
+	genericFeatures := []string{
+		"tagged_dialect_syntax",
+		"spreadsheet_dialects",
+		"matrix_dense_arrays",
+		"release_evidence_gates",
+		"release_distribution_surface",
+	}
+	var offenders []string
+	for _, id := range genericFeatures {
+		feature := requireFeature(t, features, id)
+		for field, raw := range feature {
+			if !featureMatrixFieldIsCoverageCell(raw) {
+				continue
+			}
+			var cell struct {
+				Refs []string `json:"refs"`
+			}
+			if err := json.Unmarshal(raw, &cell); err != nil {
+				t.Fatalf("%s.%s: %v", id, field, err)
+			}
+			for _, ref := range cell.Refs {
+				if featureMatrixRefIsQExample(ref) {
+					offenders = append(offenders, id+"."+field+"="+ref)
+				}
+			}
+		}
+	}
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		t.Fatalf("generic release/dialect/matrix/spreadsheet/data runtime feature refs must use non-q examples: %s", strings.Join(offenders, ", "))
+	}
+}
+
+func featureMatrixFieldIsCoverageCell(raw json.RawMessage) bool {
+	var cell struct {
+		Status string   `json:"status"`
+		Refs   []string `json:"refs"`
+	}
+	if err := json.Unmarshal(raw, &cell); err != nil {
+		return false
+	}
+	return cell.Status != "" && cell.Refs != nil
+}
+
+func featureMatrixRefIsQExample(ref string) bool {
+	base := filepath.Base(ref)
+	return strings.HasPrefix(ref, "examples/data/q") ||
+		strings.HasPrefix(ref, "tests/language/q") ||
+		strings.HasPrefix(base, "q_") ||
+		strings.HasPrefix(base, "q-")
+}
+
 func TestActiveDocsUseLeiaNamingAndNoLegacyAskAgentDesign(t *testing.T) {
 	root := findRepoRoot(t)
 	legacyProjectName := regexp.MustCompile(`(?i)\b(gscript|gs)\b`)
@@ -1334,8 +1395,11 @@ func TestUserFacingLeiaSourcesPreferListLiteralsForSequences(t *testing.T) {
 		"cmd/leia/main_lint_test.go",
 		"docs/spec/index.html",
 		"internal/stdlib/bind/table_",
-		"internal/stdlib/bind/q_bench",
-		"internal/stdlib/bind/q_runtime_kernel_bridge_test.go",
+		"internal/stdlib/bind/process_test.go",
+		"internal/stdlib/bind/string_extra_test.go",
+		"internal/stdlib/bind/testkit_test.go",
+		"tests/sdk/resource_budget_host_result_test.go",
+		"tests/sdk/security_host_capability_test.go",
 	}
 	var offenders []string
 	for _, base := range scanRoots {

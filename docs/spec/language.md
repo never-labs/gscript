@@ -115,7 +115,7 @@ expr_list     = expr { "," expr } ;
 ```
 
 Tables, calls, member selection, indexing, anonymous functions, dense arrays,
-imports, and tagged dialect forms are layered on this core grammar. Dialect
+imports, and tagged dialect forms build on this grammar. Dialect
 tags and blocks are the generic extension mechanism; shell/data/web forms,
 spreadsheets, AI workflows, and host-defined extensions all use the same
 dialect boundary.
@@ -144,7 +144,7 @@ Recoverable provider, budget, validation, and tool failures return structured
 error. Host-provided model credentials and endpoints are embedding policy, not
 source-level secrets.
 
-## Core Behavioral Rules
+## Behavioral Rules
 
 Leia is dynamically typed. Values are nil, booleans, numbers, strings, tables,
 functions, coroutines, channels, and host-backed userdata-like values represented

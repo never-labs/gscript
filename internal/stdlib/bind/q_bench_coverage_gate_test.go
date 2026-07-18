@@ -1,3 +1,5 @@
+//go:build leia_q
+
 package bind
 
 // Source-derived qSQL benchmark coverage gate, mirroring the q.eval verb gate

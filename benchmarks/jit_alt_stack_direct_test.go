@@ -1,4 +1,4 @@
-//go:build darwin && arm64
+//go:build darwin && arm64 && leia_q
 
 // jit_alt_stack_direct_test.go pins the R5-K JIT alternate-stack direct
 // helper-call lane (LEIA_JIT_ALT_STACK=1): when enabled, the per-iteration

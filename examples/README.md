@@ -29,15 +29,15 @@ Directories:
 
 | Directory | Purpose |
 |---|---|
-| `hello/` | Core language features and small idioms. |
+| `hello/` | Basic language features and small idioms. |
 | `api/` | Offline API-client style scripts for host-facing workflow examples. |
-| `dialects/` | Runnable checks for built-in shell/env, text, protocol, SQL-shaped, Markdown/table, binary, and validation dialects. |
+| `dialects/` | Runnable checks for built-in shell/env, text, protocol, database-result, Markdown/table, binary, and validation dialects. |
 | `automation/` | Project-level offline workflows for release, fixture, and business-ops automation. |
 | `ai/` | Replay-backed AI workflows, including a project-level coding-agent repair loop. |
 | `operations/` | Project-level offline workflows for local logs, backup hygiene, deploy risk, and ops reporting. |
 | `tooling/` | Project-level offline workflows for release evidence, diagnostics, and CLI gate planning. |
 | `performance/` | User-facing execution mode and benchmark policy examples. |
-| `data/` | Focused data-language and optional compatibility examples. |
+| `data/` | Focused data-runtime and optional compatibility examples. |
 | `data_processing/` | Strings, containers, dense data, vectors, matrices, and SoA. |
 | `database/` | Package-managed SQLite ledger analytics project. |
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |

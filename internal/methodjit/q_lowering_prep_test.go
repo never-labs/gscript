@@ -1,4 +1,4 @@
-//go:build darwin && arm64 && qextension
+//go:build darwin && arm64 && qextension && leia_q
 
 package methodjit
 

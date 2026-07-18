@@ -1,8 +1,8 @@
 # Leia Examples
 
-The `examples/` tree is part of the product surface. It shows how the language
-is meant to feel for small scripts, host embeddings, AI agents, data-oriented
-code, concurrency, web scripts, and game-style programs.
+The `examples/` tree is a curated catalog of runnable scripts and host-facing
+projects. It shows small scripts, host embeddings, AI agents, data-oriented
+runtime usage, concurrency, web scripts, and game-style programs.
 
 The repository-local example policy and dependency notes live in the
 [example tree README](https://github.com/never-labs/leia/blob/main/examples/README.md).
@@ -35,11 +35,11 @@ set.
 
 | Directory | Focus |
 |---|---|
-| `examples/hello/` | Core syntax, functions, tables, closures, metatables, coroutines, errors, and object-style patterns. |
+| `examples/hello/` | Basic syntax, functions, tables, closures, metatables, coroutines, errors, and object-style patterns. |
 | `examples/api/` | Offline API-client style scripts for host-facing workflow examples. |
 | `examples/automation/` | Offline business and release automation workflows. |
-| `examples/dialects/` | Built-in text, protocol, SQL-shaped, Markdown/table, binary, and validation dialect examples. |
-| `examples/data/` | Focused data-language and optional compatibility examples. |
+| `examples/dialects/` | Built-in text, protocol, database-result, Markdown/table, binary, and validation dialect examples. |
+| `examples/data/` | Focused data-runtime and optional compatibility examples. |
 | `examples/data_processing/` | Data structures, string processing, dense arrays, and SoA kernels. |
 | `examples/database/` | Package-managed database capability examples. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
@@ -79,7 +79,7 @@ round-tripping as one runnable data workflow. The SoA and dense-array examples
 cover columnar layout, masks, reductions, and dense numeric kernels. The
 particle integration example runs through the repository's higher-step-budget
 example runner; use the explicit `examples check` command above instead of the
-playground's default step budget when validating it.
+playground's standard step budget when validating it.
 
 ## Concurrency Examples
 
