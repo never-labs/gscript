@@ -1230,6 +1230,17 @@ func TestBenchGoHarnessParsesAndReportsRuntimeCounters(t *testing.T) {
 	}
 }
 
+func TestBenchGoCalibrationTargetLeavesHeadroom(t *testing.T) {
+	if got := benchGoCalibrationTarget(0.1); got != 0.125 {
+		t.Fatalf("calibration target = %v, want 0.125", got)
+	}
+	total := 0.101
+	sample := benchGoSample{Status: "ok", Source: "script_repeat", ScriptTotalSeconds: &total}
+	if benchGoSampleBigEnough(sample, benchGoCalibrationTarget(0.1), 4) {
+		t.Fatal("sample barely above the reporting floor must not finish calibration")
+	}
+}
+
 func TestBenchGoHarnessSortsLuaJITGapDescending(t *testing.T) {
 	row := func(group, name string, current, luajit float64) benchGoBenchmarkResult {
 		return benchGoBenchmarkResult{

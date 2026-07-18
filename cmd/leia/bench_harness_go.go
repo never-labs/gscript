@@ -992,14 +992,21 @@ func runBenchGoSubject(subject, runMode, root, leiaBin, luajitBin string, spec b
 func calibrateBenchGoRepeat(cmd benchModeCommand, cfg benchGoHarnessConfig, timeSource string) (int, benchGoSample) {
 	repeat := 1
 	last := benchGoSample{Status: "missing", Repeat: repeat}
+	calibrationTarget := benchGoCalibrationTarget(cfg.MinSampleSeconds)
 	for repeat <= cfg.MaxRepeat {
 		last = runBenchGoSample(cmd, repeat, cfg, timeSource)
-		if benchGoSampleBigEnough(last, cfg.MinSampleSeconds, cfg.MinWallRepeat) || last.Status == "error" || last.Status == "timeout" || last.Status == "no_time" {
+		if benchGoSampleBigEnough(last, calibrationTarget, cfg.MinWallRepeat) || last.Status == "error" || last.Status == "timeout" || last.Status == "no_time" {
 			return repeat, last
 		}
 		repeat *= 2
 	}
 	return cfg.MaxRepeat, last
+}
+
+func benchGoCalibrationTarget(minSampleSeconds float64) float64 {
+	// Leave room for timer quantization and normal run-to-run variance after
+	// calibration so a sample at the configured floor does not become partial.
+	return minSampleSeconds * 1.25
 }
 
 func runBenchGoSample(cmd benchModeCommand, repeat int, cfg benchGoHarnessConfig, timeSource string) benchGoSample {
