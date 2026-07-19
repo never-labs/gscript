@@ -19,6 +19,66 @@ func allStdStringSubFunctions(vals []runtime.Value) bool {
 	return true
 }
 
+func executeStringSplitSubstrOpExit(regs []runtime.Value, slot, tempBase, nArgs, specIdx int, specs []StringSplitSubSpec, callVM *vm.VM, missingVMError string) error {
+	if slot < 0 || slot >= len(regs) || tempBase < 0 || nArgs < 4 || tempBase+nArgs > len(regs) {
+		return fmt.Errorf("string.split substring op-exit out of register range")
+	}
+	splitCallee := regs[tempBase]
+	subCallees := regs[tempBase+1 : tempBase+nArgs-2]
+	sv := regs[tempBase+nArgs-2]
+	sepv := regs[tempBase+nArgs-1]
+	if specIdx >= 0 && specIdx < len(specs) && runtime.IsStdStringSplitFunction(splitCallee) && allStdStringSubFunctions(subCallees) {
+		spec := specs[specIdx]
+		v, err := runtime.StringSplitProjectSub(sv, sepv, spec.TokenIndex, spec.Start, spec.End, spec.HasEnd)
+		if err != nil {
+			return err
+		}
+		regs[slot] = v
+		return nil
+	}
+	if callVM == nil {
+		return fmt.Errorf("%s", missingVMError)
+	}
+	v, err := executeStringSplitSubstrFallback(callVM, splitCallee, subCallees, sv, sepv, specs, specIdx)
+	if err != nil {
+		return err
+	}
+	regs[slot] = v
+	return nil
+}
+
+func executeStringSplitSubstrNumberOpExit(regs []runtime.Value, slot, tempBase, nArgs, specIdx int, specs []StringSplitSubSpec, callVM *vm.VM, missingVMError string) error {
+	if slot < 0 || slot >= len(regs) || tempBase < 0 || nArgs < 5 || tempBase+nArgs > len(regs) {
+		return fmt.Errorf("string.split substring number op-exit out of register range")
+	}
+	splitCallee := regs[tempBase]
+	subCallees := regs[tempBase+1 : tempBase+nArgs-3]
+	tonumberCallee := regs[tempBase+nArgs-3]
+	sv := regs[tempBase+nArgs-2]
+	sepv := regs[tempBase+nArgs-1]
+	if specIdx >= 0 && specIdx < len(specs) &&
+		runtime.IsStdStringSplitFunction(splitCallee) &&
+		allStdStringSubFunctions(subCallees) &&
+		runtime.IsStdToNumberFunction(tonumberCallee) {
+		spec := specs[specIdx]
+		v, err := runtime.StringSplitProjectSubToNumber(sv, sepv, spec.TokenIndex, spec.Start, spec.End, spec.HasEnd)
+		if err != nil {
+			return err
+		}
+		regs[slot] = v
+		return nil
+	}
+	if callVM == nil {
+		return fmt.Errorf("%s", missingVMError)
+	}
+	v, err := executeStringSplitSubstrNumberFallback(callVM, splitCallee, subCallees, tonumberCallee, sv, sepv, specs, specIdx)
+	if err != nil {
+		return err
+	}
+	regs[slot] = v
+	return nil
+}
+
 func executeStringSplitSubstrFallback(callVM *vm.VM, splitCallee runtime.Value, subCallees []runtime.Value, sv, sepv runtime.Value, specs []StringSplitSubSpec, specIdx int) (runtime.Value, error) {
 	if specIdx < 0 || specIdx >= len(specs) {
 		return runtime.NilValue(), fmt.Errorf("string.split substring spec out of range")

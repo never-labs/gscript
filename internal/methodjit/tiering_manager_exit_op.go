@@ -158,68 +158,26 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		regs[absSlot] = results[0].Table().RawGetInt(int64(aux))
 
 	case OpStringSplitSubstr:
-		tempBase := absArg1
-		nArgs := int(ctx.OpExitArg2)
-		if absSlot >= len(regs) || tempBase < 0 || nArgs < 4 || tempBase+nArgs > len(regs) {
-			return fmt.Errorf("string.split substring op-exit out of register range")
-		}
-		splitCallee := regs[tempBase]
-		subCallees := regs[tempBase+1 : tempBase+nArgs-2]
-		sv := regs[tempBase+nArgs-2]
-		sepv := regs[tempBase+nArgs-1]
 		cf, _ := tm.tier2CompiledFor(proto)
-		if cf != nil && aux >= 0 && aux < len(cf.StringSplitSubSpecs) &&
-			runtime.IsStdStringSplitFunction(splitCallee) &&
-			allStdStringSubFunctions(subCallees) {
-			spec := cf.StringSplitSubSpecs[aux]
-			v, err := runtime.StringSplitProjectSub(sv, sepv, spec.TokenIndex, spec.Start, spec.End, spec.HasEnd)
-			if err != nil {
-				return err
-			}
-			regs[absSlot] = v
-			return nil
+		var specs []StringSplitSubSpec
+		callVM := tm.callVM
+		if cf != nil {
+			specs = cf.StringSplitSubSpecs
+		} else {
+			callVM = nil
 		}
-		if tm.callVM == nil || cf == nil {
-			return fmt.Errorf("no callVM set for string.split substring fallback")
-		}
-		v, err := executeStringSplitSubstrFallback(tm.callVM, splitCallee, subCallees, sv, sepv, cf.StringSplitSubSpecs, aux)
-		if err != nil {
-			return err
-		}
-		regs[absSlot] = v
+		return executeStringSplitSubstrOpExit(regs, absSlot, absArg1, int(ctx.OpExitArg2), aux, specs, callVM, "no callVM set for string.split substring fallback")
 
 	case OpStringSplitSubstrNumber:
-		tempBase := absArg1
-		nArgs := int(ctx.OpExitArg2)
-		if absSlot >= len(regs) || tempBase < 0 || nArgs < 5 || tempBase+nArgs > len(regs) {
-			return fmt.Errorf("string.split substring number op-exit out of register range")
-		}
-		splitCallee := regs[tempBase]
-		subCallees := regs[tempBase+1 : tempBase+nArgs-3]
-		tonumberCallee := regs[tempBase+nArgs-3]
-		sv := regs[tempBase+nArgs-2]
-		sepv := regs[tempBase+nArgs-1]
 		cf, _ := tm.tier2CompiledFor(proto)
-		if cf != nil && aux >= 0 && aux < len(cf.StringSplitSubSpecs) &&
-			runtime.IsStdStringSplitFunction(splitCallee) &&
-			allStdStringSubFunctions(subCallees) &&
-			runtime.IsStdToNumberFunction(tonumberCallee) {
-			spec := cf.StringSplitSubSpecs[aux]
-			v, err := runtime.StringSplitProjectSubToNumber(sv, sepv, spec.TokenIndex, spec.Start, spec.End, spec.HasEnd)
-			if err != nil {
-				return err
-			}
-			regs[absSlot] = v
-			return nil
+		var specs []StringSplitSubSpec
+		callVM := tm.callVM
+		if cf != nil {
+			specs = cf.StringSplitSubSpecs
+		} else {
+			callVM = nil
 		}
-		if tm.callVM == nil || cf == nil {
-			return fmt.Errorf("no callVM set for string.split substring number fallback")
-		}
-		v, err := executeStringSplitSubstrNumberFallback(tm.callVM, splitCallee, subCallees, tonumberCallee, sv, sepv, cf.StringSplitSubSpecs, aux)
-		if err != nil {
-			return err
-		}
-		regs[absSlot] = v
+		return executeStringSplitSubstrNumberOpExit(regs, absSlot, absArg1, int(ctx.OpExitArg2), aux, specs, callVM, "no callVM set for string.split substring number fallback")
 
 	case OpGetTableStringFormatInt:
 		tempBase := absArg1
