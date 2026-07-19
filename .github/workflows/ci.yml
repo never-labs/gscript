@@ -51,7 +51,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       # The runtime has audited unsafe hot paths. Keep every other vet analyzer enabled.
-      - run: go vet -unsafeptr=false ./...
+      - run: go vet -unsafeptr=false $(scripts/go_packages.sh)
 
   race:
     name: Race detector / smoke
@@ -75,4 +75,4 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go test -tags leia_q ./... -count=1
+      - run: go test -tags leia_q $(scripts/go_packages.sh) -count=1

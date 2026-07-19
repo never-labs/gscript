@@ -28,4 +28,4 @@ jobs:
       - name: Report govulncheck version
         run: '"$(go env GOPATH)/bin/govulncheck" -version'
       - name: Scan Go packages
-        run: '"$(go env GOPATH)/bin/govulncheck" ./...'
+        run: '"$(go env GOPATH)/bin/govulncheck" $(scripts/go_packages.sh)'

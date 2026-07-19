@@ -342,7 +342,11 @@ USAGE
       go test . ./cmd/leia ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1 "$@"
       ;;
     correctness)
-      go test ./... -count=1 "$@"
+      local packages=()
+      while IFS= read -r package; do
+        packages+=("$package")
+      done < <(scripts/go_packages.sh)
+      go test "${packages[@]}" -count=1 "$@"
       ;;
     feature-integration)
       go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1 "$@"
