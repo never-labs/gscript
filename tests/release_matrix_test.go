@@ -310,7 +310,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	ciReleaseVersionListCmd := "go run ./cmd/leia ci release --release-version vX.Y.Z --list"
 	productionFullCmd := "scripts/run.sh production --full --release-profile --release-version vX.Y.Z"
 	performanceSmokeCmd := "scripts/run.sh perf --smoke"
-	fullPerfGateCmd := "scripts/run.sh perf --full"
+	releasePerfGateCmd := "scripts/run.sh perf --release"
 	shellSyntaxCmd := "scripts/run.sh shell-syntax"
 	publicReleaseBlockersCmd := "scripts/run.sh public-blockers --require-resolved"
 	releaseDistributionCmd := "scripts/run.sh release-dist --require-goreleaser"
@@ -352,7 +352,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				productionFullCmd,
 				releaseMatrixCmd,
 				docsCheckCmd,
-				fullPerfGateCmd,
+				releasePerfGateCmd,
 				publicReleaseBlockersCmd,
 				releaseDistributionCmd,
 				releaseNotesCmd,
@@ -418,8 +418,8 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 		t.Fatalf("production_check.sh --quick --list must not weaken performance gates with --no-luajit; got:\n%s", productionOut)
 	}
 	fullOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--release-profile", "--list")
-	if !strings.Contains(fullOut, fullPerfGateCmd) {
-		t.Fatalf("production_check.sh --full --list must keep full LuaJIT performance gate %q; got:\n%s", fullPerfGateCmd, fullOut)
+	if !strings.Contains(fullOut, releasePerfGateCmd) {
+		t.Fatalf("production_check.sh release profile must keep bounded all-group LuaJIT performance gate %q; got:\n%s", releasePerfGateCmd, fullOut)
 	}
 	if !strings.Contains(fullOut, shellSyntaxCmd) {
 		t.Fatalf("production_check.sh --full --list must keep shell syntax gate %q; got:\n%s", shellSyntaxCmd, fullOut)

@@ -46,7 +46,7 @@ Include command, platform, CPU, Go version, LuaJIT availability, artifact path,
 and caveats.
 
 ```bash
-scripts/run.sh perf --full
+scripts/run.sh perf --release
 ```
 
 ## Validation
@@ -56,7 +56,7 @@ go run ./cmd/leia ci release --release-version vX.Y.Z --list
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z
 scripts/run.sh test release-matrix
 scripts/run.sh docs
-scripts/run.sh perf --full
+scripts/run.sh perf --release
 scripts/run.sh public-blockers --require-resolved
 scripts/run.sh release-dist --require-goreleaser
 scripts/run.sh release-notes --require-ready --version vX.Y.Z

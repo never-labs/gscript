@@ -556,7 +556,7 @@ func TestPerformanceGateFullGateSelectorsCoverDataOrientedFeatureRefsWithoutExpa
 	root := repoRootForPerformanceGate(t)
 	gate := readPerformanceGateFile(t, root, "scripts", "performance_gate.sh")
 	dataHotRefs := stringSet(performanceGateBenchmarkIDsFromFeatureRefs(t, root, "matrix_dense_arrays", "perf_hot_case"))
-	fullParts := strings.SplitN(gate, `if [ "$PROFILE" = "full" ]; then`, 2)
+	fullParts := strings.SplitN(gate, `if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then`, 2)
 	if len(fullParts) != 2 {
 		t.Fatal("full profile block not found")
 	}

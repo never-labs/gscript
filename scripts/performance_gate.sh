@@ -123,6 +123,7 @@ Options:
   --quick-phase-smoke     Run an explicit fast phase smoke for local iteration.
   --feature-smoke         Run hot-path smoke coverage for newer language features.
   --full                  Run all benchmark groups through leia bench compare.
+  --release               Run the bounded all-group release gate without a duplicate HEAD baseline.
   --bench ID              Add one benchmark selector, e.g. numeric/spectral_norm.
   --runs N                Measured timing samples after calibration. Default: 5.
   --warmup N              Warmup samples after calibration. Default: 1.
@@ -204,6 +205,15 @@ while [ "$#" -gt 0 ]; do
             ;;
         --full)
             PROFILE="full"
+            ;;
+        --release)
+            PROFILE="release"
+            RUNS=3
+            WARMUP=1
+            MIN_SAMPLE_SECONDS=0.050
+            MAX_REPEAT=64
+            MIN_WALL_REPEAT=4
+            HEAD_REF=""
             ;;
         --bench)
             shift
@@ -518,16 +528,19 @@ TIMING_CMD=(
     --sort=luajit-gap
     --progress
     --jobs="$JOBS"
-    --head-ref="$HEAD_REF"
     --json "$TIMING_JSON"
     --markdown "$TIMING_MD"
 )
+
+if [ -n "$HEAD_REF" ]; then
+    TIMING_CMD+=(--head-ref="$HEAD_REF")
+fi
 
 if [ "$NO_LUAJIT" -eq 1 ]; then
     TIMING_CMD+=(--no-luajit)
 fi
 
-if [ "$PROFILE" = "full" ]; then
+if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then
     TIMING_CMD+=(--all-groups)
 elif [ "$PROFILE" = "smoke" ]; then
     TIMING_CMD+=(--all-groups)
@@ -594,7 +607,7 @@ if [ "$STRICT" -eq 1 ]; then
     if [ "$PROFILE" = "syntax_smoke" ]; then
         STRICT_CMD+=(--mode vm --mode default --mode no_filter)
     fi
-    if [ "$PROFILE" = "full" ]; then
+    if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then
         for bench in "${STRICT_CORE_BENCHES[@]}"; do
             STRICT_CMD+=(--bench "$bench")
         done

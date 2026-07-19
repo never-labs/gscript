@@ -382,6 +382,9 @@ add_go_test() {
 
 add_performance_gate() {
     local cmd="scripts/run.sh perf --full"
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        cmd="scripts/run.sh perf --release"
+    fi
 
     if [ ! -f scripts/performance_gate.sh ]; then
         add_skip "Performance Gate" "missing scripts/performance_gate.sh"

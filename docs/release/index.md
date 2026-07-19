@@ -11,7 +11,7 @@ go run ./cmd/leia ci release --release-version vX.Y.Z --list
 scripts/run.sh production --full --release-profile --release-version vX.Y.Z
 scripts/run.sh test release-matrix
 scripts/run.sh docs
-scripts/run.sh perf --full
+scripts/run.sh perf --release
 scripts/run.sh release-dist --require-goreleaser
 scripts/run.sh release-check --build
 ```
@@ -157,6 +157,12 @@ and reports `artifact_entries` for the verified release artifact roles.
 `scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json` verifies the GoReleaser
 snapshot archive through `scripts/install.sh` with a staged local `file://`
 release directory.
+`scripts/run.sh perf --release` covers every benchmark group and the strict
+truth set while omitting the redundant current-versus-identical-HEAD run on a
+clean release commit. It uses bounded calibration so the hosted release job
+produces complete LuaJIT evidence within its execution budget. Use
+`scripts/run.sh perf --full` while developing to compare worktree changes with
+the clean `HEAD` baseline.
 `scripts/run.sh arch --json` reports methodjit source/test size,
 `large_file_details`, `tiering_manager_mentions`, `debt_marker_details`, and
 same-name `missing_test_files` so architecture debt is visible to release
