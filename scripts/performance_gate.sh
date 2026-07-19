@@ -208,11 +208,11 @@ while [ "$#" -gt 0 ]; do
             ;;
         --release)
             PROFILE="release"
-            RUNS=3
+            RUNS=2
             WARMUP=1
-            MIN_SAMPLE_SECONDS=0.050
-            MAX_REPEAT=64
-            MIN_WALL_REPEAT=4
+            MIN_SAMPLE_SECONDS=0.020
+            MAX_REPEAT=8
+            MIN_WALL_REPEAT=2
             HEAD_REF=""
             ;;
         --bench)

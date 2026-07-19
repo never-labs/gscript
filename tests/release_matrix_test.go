@@ -401,6 +401,10 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 			}
 		}
 	}
+	releaseWorkflow := readFileString(t, filepath.Join(root, ".github", "workflows", "release.yml"))
+	if strings.Contains(releaseWorkflow, `CGO_ENABLED: "0"`) {
+		t.Fatal("release workflow must keep CGO enabled for release-profile race gates; GoReleaser builds set CGO_ENABLED=0 per build")
+	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--list")
 	for _, snippet := range []string{

@@ -122,8 +122,10 @@ func TestScriptsPerformanceGateWrapsLeiaBenchTools(t *testing.T) {
 		`for bench in "${STRICT_SMOKE_BENCHES[@]}"; do`,
 		`if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then`,
 		`PROFILE="release"`,
-		`MIN_SAMPLE_SECONDS=0.050`,
-		`MAX_REPEAT=64`,
+		`RUNS=2`,
+		`MIN_SAMPLE_SECONDS=0.020`,
+		`MAX_REPEAT=8`,
+		`MIN_WALL_REPEAT=2`,
 		`HEAD_REF=""`,
 		`for bench in "${STRICT_CORE_BENCHES[@]}"; do`,
 	} {
