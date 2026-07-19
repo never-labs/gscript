@@ -315,6 +315,33 @@ func TestDocSiteCheckReportsRenderedSite(t *testing.T) {
 	}
 }
 
+func TestDocSiteCheckMapsRepositoryBasePath(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	siteDir := filepath.Join(t.TempDir(), "site")
+	if err := os.MkdirAll(filepath.Join(siteDir, "guide"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "index.html"), []byte(`<a href="/leia/guide/">Guide</a>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(siteDir, "guide", "index.html"), []byte(`<h1 id="intro">Guide</h1><a href="/leia/">Home</a>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"site-check", "--site-dir", siteDir, "--base-path", "/leia", "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand site-check code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report docSiteReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("site-check JSON failed to decode: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "pass" || report.BasePath != "/leia" || report.LocalLinkCount != 2 || report.FailureCount != 0 {
+		t.Fatalf("site-check report = %+v, want passing /leia base-path report", report)
+	}
+}
+
 func TestDocSiteCheckReportsBrokenSite(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	siteDir := filepath.Join(t.TempDir(), "site")

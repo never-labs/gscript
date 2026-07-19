@@ -111,6 +111,24 @@ run_gate() {
     fi
 }
 
+search_markdown() {
+    local pattern="$1"
+    if command -v rg >/dev/null 2>&1; then
+        rg -n "$pattern" README.md docs -g '*.md'
+    else
+        grep -R -n -E --include='*.md' -- "$pattern" README.md docs
+    fi
+}
+
+search_markdown_fixed() {
+    local pattern="$1"
+    if command -v rg >/dev/null 2>&1; then
+        rg -n -F "$pattern" README.md docs -g '*.md'
+    else
+        grep -R -n -F --include='*.md' -- "$pattern" README.md docs
+    fi
+}
+
 TMP_DOCS="$(mktemp -d)"
 trap 'rm -rf "$TMP_DOCS"' EXIT
 
@@ -188,13 +206,13 @@ while IFS= read -r _; do
     markdown_files=$((markdown_files + 1))
 done < <({ printf '%s\n' README.md; find docs -type f -name '*.md' ! -path 'docs/archive/*'; } | sort)
 
-relative_documentation_links="$({ rg -n '\]\([^)]*\.(md|html)(#[^)]*)?\)' README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
-repository_script_code_block_mentions="$({ rg -n 'scripts/(production_check|performance_gate|diagnostics_bundle|docs_check|editor_check|public_release_blockers_check|release_notes_check|release_artifacts|release_artifacts_check|release_distribution_check|release_snapshot_install_check|site_check|worktree_audit)\.sh' README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
+relative_documentation_links="$({ search_markdown '\]\([^)]*\.(md|html)(#[^)]*)?\)' || true; } | wc -l | tr -d ' ')"
+repository_script_code_block_mentions="$({ search_markdown 'scripts/(production_check|performance_gate|diagnostics_bundle|docs_check|editor_check|public_release_blockers_check|release_notes_check|release_artifacts|release_artifacts_check|release_distribution_check|release_snapshot_install_check|site_check|worktree_audit)\.sh' || true; } | wc -l | tr -d ' ')"
 release_gate_docs=4
 reference_entrypoints="$(find docs/reference -mindepth 2 -maxdepth 2 -name index.md | wc -l | tr -d ' ')"
 examples_index_directories="$(find examples -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 examples_capability_drift_gates=3
-runnable_spec_examples="$({ rg -n '^```leia (run|fail) all$' docs/spec -g '*.md' || true; } | wc -l | tr -d ' ')"
+runnable_spec_examples="$({ search_markdown '^```leia (run|fail) all$' || true; } | wc -l | tr -d ' ')"
 
 retired_path_patterns=(
     'docs/blog'
@@ -211,11 +229,11 @@ retired_name_patterns=(
 retired_path_mentions=0
 retired_name_mentions=0
 for pattern in "${retired_path_patterns[@]}"; do
-    count="$({ rg -n -F "$pattern" README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
+    count="$({ search_markdown_fixed "$pattern" || true; } | wc -l | tr -d ' ')"
     retired_path_mentions=$((retired_path_mentions + ${count:-0}))
 done
 for pattern in "${retired_name_patterns[@]}"; do
-    count="$({ rg -n -F "$pattern" README.md docs -g '*.md' || true; } | wc -l | tr -d ' ')"
+    count="$({ search_markdown_fixed "$pattern" || true; } | wc -l | tr -d ' ')"
     retired_name_mentions=$((retired_name_mentions + ${count:-0}))
 done
 if [ "$retired_path_mentions" -gt 0 ]; then

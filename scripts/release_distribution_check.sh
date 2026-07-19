@@ -491,10 +491,10 @@ done
 
 log_info "release_distribution_check.sh: install script dry-run matrix verified"
 
+run_goreleaser_check
+
 check_local_install_fixture
 log_info "release_distribution_check.sh: local install fixture verified"
-
-run_goreleaser_check
 
 if [[ "$json_out" == "true" ]]; then
   print_json_report

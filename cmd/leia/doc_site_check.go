@@ -17,6 +17,7 @@ type docSiteReport struct {
 	SchemaVersion      int                    `json:"schema_version"`
 	Status             string                 `json:"status"`
 	SiteDir            string                 `json:"site_dir"`
+	BasePath           string                 `json:"base_path,omitempty"`
 	HTMLFileCount      int                    `json:"html_file_count"`
 	LocalLinkCount     int                    `json:"local_link_count"`
 	AssetRefCount      int                    `json:"asset_ref_count"`
@@ -57,6 +58,7 @@ func runDocSiteCheckCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("doc site-check", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	siteDir := fs.String("site-dir", filepath.Join(root, "_site"), "rendered site directory to inspect")
+	basePath := fs.String("base-path", "", "repository site URL prefix, for example /leia")
 	jsonOut := fs.Bool("json", false, "print a machine-readable site report")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -65,10 +67,10 @@ func runDocSiteCheckCommand(args []string, outw, errw io.Writer) int {
 		return 2
 	}
 	if len(fs.Args()) != 0 {
-		fmt.Fprintln(errw, "usage: leia doc site-check [--site-dir DIR] [--json]")
+		fmt.Fprintln(errw, "usage: leia doc site-check [--site-dir DIR] [--base-path PATH] [--json]")
 		return 2
 	}
-	report := checkDocSite(root, *siteDir)
+	report := checkDocSite(root, *siteDir, *basePath)
 	if *jsonOut {
 		enc := json.NewEncoder(outw)
 		enc.SetIndent("", "  ")
@@ -90,13 +92,15 @@ func runDocSiteCheckCommand(args []string, outw, errw io.Writer) int {
 	return 0
 }
 
-func checkDocSite(root, siteDir string) docSiteReport {
+func checkDocSite(root, siteDir, basePath string) docSiteReport {
 	rootAbs, _ := filepath.Abs(root)
 	siteAbs, _ := filepath.Abs(siteDir)
+	basePath = docSiteNormalizeBasePath(basePath)
 	report := docSiteReport{
 		SchemaVersion:  1,
 		Status:         "pass",
 		SiteDir:        docSiteRel(rootAbs, siteAbs, siteAbs),
+		BasePath:       basePath,
 		FailureKinds:   []string{},
 		FailureDetails: []docSiteFailureDetail{},
 	}
@@ -132,7 +136,7 @@ func checkDocSite(root, siteDir string) docSiteReport {
 			if ref.Value == "" || docSiteIsExternal(ref.Value) {
 				continue
 			}
-			target, fragment := docSiteTargetFor(htmlFile, ref.Value, siteAbs)
+			target, fragment := docSiteTargetFor(htmlFile, ref.Value, siteAbs, basePath)
 			parsed, _ := url.Parse(ref.Value)
 			parsedPath := ""
 			if parsed != nil {
@@ -237,7 +241,7 @@ func docSiteIsExternal(value string) bool {
 	return strings.HasPrefix(value, "//")
 }
 
-func docSiteTargetFor(current, value, siteDir string) (string, string) {
+func docSiteTargetFor(current, value, siteDir, basePath string) (string, string) {
 	parsed, _ := url.Parse(value)
 	parsedPath := ""
 	fragment := ""
@@ -250,6 +254,12 @@ func docSiteTargetFor(current, value, siteDir string) (string, string) {
 		return current, fragment
 	}
 	if strings.HasPrefix(parsedPath, "/") {
+		if basePath != "" && (parsedPath == basePath || strings.HasPrefix(parsedPath, basePath+"/")) {
+			parsedPath = strings.TrimPrefix(parsedPath, basePath)
+			if parsedPath == "" {
+				parsedPath = "/"
+			}
+		}
 		candidate = filepath.Join(siteDir, strings.TrimPrefix(parsedPath, "/"))
 	} else {
 		candidate = filepath.Join(filepath.Dir(current), parsedPath)
@@ -270,6 +280,14 @@ func docSiteTargetFor(current, value, siteDir string) (string, string) {
 		return candidate, fragment
 	}
 	return abs, fragment
+}
+
+func docSiteNormalizeBasePath(basePath string) string {
+	basePath = strings.TrimSpace(basePath)
+	if basePath == "" || basePath == "/" {
+		return ""
+	}
+	return "/" + strings.Trim(strings.ReplaceAll(basePath, "\\", "/"), "/")
 }
 
 func docSiteFailure(root, siteDir, kind, htmlFile, attr, value, message, target, fragment string) docSiteFailureDetail {

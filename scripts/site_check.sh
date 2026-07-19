@@ -4,17 +4,19 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SITE_DIR="$ROOT/_site"
+BASE_PATH=""
 JSON=0
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/site_check.sh [--site-dir DIR] [--json] [--help]
+Usage: scripts/site_check.sh [--site-dir DIR] [--base-path PATH] [--json] [--help]
 
 Checks rendered static site HTML for local link targets, local fragment anchors,
 and local asset references. External URLs are not fetched.
 
 Options:
   --site-dir DIR   Rendered site directory to inspect. Defaults to ./_site.
+  --base-path PATH Repository site prefix, for example /leia.
   --json           Print a machine-readable site report.
   -h, --help       Show this help.
 USAGE
@@ -35,6 +37,15 @@ while [[ $# -gt 0 ]]; do
       JSON=1
       shift
       ;;
+    --base-path)
+      if [[ $# -lt 2 ]]; then
+        echo "error: --base-path requires a value" >&2
+        usage >&2
+        exit 2
+      fi
+      BASE_PATH="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -48,6 +59,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 args=(doc site-check --site-dir "$SITE_DIR")
+if [[ -n "$BASE_PATH" ]]; then
+  args+=(--base-path "$BASE_PATH")
+fi
 if [ "$JSON" -eq 1 ]; then
   args+=(--json)
 fi
