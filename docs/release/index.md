@@ -157,10 +157,11 @@ and reports `artifact_entries` for the verified release artifact roles.
 `scripts/run.sh release-snapshot --dist-dir DIST_DIR --bin-dir BIN_DIR --json` verifies the GoReleaser
 snapshot archive through `scripts/install.sh` with a staged local `file://`
 release directory.
-`scripts/run.sh perf --release` covers every benchmark group and the strict
-truth set while omitting the redundant current-versus-identical-HEAD run on a
-clean release commit. It uses bounded calibration so the hosted release job
-produces complete LuaJIT evidence within its execution budget. Use
+`scripts/run.sh perf --release` covers every benchmark domain with a stable
+representative and runs the strict truth set while omitting the redundant
+current-versus-identical-HEAD run on a clean release commit. It uses bounded
+calibration so the hosted release job produces complete LuaJIT evidence within
+its execution budget. Use
 `scripts/run.sh perf --full` while developing to compare worktree changes with
 the clean `HEAD` baseline.
 `scripts/run.sh arch --json` reports methodjit source/test size,

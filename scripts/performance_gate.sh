@@ -43,6 +43,23 @@ CORE_BENCHES=(
     "table/nextvar_table"
 )
 
+# Hosted release runners validate one stable representative from every
+# benchmark domain. The exhaustive --full profile remains available for
+# architecture-native performance machines; several of its fixed-size hot
+# workloads take minutes per sample on platforms where MethodJIT falls back.
+RELEASE_BENCHES=(
+    "numeric/spectral_norm"
+    "recursion/mutual_recursion"
+    "table/table_field_access"
+    "table/nextvar_table"
+    "calls/method_dispatch"
+    "string/strings_patterns"
+    "concurrency/producer_consumer_pipeline"
+    "data/soa_masked_aggregate"
+    "app/actors_dispatch_mutation"
+    "control/defer_protected"
+)
+
 SMOKE_BENCHES=(
     "control/sieve"
     "table/table_array_access"
@@ -540,8 +557,13 @@ if [ "$NO_LUAJIT" -eq 1 ]; then
     TIMING_CMD+=(--no-luajit)
 fi
 
-if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then
+if [ "$PROFILE" = "full" ]; then
     TIMING_CMD+=(--all-groups)
+elif [ "$PROFILE" = "release" ]; then
+    TIMING_CMD+=(--all-groups)
+    for bench in "${RELEASE_BENCHES[@]}"; do
+        TIMING_CMD+=(--bench "$bench")
+    done
 elif [ "$PROFILE" = "smoke" ]; then
     TIMING_CMD+=(--all-groups)
     for bench in "${SMOKE_BENCHES[@]}"; do

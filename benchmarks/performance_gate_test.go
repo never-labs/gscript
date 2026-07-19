@@ -556,7 +556,7 @@ func TestPerformanceGateFullGateSelectorsCoverDataOrientedFeatureRefsWithoutExpa
 	root := repoRootForPerformanceGate(t)
 	gate := readPerformanceGateFile(t, root, "scripts", "performance_gate.sh")
 	dataHotRefs := stringSet(performanceGateBenchmarkIDsFromFeatureRefs(t, root, "matrix_dense_arrays", "perf_hot_case"))
-	fullParts := strings.SplitN(gate, `if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then`, 2)
+	fullParts := strings.SplitN(gate, `if [ "$PROFILE" = "full" ]; then`, 2)
 	if len(fullParts) != 2 {
 		t.Fatal("full profile block not found")
 	}
@@ -588,6 +588,27 @@ func TestPerformanceGateFullGateSelectorsCoverDataOrientedFeatureRefsWithoutExpa
 			if !values[want] {
 				t.Fatalf("%s missing %s", arrayName, want)
 			}
+		}
+	}
+}
+
+func TestPerformanceGateReleaseProfileCoversEveryManifestDomain(t *testing.T) {
+	root := repoRootForPerformanceGate(t)
+	gate := readPerformanceGateFile(t, root, "scripts", "performance_gate.sh")
+	manifest := readPerformanceGateManifest(t, root)
+	domains := map[string]bool{}
+	for _, c := range manifest.Cases {
+		parts := strings.SplitN(c.ID, "/", 2)
+		domains[parts[0]] = true
+	}
+	releaseDomains := map[string]bool{}
+	for _, id := range performanceGateShellArrayValues(t, gate, "RELEASE_BENCHES") {
+		parts := strings.SplitN(id, "/", 2)
+		releaseDomains[parts[0]] = true
+	}
+	for domain := range domains {
+		if !releaseDomains[domain] {
+			t.Fatalf("RELEASE_BENCHES missing manifest domain %s", domain)
 		}
 	}
 }
