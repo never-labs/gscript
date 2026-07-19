@@ -979,6 +979,174 @@ func read_only(arr, key) {
 	}
 }
 
+func TestTier2_BoundsSafeTableArrayLoadUsesPreciseDeopt(t *testing.T) {
+	src := `
+func read_at(arr, key) {
+    return arr[key]
+}
+`
+	top := compileTop(t, src)
+	proto := findProtoByName(top, "read_at")
+	if proto == nil {
+		t.Fatal("read_at proto not found")
+	}
+	seedIntTableFeedback(proto)
+
+	fn := BuildGraph(proto)
+	var err error
+	fn, _, err = RunTier2Pipeline(fn, &Tier2PipelineOpts{})
+	if err != nil {
+		t.Fatalf("pipeline: %v", err)
+	}
+	var load *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpTableArrayLoad {
+				load = instr
+				break
+			}
+		}
+	}
+	if load == nil {
+		t.Fatalf("expected TableArrayLoad after lowering:\n%s", Print(fn))
+	}
+	fn.Analysis.LoopSpecializationFacts().RecordTableArrayLowerBoundSafe(load.ID)
+	fn.Analysis.LoopSpecializationFacts().RecordTableArrayUpperBoundSafe(load.ID)
+
+	cf, err := Compile(fn, AllocateRegisters(fn))
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	defer cf.Code.Free()
+	if _, ok := cf.ResumeAddrs[load.ID]; ok {
+		t.Fatalf("bounds-safe guarded TableArrayLoad v%d emitted a table-exit continuation", load.ID)
+	}
+}
+
+func TestTier2_BoundsSafeMixedTableArrayLoadPreservesTypeMissAndHole(t *testing.T) {
+	src := `
+func read_at(arr, key) {
+    return arr[key]
+}
+`
+	top := compileTop(t, src)
+	proto := findProtoByName(top, "read_at")
+	if proto == nil {
+		t.Fatal("read_at proto not found")
+	}
+	fb := proto.EnsureFeedback()
+	for pc, inst := range proto.Code {
+		if vm.DecodeOp(inst) == vm.OP_GETTABLE {
+			fb[pc].Left = vm.FBTable
+			fb[pc].Right = vm.FBInt
+			fb[pc].Result = vm.FBTable
+			fb[pc].Kind = vm.FBKindMixed
+		}
+	}
+
+	globals := vmtest.NewInterpreterGlobals()
+	v := vm.New(globals)
+	defer v.Close()
+	if _, err := v.Execute(top); err != nil {
+		t.Fatalf("execute top: %v", err)
+	}
+	fnVal := v.GetGlobal("read_at")
+
+	fn := BuildGraph(proto)
+	var err error
+	fn, _, err = RunTier2Pipeline(fn, &Tier2PipelineOpts{})
+	if err != nil {
+		t.Fatalf("pipeline: %v", err)
+	}
+	var load *Instr
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpTableArrayLoad {
+				load = instr
+				break
+			}
+		}
+	}
+	if load == nil || load.Aux != int64(vm.FBKindMixed) {
+		t.Fatalf("expected mixed TableArrayLoad after lowering:\n%s", Print(fn))
+	}
+	fn.Analysis.LoopSpecializationFacts().RecordTableArrayLowerBoundSafe(load.ID)
+	fn.Analysis.LoopSpecializationFacts().RecordTableArrayUpperBoundSafe(load.ID)
+
+	cf, err := Compile(fn, AllocateRegisters(fn))
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	defer cf.Code.Free()
+	cf.CallVM = v
+	cf.DeoptFunc = func(args []runtime.Value) ([]runtime.Value, error) {
+		return v.CallValue(fnVal, args)
+	}
+
+	tbl := runtime.NewTable()
+	tbl.RawSetInt(1, runtime.TableValue(runtime.NewTable()))
+	tbl.RawSetInt(2, runtime.IntValue(17))
+	tbl.RawSetInt(3, runtime.TableValue(runtime.NewTable()))
+	got, err := cf.Execute([]runtime.Value{runtime.TableValue(tbl), runtime.IntValue(2)})
+	if err != nil {
+		t.Fatalf("type miss execute: %v", err)
+	}
+	if len(got) != 1 || !got[0].IsInt() || got[0].Int() != 17 {
+		t.Fatalf("type miss result = %v, want 17", got)
+	}
+
+	tbl.RawSetInt(2, runtime.NilValue())
+	got, err = cf.Execute([]runtime.Value{runtime.TableValue(tbl), runtime.IntValue(2)})
+	if err != nil {
+		t.Fatalf("hole execute: %v", err)
+	}
+	if len(got) != 1 || !got[0].IsNil() {
+		t.Fatalf("hole result = %v, want nil", got)
+	}
+}
+
+func TestTier2_UnboundedTableArrayLoadKeepsExitResume(t *testing.T) {
+	src := `
+func read_at(arr, key) {
+    return arr[key]
+}
+`
+	top := compileTop(t, src)
+	proto := findProtoByName(top, "read_at")
+	if proto == nil {
+		t.Fatal("read_at proto not found")
+	}
+	seedIntTableFeedback(proto)
+
+	fn := BuildGraph(proto)
+	var err error
+	fn, _, err = RunTier2Pipeline(fn, &Tier2PipelineOpts{})
+	if err != nil {
+		t.Fatalf("pipeline: %v", err)
+	}
+	var loadID int
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == OpTableArrayLoad {
+				loadID = instr.ID
+				break
+			}
+		}
+	}
+	if loadID == 0 {
+		t.Fatalf("expected TableArrayLoad after lowering:\n%s", Print(fn))
+	}
+
+	cf, err := Compile(fn, AllocateRegisters(fn))
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	defer cf.Code.Free()
+	if _, ok := cf.ResumeAddrs[loadID]; !ok {
+		t.Fatalf("unbounded TableArrayLoad v%d lost its table-exit continuation", loadID)
+	}
+}
+
 func seedIntTableFeedback(proto *vm.FuncProto) {
 	fb := proto.EnsureFeedback()
 	for pc, inst := range proto.Code {

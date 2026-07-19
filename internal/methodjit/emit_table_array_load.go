@@ -183,7 +183,16 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 	ec.recordTableArrayBoundedKey(instr)
 	asm.B(doneLabel)
 
+	if !ec.tableArrayLoadHasRuntimeMiss(instr) {
+		asm.Label(doneLabel)
+		return
+	}
 	asm.Label(deoptLabel)
+	if ec.tableArrayLoadCanUsePreciseDeopt(instr) {
+		ec.emitPreciseDeopt(instr)
+		asm.Label(doneLabel)
+		return
+	}
 	savedReprs := ec.snapshotValueReprs()
 	if ec.emitTableArrayLoadExit(instr) {
 		typeDeoptLabel := ec.uniqueLabel("tarr_load_exit_type_deopt")
@@ -196,6 +205,54 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		ec.emitPreciseDeopt(instr)
 	}
 	asm.Label(doneLabel)
+}
+
+func (ec *emitContext) tableArrayLoadHasRuntimeMiss(instr *Instr) bool {
+	if !ec.tableArrayLoadCanUseGuardedBounds(instr) || len(instr.Args) < 3 || instr.Args[2] == nil {
+		return true
+	}
+	keyID := instr.Args[2].ID
+	if _, constant := ec.constInts[keyID]; !constant && ec.irTypes[keyID] != TypeInt {
+		return true
+	}
+	if tableArrayLoadNeedsZeroValidGuard(instr) && !ec.tableArrayKeyKnownNonZero(keyID) {
+		return true
+	}
+	if instr.Aux != int64(vm.FBKindMixed) {
+		return false
+	}
+	switch instr.Type {
+	case TypeInt, TypeFloat, TypeTable:
+		return true
+	case TypeString:
+		return instr.Aux2&tableArrayLoadFlagProvenString == 0
+	default:
+		return false
+	}
+}
+
+// A bounds-safe load behind the matching array-kind header guard can resume
+// the original bytecode directly on a residual type/hole miss. Keeping the
+// full table-exit continuation inline only adds cold code in that case.
+func (ec *emitContext) tableArrayLoadCanUsePreciseDeopt(instr *Instr) bool {
+	if !ec.tableArrayLoadCanUseGuardedBounds(instr) || !ec.canPreciseDeopt(instr) {
+		return false
+	}
+	return true
+}
+
+func (ec *emitContext) tableArrayLoadCanUseGuardedBounds(instr *Instr) bool {
+	if ec == nil || instr == nil ||
+		!ec.tableArrayLowerBoundSafe(instr.ID) ||
+		!ec.tableArrayUpperBoundSafe(instr.ID) {
+		return false
+	}
+	headerValue, ok := tableArrayLoadHeaderValue(instr)
+	if !ok || headerValue.Def == nil || headerValue.Def.Op != OpTableArrayHeader {
+		return false
+	}
+	_, _, kindOK := tableArrayOffsets(instr.Aux)
+	return kindOK && headerValue.Def.Aux == instr.Aux
 }
 
 func (ec *emitContext) emitTableArrayNestedLoad(instr *Instr) {
