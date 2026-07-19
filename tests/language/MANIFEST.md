@@ -6,6 +6,14 @@ Source baseline:
 - URL: `https://www.lua.org/tests/lua-5.4.8-tests.tar.gz`
 - SHA-256: `9581d5a7c39ffbf29b8ccde2709083c380f7bbddbd968dcb15712d2f2e33f4e5`
 
+Execution oracle:
+
+- Version: Lua 5.5.0
+- Installer: `scripts/install_lua_oracle.sh`
+- SHA-256: `57ccc32bbbd005cab75bcc52444052535af691789dba2b9016d5c50640d68b3d`
+- `LUA_BIN` must name this interpreter. LuaJIT is used only by performance
+  comparisons, not by this conformance harness.
+
 Harness:
 
 ```bash

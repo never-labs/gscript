@@ -818,11 +818,22 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			},
 		},
 		{
+			path: "scripts/install_lua_oracle.sh",
+			snippets: []string{
+				`readonly LUA_VERSION="5.5.0"`,
+				`readonly LUA_SHA256="57ccc32bbbd005cab75bcc52444052535af691789dba2b9016d5c50640d68b3d"`,
+				`readonly LUA_URL="https://www.lua.org/ftp/lua-${LUA_VERSION}.tar.gz"`,
+				`actual_sha256="$(sha256_file "$archive")"`,
+			},
+		},
+		{
 			path: ".github/workflows/ci.yml",
 			snippets: []string{
 				"name: CI",
 				"go run ./cmd/leia ci pr --no-luajit",
 				"go-version-file: go.mod",
+				`scripts/install_lua_oracle.sh --bin-dir "$RUNNER_TEMP/lua/bin"`,
+				`echo "LUA_BIN=$RUNNER_TEMP/lua/bin/lua"`,
 			},
 		},
 		{
@@ -855,6 +866,8 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				`"$(go env GOPATH)/bin/goreleaser" --version`,
 				"LEIA_RELEASE_REQUIRE_TAG=1",
 				"LEIA_RELEASE_ARTIFACT_VERSION=\"${GITHUB_REF_NAME}\"",
+				`scripts/install_lua_oracle.sh --bin-dir "$RUNNER_TEMP/lua/bin"`,
+				`echo "LUA_BIN=$RUNNER_TEMP/lua/bin/lua"`,
 				`scripts/run.sh release-notes --require-ready --version "${GITHUB_REF_NAME}"`,
 				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
 				"scripts/run.sh release-snapshot --dist-dir dist --bin-dir /tmp/leia-snapshot-bin",

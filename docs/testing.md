@@ -32,6 +32,11 @@ scripts/run.sh docs
 scripts/run.sh perf --feature-smoke
 ```
 
+Language conformance uses the pinned Lua 5.5.0 oracle installed by
+`scripts/install_lua_oracle.sh`; set `LUA_BIN` to that executable. The
+translated corpus remains derived from the separately recorded Lua 5.4.8 test
+suite. LuaJIT is a performance reference and is not the conformance oracle.
+
 Use the `--syntax-smoke` command first after syntax-only language changes when
 you need quick hot-path performance evidence without the longer strict pass.
 
