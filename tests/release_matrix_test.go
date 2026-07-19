@@ -465,7 +465,7 @@ func TestReleaseMatrixReleaseProfileFailsCriticalSkips(t *testing.T) {
 
 	cmd := exec.Command("bash", "scripts/production_check.sh", "--full", "--release-profile")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "PATH="+tmpBin+":/usr/bin:/bin")
+	cmd.Env = append(os.Environ(), "PATH="+tmpBin+":/usr/bin:/bin", "LUA_BIN=leia-missing-lua")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("release profile unexpectedly passed with language oracle absent from PATH:\n%s", out)
@@ -473,7 +473,7 @@ func TestReleaseMatrixReleaseProfileFailsCriticalSkips(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"Runnable checks:",
-		"Language Conformance Surface: missing lua",
+		"Language Conformance Surface: missing leia-missing-lua",
 		"Release profile requires these checks to run instead of skip:",
 	} {
 		if !strings.Contains(text, want) {
