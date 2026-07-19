@@ -120,7 +120,11 @@ func TestScriptsPerformanceGateWrapsLeiaBenchTools(t *testing.T) {
 		`PROFILE="quick_phase_smoke"`,
 		"STRICT_SMOKE_BENCHES=(",
 		`for bench in "${STRICT_SMOKE_BENCHES[@]}"; do`,
-		`if [ "$PROFILE" = "full" ]; then`,
+		`if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then`,
+		`PROFILE="release"`,
+		`MIN_SAMPLE_SECONDS=0.050`,
+		`MAX_REPEAT=64`,
+		`HEAD_REF=""`,
 		`for bench in "${STRICT_CORE_BENCHES[@]}"; do`,
 	} {
 		requireContains(t, gate, want)
