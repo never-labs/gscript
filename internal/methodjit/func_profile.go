@@ -515,6 +515,12 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 	if shouldStayTier1ForBoxedRawIntSpecialization(proto, profile) {
 		return false
 	}
+	if !profile.HasLoop && protoHasDynamicTableStore(proto) {
+		return false
+	}
+	if profile.HasLoop && protoCallsDynamicTableStore(proto) {
+		return false
+	}
 	if proto != nil && !proto.MethodJITTier2Callable() {
 		return false
 	}
@@ -641,6 +647,38 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 	// Default: stay at Tier 1. Simple functions without loops, calls, or
 	// significant arithmetic don't benefit enough from Tier 2 to justify
 	// compilation overhead.
+	return false
+}
+
+// Dynamic array stores in loop-free leaves are not yet safe across every
+// Tier 2 deopt/resume path. Keep the call boundary in Tier 1 until the store's
+// partially executed state can be reconstructed without replaying mutations.
+func protoHasDynamicTableStore(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	for _, inst := range proto.Code {
+		if vm.DecodeOp(inst) == vm.OP_SETTABLE {
+			return true
+		}
+	}
+	return false
+}
+
+func protoCallsDynamicTableStore(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	for _, feedback := range proto.CallSiteFeedback {
+		if protoHasDynamicTableStore(feedback.CalleeVMProto) {
+			return true
+		}
+		for i := 0; i < int(feedback.CalleeVMProtoCount); i++ {
+			if protoHasDynamicTableStore(feedback.CalleeVMProtos[i]) {
+				return true
+			}
+		}
+	}
 	return false
 }
 

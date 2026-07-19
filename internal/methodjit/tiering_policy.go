@@ -110,7 +110,8 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 			RuntimeSpecialization: d,
 		}
 	}
-	if !state.Tier2Failed && tm.shouldPromoteNativeLoopDriver(proto, profile) {
+	unsafeDynamicTableStoreDispatch := tm.loopFieldDispatchMayCallDynamicTableStore(proto, profile)
+	if !state.Tier2Failed && !unsafeDynamicTableStoreDispatch && tm.shouldPromoteNativeLoopDriver(proto, profile) {
 		return PromotionDecision{
 			Action:       TieringActionPromoteTier2,
 			Reason:       PromotionReasonNativeLoopDriver,
@@ -191,6 +192,11 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 		promoteTier2 = false
 		reason = PromotionReasonLoopCallSuppressed
 		gate = blockGate("LoopCallTier2", "loop call path remains better at Tier 1")
+	}
+	if promoteTier2 && unsafeDynamicTableStoreDispatch {
+		promoteTier2 = false
+		reason = PromotionReasonLoopCallSuppressed
+		gate = blockGate("DynamicTableStoreDispatch", "field dispatch may call a dynamic table-store leaf")
 	}
 	if promoteTier2 {
 		if staticGate := tm.shouldSuppressStaticLoopBoundaryTier2(proto, profile); !staticGate.Allowed {

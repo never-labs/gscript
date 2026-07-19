@@ -362,6 +362,18 @@ func (tm *TieringManager) shouldPromoteNativeLoopDriver(proto *vm.FuncProto, pro
 	return canPromoteWithNativeLoopCalls(proto, globals)
 }
 
+func (tm *TieringManager) loopFieldDispatchMayCallDynamicTableStore(proto *vm.FuncProto, profile FuncProfile) bool {
+	if tm == nil || proto == nil || !profile.HasLoop || !hasFieldDispatchCallInLoop(proto) {
+		return false
+	}
+	for _, callee := range tm.buildLoopCallGlobals(proto) {
+		if protoHasDynamicTableStore(callee) {
+			return true
+		}
+	}
+	return false
+}
+
 func mainNativeLoopDriverCallsTableLoopCallee(proto *vm.FuncProto, globals map[string]*vm.FuncProto) bool {
 	if proto == nil || proto.Name != "<main>" || len(globals) == 0 {
 		return false

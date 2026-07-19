@@ -123,7 +123,7 @@ result := aggregate(2000, 2)
 	}
 }
 
-func TestNativeLoopDriverDoesNotReplayActorSideEffectsAfterDeopt(t *testing.T) {
+func TestDynamicTableStoreDispatchStaysTier1ToPreserveActorSemantics(t *testing.T) {
 	src := `
 func step_worker(a, tick) {
     a.x = a.x + a.vx
@@ -189,7 +189,7 @@ func run_world(actors, n, ticks) {
     return checksum
 }
 
-result := run_world(build_actors(3), 3, 1)
+result := run_world(build_actors(3000), 3000, 500)
 `
 	proto := compileTop(t, src)
 	globals := vmtest.NewInterpreterGlobals()
@@ -200,10 +200,10 @@ result := run_world(build_actors(3), 3, 1)
 	if _, err := v.Execute(proto); err != nil {
 		t.Fatalf("JIT execute: %v", err)
 	}
-	if got := v.GetGlobal("result"); !got.IsInt() || got.Int() != 332 {
-		t.Fatalf("result=%v, want 332", got)
+	if got := v.GetGlobal("result"); !got.IsInt() || got.Int() != 411826756 {
+		t.Fatalf("result=%v, want 411826756", got)
 	}
-	if !containsString(tm.Tier2Entered(), "run_world") {
-		t.Fatalf("expected run_world to enter Tier2 without replaying actor mutations, entered=%v failed=%v", tm.Tier2Entered(), tm.Tier2Failed())
+	if containsString(tm.Tier2Entered(), "run_world") || containsString(tm.Tier2Entered(), "step_cache") {
+		t.Fatalf("unsafe dynamic table-store path entered Tier2: entered=%v failed=%v", tm.Tier2Entered(), tm.Tier2Failed())
 	}
 }

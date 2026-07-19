@@ -219,6 +219,11 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 				"preserved self call for specialized recursive entry")
 			continue
 		}
+		if !analyzeFuncProfile(calleeProto).HasLoop && protoHasDynamicTableStore(calleeProto) {
+			functionRemarks(fn).Add("Inline", "missed", block.ID, instr.ID, instr.Op,
+				fmt.Sprintf("preserved %s call across dynamic table-store recovery boundary", calleeName))
+			continue
+		}
 		if computeLoopInfo(fn).loopBlocks[block.ID] && inlineCalleeHasRuntimeSpecializationEntry(calleeProto, config.Globals) {
 			functionRemarks(fn).Add("Inline", "missed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("preserved %s call for runtime-specialization entry", calleeName))
