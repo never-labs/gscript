@@ -60,6 +60,14 @@ RELEASE_BENCHES=(
     "control/sieve"
 )
 
+RELEASE_SCALES=(
+    "recursion/mutual_recursion:REPS=1000"
+    "calls/method_dispatch:N=100000"
+    "app/actors_dispatch_mutation:N=3000,TICKS=500"
+    "control/sieve:N=100000,REPS=1"
+    "control/defer_protected:DEFER_N=16,PROTECTED_N=10000,COROUTINE_N=5000"
+)
+
 SMOKE_BENCHES=(
     "control/sieve"
     "table/table_array_access"
@@ -111,6 +119,13 @@ FEATURE_SMOKE_BENCHES=(
 
 STRICT_CORE_BENCHES=(
     "control/sieve"
+    "string/string_bench"
+    "table/table_field_access"
+    "table/json_table_walk"
+)
+
+RELEASE_STRICT_BENCHES=(
+    "control/defer_protected"
     "string/string_bench"
     "table/table_field_access"
     "table/json_table_walk"
@@ -564,6 +579,9 @@ elif [ "$PROFILE" = "release" ]; then
     for bench in "${RELEASE_BENCHES[@]}"; do
         TIMING_CMD+=(--bench "$bench")
     done
+    for scale in "${RELEASE_SCALES[@]}"; do
+        TIMING_CMD+=(--scale "$scale")
+    done
 elif [ "$PROFILE" = "smoke" ]; then
     TIMING_CMD+=(--all-groups)
     for bench in "${SMOKE_BENCHES[@]}"; do
@@ -629,8 +647,17 @@ if [ "$STRICT" -eq 1 ]; then
     if [ "$PROFILE" = "syntax_smoke" ]; then
         STRICT_CMD+=(--mode vm --mode default --mode no_filter)
     fi
-    if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "release" ]; then
+    if [ "$PROFILE" = "release" ]; then
+        for scale in "${RELEASE_SCALES[@]}"; do
+            STRICT_CMD+=(--scale "$scale")
+        done
+    fi
+    if [ "$PROFILE" = "full" ]; then
         for bench in "${STRICT_CORE_BENCHES[@]}"; do
+            STRICT_CMD+=(--bench "$bench")
+        done
+    elif [ "$PROFILE" = "release" ]; then
+        for bench in "${RELEASE_STRICT_BENCHES[@]}"; do
             STRICT_CMD+=(--bench "$bench")
         done
     else

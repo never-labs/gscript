@@ -166,7 +166,9 @@ release directory.
 representative and runs the strict truth set while omitting the redundant
 current-versus-identical-HEAD run on a clean release commit. It uses bounded
 calibration so the hosted release job produces complete LuaJIT evidence within
-its execution budget. Use
+its execution budget. Fixed-size workloads that exceed the amd64 fallback
+budget use the same explicit parameter override for Leia and their Lua
+reference in both compare and strict passes. Use
 `scripts/run.sh perf --full` while developing to compare worktree changes with
 the clean `HEAD` baseline.
 `scripts/run.sh arch --json` reports methodjit source/test size,
