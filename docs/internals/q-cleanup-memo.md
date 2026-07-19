@@ -8,21 +8,17 @@ Remote: `https://github.com/never-labs/leia.git`
 
 ## Current State
 
-The q cleanup work has been pushed to `main`; this memo also tracks follow-up
-release-prep cleanup in the current working tree.
+The q cleanup work shipped in Leia v0.1.0. The release tag and `main` pointed
+to `176ed5da` when the release artifacts were built and published. The q
+extension remains in the repository behind the `leia_q` build tag; it is not
+part of the default v0.1.0 product surface.
 
-Latest commit:
+The commits that established that boundary are:
 
 - `c19a162c refactor: gate q extension behind build tag`
-
-Preceding commits:
-
 - `d8b4b601 refactor: remove q from default product surface`
 - `3aba757b refactor: remove q gate entrypoints`
 - `a4afd6f0 refactor: make q optional extension surface`
-
-The working tree was clean after the last push. Current follow-up edits are
-local until committed.
 
 ## Completed
 
@@ -72,9 +68,9 @@ If the target is "q becomes an independent optional extension package":
 
 ## Remaining Work
 
-### 1. Release boundary for v0.1.0
+### 1. Post-v0.1 extension boundary
 
-For v0.1.0, q remains an in-repository experimental extension enabled only
+In v0.1.0, q is an in-repository experimental extension enabled only
 with the `leia_q` build tag. It is not part of the default CLI/VM dependency
 graph, stable language specification, default documentation narrative, or
 platform support claim.
@@ -147,5 +143,5 @@ Do the low-risk architecture cleanup first:
    graph.
 2. Run the opt-in validation path before tags that intentionally include the
    extension source.
-3. Continue methodjit/runtime-kernel naming cleanup behind that boundary after
-   v0.1.0.
+3. Continue MethodJIT/runtime-kernel naming cleanup behind that boundary as
+   post-v0.1 architecture work.
