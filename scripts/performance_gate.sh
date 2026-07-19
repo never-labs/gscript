@@ -57,7 +57,7 @@ RELEASE_BENCHES=(
     "concurrency/producer_consumer_pipeline"
     "data/soa_masked_aggregate"
     "app/actors_dispatch_mutation"
-    "control/defer_protected"
+    "control/sieve"
 )
 
 SMOKE_BENCHES=(

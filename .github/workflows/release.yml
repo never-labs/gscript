@@ -14,10 +14,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  validate:
     runs-on: ubuntu-latest
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       LEIA_CONFORMANCE_CHECK_JIT: "1"
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +51,22 @@ jobs:
           else
             go run ./cmd/leia ci release
           fi
+
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
+      - run: '"$(go env GOPATH)/bin/goreleaser" --version'
       - if: github.ref_type == 'tag'
         run: scripts/run.sh release-notes --require-ready --version "${GITHUB_REF_NAME}"
       - if: github.event_name == 'workflow_dispatch'

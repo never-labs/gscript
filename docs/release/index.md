@@ -52,6 +52,11 @@ profile is the release validation source of truth: correctness, documentation,
 performance, language conformance, public blockers, distribution configuration,
 and local artifact installation evidence are all listed there. Documentation
 evidence is produced by `leia doc check --json` inside that profile.
+The hosted Release workflow runs this profile in a dedicated `validate` job;
+the dependent `release` job performs snapshot or tagged packaging only after
+validation succeeds. This keeps correctness, race, and performance evidence
+independent from the packaging runner budget without allowing publication to
+bypass a failed gate.
 
 The release evidence should cite:
 

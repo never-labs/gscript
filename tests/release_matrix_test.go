@@ -405,6 +405,11 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	if strings.Contains(releaseWorkflow, `CGO_ENABLED: "0"`) {
 		t.Fatal("release workflow must keep CGO enabled for release-profile race gates; GoReleaser builds set CGO_ENABLED=0 per build")
 	}
+	for _, want := range []string{"  validate:", "  release:", "    needs: validate"} {
+		if !strings.Contains(releaseWorkflow, want) {
+			t.Fatalf("release workflow must separate validation from packaging; missing %q", want)
+		}
+	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--list")
 	for _, snippet := range []string{
