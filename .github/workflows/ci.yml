@@ -77,4 +77,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - run: sudo apt-get update && sudo apt-get install -y luajit
+      - run: echo "LUA_BIN=luajit" >> "$GITHUB_ENV"
       - run: go test -tags leia_q $(scripts/go_packages.sh) -count=1
