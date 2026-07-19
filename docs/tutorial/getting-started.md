@@ -28,11 +28,12 @@ GOBIN=/tmp/leia-bin go install ./cmd/leia ./cmd/leia-lsp
 /tmp/leia-bin/leia-lsp --help
 ```
 
-After public binary releases exist, `scripts/install.sh` can install a
-checksummed release artifact containing both `leia` and `leia-lsp`:
+The published v0.1.0 binary release can be installed with
+`scripts/install.sh`; the checksummed archive contains both `leia` and
+`leia-lsp`:
 
 ```bash
-bash scripts/install.sh --version v0.1.0 --bin-dir "$HOME/bin" --dry-run
+bash scripts/install.sh --version v0.1.0 --bin-dir "$HOME/bin"
 ```
 
 Use `--base-url` when installing from a release mirror or local artifact

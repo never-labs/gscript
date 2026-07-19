@@ -1,10 +1,10 @@
 # Release Decisions
 
 Public releases require explicit maintainer decisions. This file records the
-open decisions that must not be inferred from implementation details, examples,
-or local validation runs.
+decisions that must not be inferred from implementation details, examples, or
+local validation runs, including their current resolution status.
 
-## Required Before Public Release
+## Initial Release Decisions
 
 | Area | Decision Needed | Current Status |
 |---|---|---|
