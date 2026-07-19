@@ -32,6 +32,7 @@ const (
 	NativeKindStdSoAAffineMany uint8 = 115
 	NativeKindStdQSQL          uint8 = 116
 	NativeKindStdQSelect       uint8 = 117
+	NativeKindStdIPairsIter    uint8 = 118
 )
 
 var stdStringFormatIdentity byte

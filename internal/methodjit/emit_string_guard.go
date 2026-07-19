@@ -62,7 +62,10 @@ func (ec *emitContext) emitStdStringFormatGuard(val jit.Reg, slowLabel string) {
 }
 
 func (ec *emitContext) emitStdNativeFunctionGuard(val jit.Reg, kind uint8, identity unsafe.Pointer, slowLabel string) {
-	asm := ec.asm
+	emitStdNativeFunctionIdentityGuard(ec.asm, val, kind, identity, slowLabel)
+}
+
+func emitStdNativeFunctionIdentityGuard(asm *jit.Assembler, val jit.Reg, kind uint8, identity unsafe.Pointer, slowLabel string) {
 	asm.LSRimm(jit.X2, val, 48)
 	asm.MOVimm16(jit.X3, jit.NB_TagPtrShr48)
 	asm.CMPreg(jit.X2, jit.X3)

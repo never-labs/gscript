@@ -307,7 +307,7 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 			emitBaselineOpExit(asm, inst, pc, vm.OP_VARARG)
 			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_TFORCALL:
-			emitBaselineOpExit(asm, inst, pc, vm.OP_TFORCALL)
+			emitBaselineTForCall(asm, inst, pc)
 			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_TFORLOOP:
 			emitBaselineTForLoop(asm, inst, pc)

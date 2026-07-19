@@ -614,6 +614,8 @@ func (vm *VM) newIPairsIteratorFunction() *runtime.GoFunction {
 			}
 			return key, v, 2, nil
 		},
+		NativeKind: runtime.NativeKindStdIPairsIter,
+		NativeData: runtime.StdIPairsIdentityPtr(),
 	}
 }
 
