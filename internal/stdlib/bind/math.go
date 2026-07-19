@@ -47,8 +47,8 @@ func BuildMath() *Table {
 	// Constants
 	t.RawSet(StringValue("pi"), FloatValue(math.Pi))
 	t.RawSet(StringValue("huge"), FloatValue(math.Inf(1)))
-	t.RawSet(StringValue("maxinteger"), IntValue(math.MaxInt64))
-	t.RawSet(StringValue("mininteger"), IntValue(math.MinInt64))
+	t.RawSet(StringValue("maxinteger"), IntValue(MaxInteger))
+	t.RawSet(StringValue("mininteger"), IntValue(MinInteger))
 
 	// math.abs(x)
 	set("abs", func(args []Value) ([]Value, error) {
@@ -375,7 +375,10 @@ func BuildMath() *Table {
 			return []Value{FloatValue(rng.Float64())}, nil
 		}
 		if len(args) == 1 {
-			m := mathToInt(args[0])
+			m, err := mathRandomInt(args[0], 1)
+			if err != nil {
+				return nil, err
+			}
 			if m == 0 {
 				return []Value{IntValue(rng.Int63())}, nil
 			}
@@ -384,8 +387,14 @@ func BuildMath() *Table {
 			}
 			return []Value{IntValue(rng.Int63n(m) + 1)}, nil
 		}
-		m := mathToInt(args[0])
-		n := mathToInt(args[1])
+		m, err := mathRandomInt(args[0], 1)
+		if err != nil {
+			return nil, err
+		}
+		n, err := mathRandomInt(args[1], 2)
+		if err != nil {
+			return nil, err
+		}
 		if m > n {
 			return nil, fmt.Errorf("bad argument #2 to 'math.random' (interval is empty)")
 		}
@@ -622,7 +631,17 @@ func mathToInt(v Value) int64 {
 	case TypeInt:
 		return v.Int()
 	case TypeFloat:
-		return int64(v.Float())
+		f := v.Float()
+		if math.IsNaN(f) {
+			return 0
+		}
+		if f >= float64(math.MaxInt64) {
+			return math.MaxInt64
+		}
+		if f <= float64(math.MinInt64) {
+			return math.MinInt64
+		}
+		return int64(f)
 	case TypeString:
 		n, ok := v.ToNumber()
 		if ok {
@@ -632,6 +651,25 @@ func mathToInt(v Value) int64 {
 	default:
 		return 0
 	}
+}
+
+func mathRandomInt(v Value, argument int) (int64, error) {
+	if v.IsString() {
+		n, ok := v.ToNumber()
+		if ok {
+			return mathRandomInt(n, argument)
+		}
+	}
+	if v.IsInt() {
+		return v.Int(), nil
+	}
+	if v.IsFloat() {
+		f := v.Float()
+		if !math.IsNaN(f) && !math.IsInf(f, 0) && math.Trunc(f) == f && f >= float64(MinInteger) && f <= float64(MaxInteger) {
+			return int64(f), nil
+		}
+	}
+	return 0, fmt.Errorf("bad argument #%d to 'math.random' (number has no integer representation)", argument)
 }
 
 func mathToFloat(v Value) float64 {

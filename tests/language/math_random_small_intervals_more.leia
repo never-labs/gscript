@@ -1,6 +1,8 @@
 print("case:math_random_small_intervals_more")
 
 random := math.random
+assert(math.type(math.mininteger) == "integer")
+assert(math.type(math.maxinteger) == "integer")
 func aux(x1, x2) {
   mark := {}
   count := 0

@@ -1,6 +1,8 @@
 print("case:math_random_small_intervals_more")
 
 local random = math.random
+assert(math.type(math.mininteger) == "integer")
+assert(math.type(math.maxinteger) == "integer")
 local function aux(x1, x2)
   local mark = {}
   local count = 0

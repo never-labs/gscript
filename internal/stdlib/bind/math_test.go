@@ -191,6 +191,57 @@ func TestMathModuleBinaryFastPaths(t *testing.T) {
 	}
 }
 
+func TestMathIntegerBoundariesArePortable(t *testing.T) {
+	mathLib := BuildMath()
+	max := mathLib.RawGetString("maxinteger")
+	min := mathLib.RawGetString("mininteger")
+	if !max.IsInt() || max.Int() != MaxInteger {
+		t.Fatalf("math.maxinteger = %v, want exact integer %d", max, MaxInteger)
+	}
+	if !min.IsInt() || min.Int() != MinInteger {
+		t.Fatalf("math.mininteger = %v, want exact integer %d", min, MinInteger)
+	}
+
+	ult := requireMathGoFunction(t, mathLib, "ult")
+	for name, call := range map[string]func() (Value, error){
+		"FastArg2": func() (Value, error) { return ult.FastArg2(max, min) },
+		"Fast1":    func() (Value, error) { return ult.Fast1([]Value{max, min}) },
+	} {
+		got, err := call()
+		if err != nil {
+			t.Fatalf("math.ult.%s: %v", name, err)
+		}
+		if !got.Truthy() {
+			t.Fatalf("math.ult.%s(maxinteger, mininteger) = %v, want true", name, got)
+		}
+	}
+	got, err := ult.Fn([]Value{max, min})
+	if err != nil || len(got) != 1 || !got[0].Truthy() {
+		t.Fatalf("math.ult.Fn(maxinteger, mininteger) = %v, %v, want true", got, err)
+	}
+}
+
+func TestMathRandomRejectsIntegersOutsidePortableRange(t *testing.T) {
+	mathLib := BuildMath()
+	random := requireMathGoFunction(t, mathLib, "random")
+
+	for _, bounds := range [][2]Value{
+		{IntValue(MinInteger), IntValue(MinInteger)},
+		{IntValue(MaxInteger), IntValue(MaxInteger)},
+		{IntValue(MinInteger), IntValue(MinInteger + 9)},
+		{IntValue(MaxInteger - 3), IntValue(MaxInteger)},
+	} {
+		got, err := random.Fn([]Value{bounds[0], bounds[1]})
+		if err != nil || len(got) != 1 || !got[0].IsInt() || got[0].Int() < bounds[0].Int() || got[0].Int() > bounds[1].Int() {
+			t.Fatalf("math.random(%v, %v) = %v, %v", bounds[0], bounds[1], got, err)
+		}
+	}
+
+	if _, err := random.Fn([]Value{FloatValue(-1 << 62), FloatValue(1 << 62)}); err == nil {
+		t.Fatal("math.random accepted a range outside Leia's exact integer bounds")
+	}
+}
+
 func TestMathModuleTernaryFastPaths(t *testing.T) {
 	mathLib := BuildMath()
 	gf := requireMathGoFunction(t, mathLib, "near")

@@ -67,9 +67,11 @@ const (
 	// does NOT collide with our tagged space (which requires bit 50 = 1).
 	canonicalNaN uint64 = 0x7FF8000000000000
 
-	// Int48 range limits.
-	maxInt48 int64 = (1 << 47) - 1 //  140_737_488_355_327
-	minInt48 int64 = -(1 << 47)    // -140_737_488_355_328
+	// MaxInteger and MinInteger are the exact integer range exposed by Leia.
+	MaxInteger int64 = (1 << 47) - 1 //  140_737_488_355_327
+	MinInteger int64 = -(1 << 47)    // -140_737_488_355_328
+	maxInt48         = MaxInteger
+	minInt48         = MinInteger
 
 	// Pointer sub-type bits (stored in bits 44-47 of the pointer payload).
 	// macOS ARM64 pointers use ~41 bits, so bits 44-47 are free.

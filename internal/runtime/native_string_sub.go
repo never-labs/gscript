@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"math"
 	"unsafe"
 
 	stdlibstring "github.com/never-labs/leia/internal/support/stringlib"
@@ -21,24 +22,46 @@ func stringSubValue(args []Value) (Value, error) {
 	j := int64(0)
 	hasEnd := false
 	if len(args) >= 3 {
-		j = toInt(args[2])
+		j = stringSubIndex(args[2])
 		hasEnd = true
 	}
-	return StringValue(stdlibstring.LuaSub(args[0].Str(), toInt(args[1]), j, hasEnd)), nil
+	return StringValue(stdlibstring.LuaSub(args[0].Str(), stringSubIndex(args[1]), j, hasEnd)), nil
 }
 
 func stringSub2Value(sv, iv Value) (Value, error) {
 	if !sv.IsString() {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.sub' (string expected)")
 	}
-	return StringValue(stdlibstring.LuaSub(sv.Str(), toInt(iv), 0, false)), nil
+	return StringValue(stdlibstring.LuaSub(sv.Str(), stringSubIndex(iv), 0, false)), nil
 }
 
 func stringSub3Value(sv, iv, jv Value) (Value, error) {
 	if !sv.IsString() {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.sub' (string expected)")
 	}
-	return StringValue(stdlibstring.LuaSub(sv.Str(), toInt(iv), toInt(jv), true)), nil
+	return StringValue(stdlibstring.LuaSub(sv.Str(), stringSubIndex(iv), stringSubIndex(jv), true)), nil
+}
+
+func stringSubIndex(v Value) int64 {
+	switch v.Type() {
+	case TypeFloat:
+		f := v.Float()
+		if f >= float64(math.MaxInt64) {
+			return math.MaxInt64
+		}
+		if f <= float64(math.MinInt64) {
+			return math.MinInt64
+		}
+		return int64(f)
+	case TypeString:
+		n, ok := v.ToNumber()
+		if ok {
+			return stringSubIndex(n)
+		}
+		return 0
+	default:
+		return toInt(v)
+	}
 }
 
 func stringByte1Value(sv Value) (Value, error) {

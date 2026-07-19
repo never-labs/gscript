@@ -54,6 +54,8 @@ const (
 	NativePayloadKeyedFrame = runtime.NativePayloadKeyedFrame
 
 	LLMProviderErrorProvider = runtime.LLMProviderErrorProvider
+	MaxInteger               = runtime.MaxInteger
+	MinInteger               = runtime.MinInteger
 )
 
 var (

@@ -2,6 +2,8 @@ print("case:math_random_unit_edges_more")
 
 local minint = math.mininteger
 local maxint = math.maxinteger
+assert(math.type(minint) == "integer")
+assert(math.type(maxint) == "integer")
 for i = 1, 20 do
   assert(math.random(-10, -10) == -10)
   assert(math.random(minint, minint) == minint)
