@@ -11,7 +11,7 @@ func greet(name) {
 
 numbers := [1, 2, 3, 4, 5]
 total := 0
-for _, n := range ipairs(numbers) {
+for _, n := range numbers {
     total += n
 }
 
