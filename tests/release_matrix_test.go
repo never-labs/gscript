@@ -3210,7 +3210,7 @@ func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
 			t.Fatalf("editor asset JSON has unexpected optional tool status %q: %+v", status, report)
 		}
 	}
-	if report.TextMateCount != len(report.TextMateGrammars) || report.TextMateCount != 2 || report.VSCodeCount != len(report.VSCodeAssets) || report.VSCodeCount != 5 || report.TreeSitterCount != len(report.TreeSitterAssets) || report.TreeSitterCount != 3 || report.SmokeTestCount != len(report.SmokeTests) || report.SmokeTestCount != 1 {
+	if report.TextMateCount != len(report.TextMateGrammars) || report.TextMateCount != 2 || report.VSCodeCount != len(report.VSCodeAssets) || report.VSCodeCount != 5 || report.TreeSitterCount != len(report.TreeSitterAssets) || report.TreeSitterCount != 5 || report.SmokeTestCount != len(report.SmokeTests) || report.SmokeTestCount != 1 {
 		t.Fatalf("editor asset JSON counts = %+v, want counted asset collections", report)
 	}
 	for _, want := range []string{"tools/syntax/textmate/leia.tmLanguage.json", "tools/syntax/textmate/leia-mod.tmLanguage.json"} {
@@ -3223,7 +3223,7 @@ func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
 			t.Fatalf("editor asset JSON missing VS Code asset %q: %+v", want, report.VSCodeAssets)
 		}
 	}
-	for _, want := range []string{"tools/tree-sitter-leia/grammar.js", "tools/tree-sitter-leia/src/grammar.json"} {
+	for _, want := range []string{"tools/tree-sitter-leia/grammar.js", "tools/tree-sitter-leia/queries/highlights.scm", "tools/tree-sitter-leia/src/grammar.json", "tools/tree-sitter-leia/src/parser.c"} {
 		if !stringSliceContains(report.TreeSitterAssets, want) {
 			t.Fatalf("editor asset JSON missing tree-sitter asset %q: %+v", want, report.TreeSitterAssets)
 		}
