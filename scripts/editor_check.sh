@@ -130,7 +130,7 @@ print_json_report() {
   printf ',\n'
   printf '  "textmate_grammar_count": 2,\n'
   printf '  "vscode_asset_count": 5,\n'
-  printf '  "tree_sitter_asset_count": 3,\n'
+  printf '  "tree_sitter_asset_count": 5,\n'
   printf '  "smoke_test_count": 1,\n'
   printf '  "textmate_grammars": [\n'
   printf '    "tools/syntax/textmate/leia.tmLanguage.json",\n'
@@ -145,8 +145,10 @@ print_json_report() {
   printf '  ],\n'
   printf '  "tree_sitter_assets": [\n'
   printf '    "tools/tree-sitter-leia/grammar.js",\n'
+  printf '    "tools/tree-sitter-leia/queries/highlights.scm",\n'
   printf '    "tools/tree-sitter-leia/src/grammar.json",\n'
-  printf '    "tools/tree-sitter-leia/src/node-types.json"\n'
+  printf '    "tools/tree-sitter-leia/src/node-types.json",\n'
+  printf '    "tools/tree-sitter-leia/src/parser.c"\n'
   printf '  ],\n'
   printf '  "smoke_tests": [\n'
   printf '    "cmd/leia/editor_smoke.go"\n'
@@ -217,6 +219,9 @@ if command -v emacs >/dev/null 2>&1; then
   emacs -Q --batch -L editors/emacs \
     --eval "(setq byte-compile-dest-file-function (lambda (_) \"$tmpdir/leia-mode.elc\"))" \
     -f batch-byte-compile editors/emacs/leia-mode.el >/dev/null
+  emacs -Q --batch -L editors/emacs \
+    -l editors/emacs/leia-mode-test.el \
+    -f ert-run-tests-batch-and-exit >/dev/null
 else
   EMACS_STATUS="skipped"
 fi

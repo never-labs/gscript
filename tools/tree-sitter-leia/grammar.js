@@ -25,6 +25,30 @@ module.exports = grammar({
 
   word: $ => $.identifier,
 
+  reserved: {
+    global: $ => [
+      "func",
+      "return",
+      "if",
+      "else",
+      "elseif",
+      "for",
+      "range",
+      "break",
+      "continue",
+      $.in_keyword,
+      $.var_keyword,
+      "true",
+      "false",
+      "nil",
+      "go",
+      "chan",
+      "defer",
+      "const",
+      "goto",
+    ],
+  },
+
   conflicts: $ => [
     [$.expression_statement, $.table_field],
     [$.expression_list, $.table_field],
@@ -32,6 +56,10 @@ module.exports = grammar({
 
   rules: {
     source_file: $ => repeat(choice($.separator, $.statement)),
+
+    in_keyword: _ => token("in"),
+    var_keyword: _ => token("var"),
+    _reserved_word_guard: _ => token(/[^\s\S]/),
 
     separator: _ => ";",
 
@@ -46,6 +74,7 @@ module.exports = grammar({
       $.if_statement,
       $.for_statement,
       $.select_statement,
+      $.evaluate_statement,
       $.return_statement,
       $.break_statement,
       $.continue_statement,
@@ -54,7 +83,13 @@ module.exports = grammar({
       $.go_statement,
       $.defer_statement,
       $.const_declaration,
+      $._reserved_word_error,
       $.simple_statement,
+    ),
+
+    _reserved_word_error: $ => seq(
+      choice($.in_keyword, $.var_keyword),
+      $._reserved_word_guard,
     ),
 
     block: $ => prec(1, seq("{", repeat(choice($.separator, $.statement)), "}")),
@@ -161,6 +196,12 @@ module.exports = grammar({
       optional(field("value", $.expression)),
     ),
 
+    evaluate_statement: $ => seq(
+      "evaluate",
+      field("name", $.string),
+      field("body", $.block),
+    ),
+
     return_statement: $ => prec.right(seq("return", optional($.expression_list))),
     break_statement: _ => "break",
     continue_statement: _ => "continue",
@@ -209,7 +250,6 @@ module.exports = grammar({
       $.tagged_block_expression,
       $.identifier,
       $.number,
-      $.duration,
       $.string,
       $.boolean,
       $.nil,
@@ -222,6 +262,7 @@ module.exports = grammar({
       $.unary_expression,
       $.binary_expression,
       $.receive_expression,
+      $.make_channel_expression,
       $.field_expression,
       $.index_expression,
       $.call_expression,
@@ -303,6 +344,14 @@ module.exports = grammar({
 
     receive_expression: $ => prec(PREC.unary, seq("<-", field("channel", $.expression))),
 
+    make_channel_expression: $ => prec(PREC.call, seq(
+      "make",
+      "(",
+      "chan",
+      optional(seq(",", field("capacity", $.expression))),
+      ")",
+    )),
+
     binary_expression: $ => choice(
       ...[
         ["||", PREC.or],
@@ -371,7 +420,6 @@ module.exports = grammar({
     boolean: _ => choice("true", "false"),
     nil: _ => "nil",
     vararg_expression: _ => "...",
-    duration: $ => token(seq(/[0-9][0-9_]*/, choice("ns", "us", "µs", "ms", "s", "m", "h"))),
     number: _ => token(choice(
       /0[xX][0-9a-fA-F_]+/,
       /0[bB][01_]+/,
@@ -381,7 +429,9 @@ module.exports = grammar({
       /[0-9][0-9_]*/,
     )),
     string: _ => token(choice(
+      seq("```", repeat(choice(/[^`]/, /`[^`]/, /``[^`]/)), "```"),
       seq('"', repeat(choice(/[^"\\\n]/, /\\./)), '"'),
+      seq("'", repeat(choice(/[^'\\\n]/, /\\./)), "'"),
       seq("`", repeat(/[^`]/), "`"),
     )),
     identifier: _ => /[A-Za-z_][A-Za-z0-9_]*/,

@@ -435,6 +435,32 @@
     }
   },
   {
+    "type": "evaluate_statement",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "expression",
     "named": true,
     "fields": {},
@@ -459,10 +485,6 @@
           "named": true
         },
         {
-          "type": "duration",
-          "named": true
-        },
-        {
           "type": "field_expression",
           "named": true
         },
@@ -480,6 +502,10 @@
         },
         {
           "type": "list_literal",
+          "named": true
+        },
+        {
+          "type": "make_channel_expression",
           "named": true
         },
         {
@@ -942,6 +968,22 @@
     }
   },
   {
+    "type": "make_channel_expression",
+    "named": true,
+    "fields": {
+      "capacity": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "method_call_expression",
     "named": true,
     "fields": {
@@ -1272,6 +1314,10 @@
           "named": true
         },
         {
+          "type": "evaluate_statement",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -1296,6 +1342,10 @@
           "named": true
         },
         {
+          "type": "in_keyword",
+          "named": true
+        },
+        {
           "type": "label_statement",
           "named": true
         },
@@ -1309,6 +1359,10 @@
         },
         {
           "type": "simple_statement",
+          "named": true
+        },
+        {
+          "type": "var_keyword",
           "named": true
         }
       ]
@@ -1684,6 +1738,10 @@
     "named": false
   },
   {
+    "type": "chan",
+    "named": false
+  },
+  {
     "type": "comment",
     "named": true,
     "extra": true
@@ -1705,15 +1763,15 @@
     "named": false
   },
   {
-    "type": "duration",
-    "named": true
-  },
-  {
     "type": "else",
     "named": false
   },
   {
     "type": "elseif",
+    "named": false
+  },
+  {
+    "type": "evaluate",
     "named": false
   },
   {
@@ -1765,6 +1823,14 @@
     "named": false
   },
   {
+    "type": "in_keyword",
+    "named": true
+  },
+  {
+    "type": "make",
+    "named": false
+  },
+  {
     "type": "nil",
     "named": true
   },
@@ -1795,6 +1861,10 @@
   {
     "type": "true",
     "named": false
+  },
+  {
+    "type": "var_keyword",
+    "named": true
   },
   {
     "type": "{",

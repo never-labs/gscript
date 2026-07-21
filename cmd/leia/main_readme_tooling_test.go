@@ -18,6 +18,9 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 		t.Fatal(err)
 	}
 	readme := string(data)
+	if !strings.Contains(readme, "GitHub Linguist does not yet register Leia") || !strings.Contains(readme, "```go\nfunc greet(name)") {
+		t.Fatal("README must keep the documented GitHub syntax-highlighting fallback")
+	}
 	for _, want := range []string{
 		"Leia is a general-purpose scripting language designed to run standalone or inside Go applications.",
 		"func greet(name)",

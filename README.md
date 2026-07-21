@@ -4,7 +4,8 @@ Leia is a general-purpose scripting language designed to run standalone or insid
 It combines a compact, Go-shaped syntax with dynamic values, modules,
 concurrency, an embeddable VM, and opt-in domain dialects.
 
-```leia
+<!-- GitHub Linguist does not yet register Leia; use its Go lexer for visible highlighting. -->
+```go
 func greet(name) {
     return "Hello, " .. name .. "!"
 }

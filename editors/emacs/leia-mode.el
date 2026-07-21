@@ -43,24 +43,20 @@
   :group 'leia)
 
 (defconst leia--keywords
-  '("break" "case" "continue" "defer" "default" "else" "elseif" "for"
-    "go" "goto" "if" "in" "range" "return" "select" "switch"
-    "fallthrough"))
+  '("break" "continue" "defer" "else" "elseif" "for" "go" "goto" "if"
+    "in" "range" "return"))
 
 (defconst leia--declarations
-  '("chan" "const" "func" "import" "var"))
-
-(defconst leia--contextual-keywords
-  '())
+  '("chan" "const" "func" "var"))
 
 (defconst leia--constants
   '("false" "nil" "true"))
 
 (defconst leia--builtins
-  '("assert" "cap" "close" "delete" "error" "getmetatable" "ipairs" "len"
-    "make" "next" "pairs" "pcall" "print" "rawequal" "rawget" "rawlen"
-    "rawset" "recv" "require" "select" "send" "setmetatable" "sleep" "spawn"
-    "spread" "tonumber" "tostring" "type" "wait" "xpcall"))
+  '("assert" "cap" "close" "collectgarbage" "dofile" "error" "getmetatable"
+    "ipairs" "len" "load" "loadfile" "loadstring" "next" "pairs" "pcall"
+    "print" "rawequal" "rawget" "rawlen" "rawset" "require" "select"
+    "setmetatable" "spread" "tonumber" "tostring" "type" "unpack" "xpcall"))
 
 (defconst leia--modules
   '("array" "base64" "binary" "bit32" "bits" "bytes" "chat" "color"
@@ -73,14 +69,103 @@
 (defconst leia--primitive-types
   '("bool" "f32" "f64" "i32" "i64"))
 
+(defconst leia--number-regexp
+  (let* ((decimal "[0-9]+\\(?:_[0-9]+\\)*")
+         (exponent (concat "[eE][+-]?" decimal)))
+    (concat
+     "\\_<\\(?:"
+     "0[xX][0-9A-Fa-f]+\\(?:_[0-9A-Fa-f]+\\)*"
+     "\\|0[bB][01]+\\(?:_[01]+\\)*"
+     "\\|0[oO][0-7]+\\(?:_[0-7]+\\)*"
+     "\\|" decimal "\\." decimal "\\(?:" exponent "\\)?"
+     "\\|" decimal exponent
+     "\\|" decimal
+     "\\)\\_>"))
+  "Regexp matching portable Leia numeric literals.")
+
+(defconst leia--dialect-tag-regexp
+  (rx symbol-start (group (+ (or alnum "_"))) symbol-end
+      (? "!") (* (any " \t\n")) (or "`" "{")))
+
+(defun leia--code-position-p (position)
+  "Return non-nil when POSITION is outside a string or comment."
+  (not (nth 8 (syntax-ppss position))))
+
+(defun leia--dialect-block-context-p (position)
+  "Return non-nil when a dialect block tag may begin at POSITION."
+  (save-excursion
+    (goto-char position)
+    (skip-chars-backward " \t")
+    (or (bolp)
+        (memq (char-before) '(?= ?: ?\( ?\[ ?\{ ?, ?\; ?+ ?- ?* ?/ ?% ?& ?| ?^))
+        (let ((end (point)))
+          (skip-syntax-backward "w_")
+          (equal (buffer-substring-no-properties (point) end) "return")))))
+
+(defun leia--match-dialect-tag (limit)
+  "Find the next tagged dialect form before LIMIT."
+  (let (found)
+    (while (and (not found) (re-search-forward leia--dialect-tag-regexp limit t))
+      (let ((match (match-data))
+            (resume (point))
+            (tag-start (match-beginning 1))
+            (tag (match-string-no-properties 1))
+            (delimiter (char-before (match-end 0))))
+        (when (and (leia--code-position-p tag-start)
+                   (leia--dialect-block-context-p tag-start)
+                   (or (eq delimiter ?`)
+                       (not (and (equal tag "select")
+                                 (save-excursion
+                                   (goto-char tag-start)
+                                   (= (progn (back-to-indentation) (point))
+                                      tag-start))))))
+          (set-match-data match)
+          (setq found t))
+        (goto-char resume)))
+    found))
+
+(defun leia--match-contextual-keyword (limit)
+  "Find the next contextual keyword use before LIMIT."
+  (let ((regexp (rx line-start (* (any " \t"))
+                    (group (or "evaluate" "import" "select" "case" "default"))
+                    symbol-end))
+        found)
+    (while (and (not found) (re-search-forward regexp limit t))
+      (let ((match (match-data))
+            (resume (point))
+            (word (match-string-no-properties 1))
+            valid)
+        (save-excursion
+          (goto-char (match-end 1))
+          (let ((spaces (skip-chars-forward " \t")))
+            (setq valid
+                  (pcase word
+                    ((or "evaluate" "import")
+                     (and (> spaces 0) (looking-at-p "[\"'`(]")))
+                    ("select" (eq (char-after) ?\{))
+                    ("case" (and (> spaces 0)
+                                 (not (memq (char-after) '(?= ?:)))))
+                    ("default" (eq (char-after) ?:))))))
+        (when (and valid (leia--code-position-p (match-beginning 1)))
+          (set-match-data match)
+          (setq found t))
+        (goto-char resume)))
+    found))
+
 (defconst leia-font-lock-keywords
-  `((,(rx "//leia:" (+ (or word "_" "." "-"))) . font-lock-preprocessor-face)
-    (,(rx "$" (? "!") (* space) "`") . font-lock-preprocessor-face)
-    (,(rx symbol-start (group (+ (or word "_"))) (? "!") (* space) (or "`" "{"))
+  `((,(rx line-start (* (any " \t")) "//leia:"
+          (+ (or alnum "_" "-")) (* nonl) line-end)
+     0 font-lock-preprocessor-face t)
+    (,(rx "```" (*? (or nonl "\n")) "```")
+     0 font-lock-string-face t)
+    (,(rx (group (literal "$") (? "!"))
+          (* (any " \t\n")) "`")
      1 font-lock-preprocessor-face)
+    (leia--match-dialect-tag 1 font-lock-preprocessor-face)
+    (leia--match-contextual-keyword 1 font-lock-keyword-face)
+    (,leia--number-regexp . font-lock-constant-face)
     (,(regexp-opt leia--keywords 'symbols) . font-lock-keyword-face)
     (,(regexp-opt leia--declarations 'symbols) . font-lock-type-face)
-    (,(regexp-opt leia--contextual-keywords 'symbols) . font-lock-keyword-face)
     (,(regexp-opt leia--constants 'symbols) . font-lock-constant-face)
     (,(regexp-opt leia--primitive-types 'symbols) . font-lock-type-face)
     (,(regexp-opt leia--builtins 'symbols) . font-lock-builtin-face)
@@ -108,9 +193,31 @@
     (modify-syntax-entry ?* ". 23" table)
     (modify-syntax-entry ?\n "> b" table)
     (modify-syntax-entry ?\" "\"" table)
+    (modify-syntax-entry ?' "\"" table)
     (modify-syntax-entry ?` "\"" table)
     table)
   "Syntax table for `leia-mode'.")
+
+(defun leia--syntax-propertize (start end)
+  "Apply fenced raw string syntax properties between START and END."
+  (save-excursion
+    (goto-char start)
+    (while (re-search-forward "```" end t)
+      (let ((open (match-beginning 0)))
+        (if (nth 8 (parse-partial-sexp (point-min) open))
+            (goto-char (match-end 0))
+          (let* ((body-start (match-end 0))
+                 (close (and (search-forward "```" end t)
+                             (- (point) 3)))
+                 (raw-end (if close (+ close 3) end)))
+            (put-text-property open raw-end
+                               'syntax-table (string-to-syntax "."))
+            (put-text-property open (1+ open)
+                               'syntax-table (string-to-syntax "\""))
+            (when close
+              (put-text-property (+ close 2) (+ close 3)
+                                 'syntax-table (string-to-syntax "\"")))
+            (goto-char (if close raw-end body-start))))))))
 
 (defvar leia-mod-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -246,6 +353,7 @@ With prefix argument VM, run through the bytecode VM without JIT."
   "Major mode for editing Leia source files."
   :syntax-table leia-mode-syntax-table
   (setq-local font-lock-defaults '(leia-font-lock-keywords))
+  (setq-local syntax-propertize-function #'leia--syntax-propertize)
   (setq-local comment-start "// ")
   (setq-local comment-end "")
   (setq-local comment-start-skip "\\(?://+\\|/\\*+\\)\\s *")

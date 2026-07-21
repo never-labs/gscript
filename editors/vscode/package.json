@@ -4,7 +4,7 @@
   "description": "Language support and common Leia CLI actions for VS Code.",
   "version": "0.1.0",
   "publisher": "never-labs",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "scripts": {
     "package": "npx --yes @vscode/vsce package"
   },

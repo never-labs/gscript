@@ -67,6 +67,7 @@
       border:0;
       padding:0;
     }
+    .toc-details > summary { display:none; }
     .toc ol { list-style:none; margin:0; padding:0; }
     .toc li { margin:0; }
     .toc a {
@@ -192,6 +193,26 @@
         padding:0 0 18px;
         margin-bottom:24px;
       }
+      .toc-details > summary {
+        display:list-item;
+        cursor:pointer;
+        color:var(--blue-dark);
+        font-size:14px;
+        font-weight:600;
+        padding:8px 0;
+      }
+      .toc-details[open] > summary { margin-bottom:6px; }
+      .toc h2 {
+        position:absolute;
+        width:1px;
+        height:1px;
+        padding:0;
+        margin:-1px;
+        overflow:hidden;
+        clip:rect(0, 0, 0, 0);
+        white-space:nowrap;
+        border:0;
+      }
       .toc ol { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); column-gap:24px; }
       .topbar { padding:0 18px; }
     }
@@ -206,8 +227,11 @@
   <div class="topbar"><a class="brand" href="{{ '/' | relative_url }}">Leia</a><span class="section">Language Specification</span></div>
   <div class="shell">
     <nav class="toc" aria-label="Table of contents">
-      <h2>Contents</h2>
-      <ol id="spec-toc"></ol>
+      <details class="toc-details" open>
+        <summary>Contents</summary>
+        <h2>Contents</h2>
+        <ol id="spec-toc"></ol>
+      </details>
     </nav>
     <main>
       <article id="spec-content">
@@ -220,12 +244,23 @@
     (function () {
       var article = document.getElementById("spec-content");
       var toc = document.getElementById("spec-toc");
+      var tocDetails = document.querySelector(".toc-details");
+      var mobileTOC = window.matchMedia("(max-width: 900px)");
+      if (tocDetails && mobileTOC.matches) tocDetails.removeAttribute("open");
       if (!article || !toc) return;
 
-      article.querySelectorAll("h2").forEach(function (heading) {
-        if (!heading.id) {
-          heading.id = heading.textContent.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      var headingIDs = new Set();
+      article.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach(function (heading) {
+        var base = heading.id || heading.textContent.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "section";
+        var id = base;
+        var suffix = 2;
+        while (headingIDs.has(id)) {
+          id = base + "-" + suffix;
+          suffix++;
         }
+        heading.id = id;
+        headingIDs.add(id);
+        if (heading.tagName !== "H2") return;
         var item = document.createElement("li");
         var link = document.createElement("a");
         link.href = "#" + heading.id;
@@ -234,10 +269,10 @@
         toc.appendChild(item);
       });
 
-      var keywords = new Set("break case continue defer default else elseif fallthrough for go goto if import in range return select switch chan const func var".split(" "));
+      var keywords = new Set("break chan const continue defer else elseif for func go goto if in range return var".split(" "));
       var constants = new Set("false nil true".split(" "));
-      var builtins = new Set("assert close delete error getmetatable ipairs len make next pairs pcall print rawequal rawget rawlen rawset require select setmetatable spread tonumber tostring type xpcall".split(" "));
-      var token = /("(?:\\.|[^"\\])*"|`[^`]*`|\/\/[^\n]*|\/\*[\s\S]*?\*\/|\b0[xX][0-9A-Fa-f_]+\b|\b0[bB][01_]+\b|\b0[oO][0-7_]+\b|\b\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?(?:[eE][+-]?\d+(?:_\d+)*)?\b|\b[A-Za-z_][A-Za-z0-9_]*\b|==|!=|<=|>=|:=|\+\+|--|\+=|-=|\*=|\/=|%=|&&|\|\||<-|\.\.\.|\.\.|[+\-*\/%=<>!#&|^])/g;
+      var builtins = new Set("assert cap close collectgarbage dofile error getmetatable ipairs len load loadfile loadstring next pairs pcall print rawequal rawget rawlen rawset require select setmetatable spread tonumber tostring type unpack xpcall".split(" "));
+      var token = /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`|\/\/[^\n]*|\/\*[\s\S]*?\*\/|\b0[xX][0-9A-Fa-f_]+\b|\b0[bB][01_]+\b|\b0[oO][0-7_]+\b|\b\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?(?:[eE][+-]?\d+(?:_\d+)*)?\b|\b[A-Za-z_][A-Za-z0-9_]*\b|\.\.\.|\+\+|--|\+=|-=|\*=|\/=|:=|==|!=|<=|>=|&&|\|\||&\^|<<|>>|<-|\.\.|\*\*|[+\-*\/%=<>!#&|^])/g;
 
       function escapeHTML(text) {
         return text.replace(/[&<>]/g, function (ch) {
@@ -247,12 +282,12 @@
 
       function classify(part) {
         if (/^(\/\/|\/\*)/.test(part)) return "tok-comment";
-        if (/^["`]/.test(part)) return "tok-string";
+        if (/^["'`]/.test(part)) return "tok-string";
         if (/^(?:0[xX]|0[bB]|0[oO]|\d)/.test(part)) return "tok-number";
         if (keywords.has(part)) return "tok-keyword";
         if (constants.has(part)) return "tok-constant";
         if (builtins.has(part)) return "tok-builtin";
-        if (/^(==|!=|<=|>=|:=|\+\+|--|\+=|-=|\*=|\/=|%=|&&|\|\||<-|\.\.\.|\.\.|[+\-*\/%=<>!#&|^])$/.test(part)) return "tok-operator";
+        if (/^(?:\.\.\.|\+\+|--|\+=|-=|\*=|\/=|:=|==|!=|<=|>=|&&|\|\||&\^|<<|>>|<-|\.\.|\*\*|[+\-*\/%=<>!#&|^])$/.test(part)) return "tok-operator";
         return "";
       }
 

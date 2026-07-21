@@ -34,6 +34,7 @@ node_modules/
 .vscode/
 *.swp
 *.swo
+*.elc
 *~
 
 # OS

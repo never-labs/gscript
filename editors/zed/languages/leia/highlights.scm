@@ -13,23 +13,31 @@
   "range"
   "return"
   "select"
+  "evaluate"
 ] @keyword.control
+
+(break_statement) @keyword.control
+(continue_statement) @keyword.control
 
 [
   "const"
   "func"
+  "chan"
 ] @keyword.function
 
-[
-  "true"
-  "false"
-] @boolean
+((ERROR) @keyword.control
+  (#eq? @keyword.control "in"))
+
+((ERROR) @keyword.function
+  (#eq? @keyword.function "var"))
+
+(boolean) @boolean
+(nil) @constant.builtin
 
 
 (comment) @comment
 (string) @string
 (number) @number
-(duration) @number
 (dense_type) @type.builtin
 
 (function_declaration
@@ -114,6 +122,10 @@
   "-="
   "*="
   "/="
+  "++"
+  "--"
+  "#"
+  "..."
 ] @operator
 
 [

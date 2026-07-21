@@ -3,11 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/leia/internal/lexer"
 )
 
 func TestDocGenerateWritesReferenceFiles(t *testing.T) {
@@ -163,9 +167,9 @@ func TestDocSpecPreviewRendersPublishableHTML(t *testing.T) {
 	}{
 		{
 			name: "index.md",
-			body: "---\nlayout: spec\ntitle: Spec\n---\n# Intro\nSee [Notation](notation.md), [Grammar](grammar.ebnf), and [Source section](source.md#comments).\n<!-- hidden generator marker -->\n```leia\nprint(\"ok\")\n```\n",
+			body: "---\nlayout: spec\ntitle: Spec\n---\n# Intro\nSee [Notation](notation.md), [Grammar](grammar.ebnf), and [Source section](source.md#comments).\n<!-- hidden generator marker -->\n```leia\nprint(\"ok\")\n```\n\n<!-- BEGIN GENERATED SPEC CHAPTERS -->\n## Notation\nThis generated copy must not render.\n<!-- END GENERATED SPEC CHAPTERS -->\n",
 		},
-		{name: "notation.md", body: "# Notation\n"},
+		{name: "notation.md", body: "# Notation\n\n## Repeated\n\n## Repeated\n"},
 		{name: "source.md", body: "# Source\n"},
 		{name: "lexical.md", body: "# Lexical\n"},
 		{name: "declarations.md", body: "# Declarations\n"},
@@ -199,6 +203,101 @@ func TestDocSpecPreviewRendersPublishableHTML(t *testing.T) {
 	for _, want := range []string{`href="#notation"`, `href="#grammar-appendix"`, `href="#source-code-representation-comments"`, `language-leia leia-code`} {
 		if !strings.Contains(htmlText, want) {
 			t.Fatalf("spec preview missing %q:\n%s", want, htmlText)
+		}
+	}
+	if strings.Contains(htmlText, "This generated copy must not render") || strings.Count(htmlText, `<h2 id="notation">`) != 1 {
+		t.Fatalf("spec preview rendered a generated chapter copy:\n%s", htmlText)
+	}
+	if !strings.Contains(htmlText, `id="notation-repeated-2"`) {
+		t.Fatalf("spec preview did not disambiguate repeated heading IDs:\n%s", htmlText)
+	}
+	idRE := regexp.MustCompile(`\sid="([^"]+)"`)
+	seenIDs := map[string]bool{}
+	for _, match := range idRE.FindAllStringSubmatch(htmlText, -1) {
+		if seenIDs[match[1]] {
+			t.Fatalf("spec preview contains duplicate id %q", match[1])
+		}
+		seenIDs[match[1]] = true
+	}
+}
+
+func TestDocSpecPreviewHighlighterTokenParity(t *testing.T) {
+	keywords := strings.Fields("break chan const continue defer else elseif for func go goto if in range return var")
+	builtins := strings.Fields("assert cap close collectgarbage dofile error getmetatable ipairs len load loadfile loadstring next pairs pcall print rawequal rawget rawlen rawset require select setmetatable spread tonumber tostring type unpack xpcall")
+	operators := strings.Fields("... ++ -- += -= *= /= := == != <= >= && || &^ << >> <- .. ** + - * / % = < > ! # & | ^")
+	words := append(append(append([]string{}, keywords...), builtins...), operators...)
+	source := strings.Join(words, " ")
+	tokens, err := lexer.New(source).Tokenize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(tokens)-1, len(words); got != want {
+		t.Fatalf("lexer token count = %d, want %d", got, want)
+	}
+
+	spanRE := regexp.MustCompile(`<span class="(tok-keyword|tok-builtin|tok-operator)">([^<]+)</span>`)
+	matches := spanRE.FindAllStringSubmatch(specPreviewHighlightLeia(source), -1)
+	if len(matches) != len(tokens)-1 {
+		t.Fatalf("highlighted token count = %d, lexer token count = %d", len(matches), len(tokens)-1)
+	}
+	for i, match := range matches {
+		if got := html.UnescapeString(match[2]); got != tokens[i].Value {
+			t.Fatalf("highlighted token %d = %q, lexer token = %q", i, got, tokens[i].Value)
+		}
+		wantClass := "tok-operator"
+		if i < len(keywords) {
+			wantClass = "tok-keyword"
+		} else if i < len(keywords)+len(builtins) {
+			wantClass = "tok-builtin"
+		}
+		if match[1] != wantClass {
+			t.Fatalf("highlighted token %q class = %q, want %q", tokens[i].Value, match[1], wantClass)
+		}
+	}
+}
+
+func TestDocSpecPreviewHighlighterNearMisses(t *testing.T) {
+	source := "switch fallthrough case default import function rangeValue delete make coroutine package script debug %="
+	highlighted := specPreviewHighlightLeia(source)
+	for _, word := range strings.Fields("switch fallthrough case default import function rangeValue") {
+		if strings.Contains(highlighted, `<span class="tok-keyword">`+word+`</span>`) {
+			t.Fatalf("near-miss %q highlighted as keyword: %s", word, highlighted)
+		}
+	}
+	for _, word := range strings.Fields("delete make coroutine package script debug") {
+		if strings.Contains(highlighted, `<span class="tok-builtin">`+word+`</span>`) {
+			t.Fatalf("non-function global %q highlighted as builtin: %s", word, highlighted)
+		}
+	}
+	if strings.Contains(highlighted, `<span class="tok-operator">%=</span>`) {
+		t.Fatalf("unsupported %%= highlighted as one token: %s", highlighted)
+	}
+	if !strings.Contains(highlighted, `<span class="tok-operator">%</span><span class="tok-operator">=</span>`) {
+		t.Fatalf("%%= did not follow lexer tokenization: %s", highlighted)
+	}
+}
+
+func TestDocSpecLayoutHighlighterMatchesPreviewVocabulary(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "docs", "_layouts", "spec.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := string(data)
+	for _, want := range []string{
+		`new Set("break chan const continue defer else elseif for func go goto if in range return var".split(" "))`,
+		`new Set("assert cap close collectgarbage dofile error getmetatable ipairs len load loadfile loadstring next pairs pcall print rawequal rawget rawlen rawset require select setmetatable spread tonumber tostring type unpack xpcall".split(" "))`,
+		`|&\^|<<|>>|<-|\.\.|\*\*|`,
+		`<details class="toc-details" open>`,
+		`<summary>Contents</summary>`,
+	} {
+		if !strings.Contains(layout, want) {
+			t.Fatalf("spec layout missing %q", want)
+		}
+	}
+	for _, bad := range []string{"fallthrough for", "select switch", "close delete", "len make", `|%=|`} {
+		if strings.Contains(layout, bad) {
+			t.Fatalf("spec layout contains stale highlighter token %q", bad)
 		}
 	}
 }

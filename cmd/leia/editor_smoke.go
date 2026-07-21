@@ -149,7 +149,10 @@ func (s editorSmoke) checkTextMate() error {
 		sample string
 	}{
 		{"keyword.control.directive.leia", source},
+		{"keyword.control.directive.leia", "//leia:build linux"},
 		{"storage.type.function.leia", source},
+		{"string.quoted.single.leia", `label := 'Leia'`},
+		{"string.quoted.raw.fenced.leia", "query := ```select `value` from rows```"},
 		{"meta.import.leia", `import "go:net/http" as http`},
 		{"meta.import.leia", `import "json"`},
 		{"meta.import.leia", `import p "path"`},
@@ -159,10 +162,9 @@ func (s editorSmoke) checkTextMate() error {
 		{"meta.dialect.tagged-string.leia", "rows := custom`domain source`"},
 		{"meta.dialect.shell.tagged-string.leia", "out := $`printf ok`"},
 		{"meta.dialect.shell.tagged-string.leia", "out := $!`printf ok`"},
-		{"meta.dialect.tagged-block.leia", `prompt! { role: "system" }`},
+		{"meta.dialect.tagged-block.begin.leia", `prompt! { role: "system" }`},
 		{"support.type.primitive.leia", source},
 		{"support.type.primitive.leia", "ids := [3]i64{1, 2, 3}"},
-		{"constant.numeric.duration.leia", "timeout := 30s"},
 		{"keyword.operator.leia", source},
 		{"entity.name.function.leia", source},
 		{"support.module.leia", "joined := bytes.concat(parts)"},
@@ -196,6 +198,31 @@ func (s editorSmoke) checkTextMate() error {
 	if hasEditorPattern(leia, "keyword.control.ai.leia") {
 		return errors.New("Leia TextMate grammar still exposes old AI dialect keyword scope")
 	}
+	for _, removed := range []string{"constant.numeric.duration.leia", "meta.dialect.tagged-block.leia"} {
+		if hasEditorPattern(leia, removed) {
+			return fmt.Errorf("Leia TextMate grammar still exposes removed scope %s", removed)
+		}
+	}
+	for _, tc := range []struct {
+		name   string
+		sample string
+	}{
+		{"keyword.control.directive.leia", "// leia:build linux"},
+		{"keyword.control.leia", "switch value"},
+		{"keyword.control.leia", "fallthrough"},
+		{"meta.dialect.tagged-block.begin.leia", "if ready {"},
+	} {
+		if err := assertEditorPatternNoMatch(leia, tc.name, tc.sample); err != nil {
+			return err
+		}
+	}
+	stringsPattern, err := editorPatternByName(leia, "string.quoted.double.leia")
+	if err != nil {
+		return err
+	}
+	if strings.Contains(fmt.Sprint(stringsPattern), `u\\{`) {
+		return errors.New("Leia TextMate grammar still exposes unsupported braced Unicode escapes")
+	}
 	for _, removed := range []string{
 		"meta.dialect.q.tagged-string.leia",
 		"entity.name.tag.dialect.q.leia",
@@ -219,6 +246,16 @@ func (s editorSmoke) checkTextMate() error {
 	if strings.Contains(fmt.Sprint(operator["match"]), "%=") {
 		return errors.New("Leia TextMate grammar still exposes unsupported %= compound assignment")
 	}
+	for _, module := range catalogModuleNames() {
+		if err := assertEditorPatternMatch("support.module.leia", leia, module+".member"); err != nil {
+			return fmt.Errorf("stdlib module %s is not highlighted: %w", module, err)
+		}
+	}
+	for _, builtin := range []string{"assert", "cap", "close", "collectgarbage", "dofile", "error", "getmetatable", "ipairs", "len", "load", "loadfile", "loadstring", "next", "pairs", "pcall", "print", "rawequal", "rawget", "rawlen", "rawset", "require", "select", "setmetatable", "spread", "tonumber", "tostring", "type", "unpack", "xpcall"} {
+		if err := assertEditorPatternMatch("support.function.builtin.leia", leia, builtin+"()"); err != nil {
+			return fmt.Errorf("builtin %s is not highlighted: %w", builtin, err)
+		}
+	}
 	return nil
 }
 
@@ -230,6 +267,23 @@ func leiaPatternGrammar(name string, leia, leiaMod map[string]any) map[string]an
 }
 
 func (s editorSmoke) checkVSCode() error {
+	languageConfig, err := s.loadJSON("editors/vscode/language-configuration.json")
+	if err != nil {
+		return err
+	}
+	for _, key := range []string{"autoClosingPairs", "surroundingPairs"} {
+		found := false
+		for _, pair := range anySlice(languageConfig[key]) {
+			m, _ := pair.(map[string]any)
+			if stringValue(m["open"]) == "'" && stringValue(m["close"]) == "'" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("VS Code language configuration %s missing single-quote pair", key)
+		}
+	}
 	packageJSON, err := s.loadJSON("editors/vscode/package.json")
 	if err != nil {
 		return err
@@ -338,13 +392,13 @@ func (s editorSmoke) checkEmacs() error {
 			return fmt.Errorf("Emacs %s must not be empty", constName)
 		}
 	}
-	for _, marker := range []string{"defcustom leia-lsp-command", "defun leia-eglot-setup", "(require 'eglot)", "eglot-server-programs", "leia-lsp-command", "add-to-list 'auto-mode-alist", "(provide 'leia-mode)"} {
+	for _, marker := range []string{"defcustom leia-lsp-command", "defun leia-eglot-setup", "defun leia--match-contextual-keyword", "defun leia--syntax-propertize", "(require 'eglot)", "eglot-server-programs", "leia-lsp-command", "add-to-list 'auto-mode-alist", "(provide 'leia-mode)"} {
 		if !strings.Contains(mode, marker) {
 			return fmt.Errorf("Emacs mode missing %s", marker)
 		}
 	}
 	for _, oldKeyword := range []string{"agent", "tool", "evaluate", "models", "messages", "budget"} {
-		for _, constName := range []string{"leia--keywords", "leia--declarations", "leia--contextual-keywords"} {
+		for _, constName := range []string{"leia--keywords", "leia--declarations"} {
 			values, err := elispStringList(mode, constName)
 			if err != nil {
 				return err
@@ -391,7 +445,7 @@ func (s editorSmoke) checkTreeSitterAssets() error {
 			namedTypes[stringValue(m["type"])] = true
 		}
 	}
-	for _, nodeType := range []string{"import_declaration", "import_group", "import_spec", "dense_literal", "tagged_string_expression", "tagged_block_expression"} {
+	for _, nodeType := range []string{"import_declaration", "import_group", "import_spec", "dense_literal", "evaluate_statement", "make_channel_expression", "tagged_string_expression", "tagged_block_expression"} {
 		if !namedTypes[nodeType] {
 			return fmt.Errorf("tree-sitter node-types missing %s", nodeType)
 		}
@@ -413,6 +467,14 @@ func (s editorSmoke) checkTreeSitterAssets() error {
 		if contents != query {
 			return fmt.Errorf("%s drifted from tools/tree-sitter-leia/queries/highlights.scm", editorQuery)
 		}
+	}
+	for _, rel := range []string{"tools/tree-sitter-leia/src/parser.c", "tools/tree-sitter-leia/corpus/syntax.txt"} {
+		if err := s.assertPath(rel); err != nil {
+			return err
+		}
+	}
+	if strings.Contains(grammarJS, "duration") || strings.Contains(query, "duration") {
+		return errors.New("tree-sitter assets still expose unsupported duration literals")
 	}
 	for _, marker := range []string{"@keyword.control", "@function.call", "@variable.parameter", "@tag.dialect", "@tag.shell", "@operator.raw.dialect", "@string.special.dialect", "@string.special.shell", "@keyword.control.import", "@keyword.control.import.as", "@string.special.import", "@namespace.import"} {
 		if !strings.Contains(query, marker) {

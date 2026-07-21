@@ -1,0 +1,222 @@
+==================
+String forms
+==================
+
+double := "escaped \"quote\""
+single := 'escaped \'quote\''
+raw := `one
+two`
+fenced := ```one ` two `` end
+three```
+
+---
+
+(source_file
+  (statement
+    (simple_statement
+      (assignment_statement
+        (expression_list
+          (expression
+            (identifier)))
+        (expression_list
+          (expression
+            (string))))))
+  (statement
+    (simple_statement
+      (assignment_statement
+        (expression_list
+          (expression
+            (identifier)))
+        (expression_list
+          (expression
+            (string))))))
+  (statement
+    (simple_statement
+      (assignment_statement
+        (expression_list
+          (expression
+            (identifier)))
+        (expression_list
+          (expression
+            (string))))))
+  (statement
+    (simple_statement
+      (assignment_statement
+        (expression_list
+          (expression
+            (identifier)))
+        (expression_list
+          (expression
+            (string)))))))
+
+==================
+Evaluate and operators
+==================
+
+evaluate "operator coverage" {
+  ch := make(chan, 1)
+  value := nil
+  size := #items
+  args := {...}
+  count++
+  count--
+  break
+  continue
+}
+
+---
+
+(source_file
+  (statement
+    (evaluate_statement
+      (string)
+      (block
+        (statement
+          (simple_statement
+            (assignment_statement
+              (expression_list
+                (expression
+                  (identifier)))
+              (expression_list
+                (expression
+                  (make_channel_expression
+                    (expression
+                      (number))))))))
+        (statement
+          (simple_statement
+            (assignment_statement
+              (expression_list
+                (expression
+                  (identifier)))
+              (expression_list
+                (expression
+                  (nil))))))
+        (statement
+          (simple_statement
+            (assignment_statement
+              (expression_list
+                (expression
+                  (identifier)))
+              (expression_list
+                (expression
+                  (unary_expression
+                    (expression
+                      (identifier))))))))
+        (statement
+          (simple_statement
+            (assignment_statement
+              (expression_list
+                (expression
+                  (identifier)))
+              (expression_list
+                (expression
+                  (table_literal
+                    (table_field
+                      (expression
+                        (vararg_expression)))))))))
+        (statement
+          (simple_statement
+            (increment_statement
+              (expression
+                (identifier)))))
+        (statement
+          (simple_statement
+            (increment_statement
+              (expression
+                (identifier)))))
+        (statement
+          (break_statement))
+        (statement
+          (continue_statement))))))
+
+==================
+Reserved words are not identifiers
+==================
+
+func break() {}
+func continue() {}
+func in() {}
+func var() {}
+func chan() {}
+func nil() {}
+
+---
+
+(source_file
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (function_literal
+            (ERROR
+              (break_statement))
+            (parameter_list)
+            (block))))))
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (function_literal
+            (ERROR
+              (continue_statement))
+            (parameter_list)
+            (block))))))
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (function_literal
+            (ERROR
+              (in_keyword))
+            (parameter_list)
+            (block))))))
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (function_literal
+            (ERROR
+              (var_keyword))
+            (parameter_list)
+            (block))))))
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (function_literal
+            (ERROR)
+            (parameter_list)
+            (block))))))
+  (statement
+    (simple_statement
+      (expression_statement
+        (expression
+          (function_literal
+            (ERROR
+              (nil))
+            (parameter_list)
+            (block)))))))
+
+==================
+Standalone in is rejected
+==================
+
+in
+
+---
+
+(source_file
+  (ERROR
+    (in_keyword)))
+
+==================
+Standalone var is rejected
+==================
+
+var
+
+---
+
+(source_file
+  (ERROR
+    (var_keyword)))

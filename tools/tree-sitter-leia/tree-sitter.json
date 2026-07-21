@@ -12,8 +12,8 @@
     }
   ],
   "metadata": {
-    "version": "0.0.1",
-    "license": "MIT",
+    "version": "0.1.0",
+    "license": "Apache-2.0",
     "description": "Leia grammar for tree-sitter",
     "authors": [
       {

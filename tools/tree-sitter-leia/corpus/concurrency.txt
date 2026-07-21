@@ -36,14 +36,9 @@ select {}
             (identifier)))
         right: (expression_list
           (expression
-            (call_expression
-              function: (expression
-                (identifier))
-              arguments: (argument_list
-                (expression
-                  (identifier))
-                (expression
-                  (number)))))))))
+            (make_channel_expression
+              capacity: (expression
+                (number))))))))
   (statement
     (go_statement
       call: (expression

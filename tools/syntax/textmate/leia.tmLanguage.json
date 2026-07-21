@@ -55,7 +55,7 @@
       "patterns": [
         {
           "name": "keyword.control.directive.leia",
-          "match": "^\\s*//\\s*leia:(?:build|test|cap|feature|requires|param)\\b.*$"
+          "match": "^\\s*//leia:(?:build|test|cap|feature|requires|param)\\b.*$"
         }
       ]
     },
@@ -68,9 +68,25 @@
           "patterns": [
             {
               "name": "constant.character.escape.leia",
-              "match": "\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})"
+              "match": "\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})"
             }
           ]
+        },
+        {
+          "name": "string.quoted.single.leia",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.leia",
+              "match": "\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.raw.fenced.leia",
+          "begin": "```",
+          "end": "```"
         },
         {
           "name": "string.quoted.raw.leia",
@@ -101,7 +117,7 @@
           "patterns": [
             {
               "name": "meta.import.leia",
-              "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s+(\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\")",
+              "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s+(\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\")",
               "captures": {
                 "1": {
                   "name": "entity.name.namespace.import.leia"
@@ -113,7 +129,7 @@
             },
             {
               "name": "meta.import.leia",
-              "match": "\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\"",
+              "match": "\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\"",
               "captures": {
                 "0": {
                   "name": "string.quoted.double.import.path.leia"
@@ -124,7 +140,7 @@
         },
         {
           "name": "meta.import.leia",
-          "match": "\\b(import)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\")",
+          "match": "\\b(import)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\")",
           "captures": {
             "1": {
               "name": "keyword.control.import.leia"
@@ -139,7 +155,7 @@
         },
         {
           "name": "meta.import.leia",
-          "match": "\\b(import)\\s+(\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\")(?:\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+          "match": "\\b(import)\\s+(\"(?:\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})|[^\"\\\\])*\")(?:\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*))?",
           "captures": {
             "1": {
               "name": "keyword.control.import.leia"
@@ -160,10 +176,6 @@
     "numbers": {
       "patterns": [
         {
-          "name": "constant.numeric.duration.leia",
-          "match": "\\b[0-9][0-9_]*(?:ns|us|µs|ms|s|m|h)\\b"
-        },
-        {
           "name": "constant.numeric.float.leia",
           "match": "\\b(?:[0-9][0-9_]*\\.[0-9_]*(?:[eE][+-]?[0-9_]+)?|[0-9][0-9_]*(?:[eE][+-]?[0-9_]+))\\b"
         },
@@ -177,7 +189,7 @@
       "patterns": [
         {
           "name": "keyword.control.leia",
-          "match": "\\b(?:if|else|elseif|for|range|in|switch|case|default|break|continue|goto|return|defer|go|select)\\b"
+          "match": "\\b(?:if|else|elseif|for|range|in|break|continue|goto|return|defer|go)\\b"
         },
         {
           "name": "storage.type.function.leia",
@@ -194,14 +206,19 @@
       ]
     },
     "contextual": {
-      "patterns": []
+      "patterns": [
+        {
+          "name": "keyword.control.contextual.leia",
+          "match": "\\b(?:import)(?=\\s*(?:\\(|[\"']))|\\b(?:select)(?=\\s*\\{)|\\b(?:case)(?=\\s+)|\\b(?:default)(?=\\s*:)|\\b(?:evaluate)(?=\\s*[\"'])"
+        }
+      ]
     },
     "dialects": {
       "patterns": [
         {
           "name": "meta.dialect.tagged-string.leia",
           "contentName": "string.quoted.raw.dialect.leia",
-          "begin": "\\b([A-Za-z_][A-Za-z0-9_]*)(!)?\\s*(`)",
+          "begin": "\\b([A-Za-z_][A-Za-z0-9_]*)(!)?\\s*(`(?:``)?)",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.dialect.leia"
@@ -213,7 +230,7 @@
               "name": "punctuation.definition.string.begin.leia"
             }
           },
-          "end": "`",
+          "end": "\\3",
           "endCaptures": {
             "0": {
               "name": "punctuation.definition.string.end.leia"
@@ -223,7 +240,7 @@
         {
           "name": "meta.dialect.shell.tagged-string.leia",
           "contentName": "string.quoted.raw.shell.leia",
-          "begin": "(\\$)(!)?\\s*(`)",
+          "begin": "(\\$)(!)?\\s*(`(?:``)?)",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.shell.leia"
@@ -235,7 +252,7 @@
               "name": "punctuation.definition.string.begin.leia"
             }
           },
-          "end": "`",
+          "end": "\\3",
           "endCaptures": {
             "0": {
               "name": "punctuation.definition.string.end.leia"
@@ -243,10 +260,9 @@
           }
         },
         {
-          "name": "meta.dialect.tagged-block.leia",
-          "contentName": "meta.dialect.block.body.leia",
-          "begin": "\\b([A-Za-z_][A-Za-z0-9_]*)(!)?\\s*(\\{)",
-          "beginCaptures": {
+          "name": "meta.dialect.tagged-block.begin.leia",
+          "match": "(?:^\\s*|[=(:,\\[]\\s*)([A-Za-z_][A-Za-z0-9_]*)(!)?\\s*(\\{)",
+          "captures": {
             "1": {
               "name": "entity.name.tag.dialect.leia"
             },
@@ -256,12 +272,6 @@
             "3": {
               "name": "punctuation.section.block.begin.leia"
             }
-          },
-          "end": "\\}",
-          "endCaptures": {
-            "0": {
-              "name": "punctuation.section.block.end.leia"
-            }
           }
         }
       ]
@@ -270,11 +280,11 @@
       "patterns": [
         {
           "name": "support.function.builtin.leia",
-          "match": "\\b(?:assert|error|pcall|xpcall|print|println|type|tostring|tonumber|pairs|ipairs|next|len|rawget|rawset|setmetatable|getmetatable|require|close|sleep|spawn|wait|send|recv|select)\\b(?=\\s*\\()"
+          "match": "\\b(?:assert|cap|close|collectgarbage|dofile|error|getmetatable|ipairs|len|load|loadfile|loadstring|next|pairs|pcall|print|rawequal|rawget|rawlen|rawset|require|select|setmetatable|spread|tonumber|tostring|type|unpack|xpcall)\\b(?=\\s*\\()"
         },
         {
           "name": "support.module.leia",
-          "match": "\\b(?:string|table|math|json|time|os|env|fs|http|process|debug|llm|msg|history|loop|soa|matrix|vec|csv|binary|bits|bit32|bytes|regexp|url|path|uuid|base64|hash|compress|sync)\\b(?=\\.)"
+          "match": "\\b(?:array|base64|binary|bit32|bits|bytes|chat|color|compress|container|context|control|crypto|csv|data|db|debug|encoding|fs|hash|history|http|io|json|linalg|llm|log|loop|math|matrix|msg|net|ode|os|path|process|rand|regexp|script|serve|soa|sort|stats|string|sync|table|testkit|time|url|utf8|uuid|vec)\\b(?=\\.)"
         }
       ]
     },

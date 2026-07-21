@@ -18,8 +18,11 @@ The mode registers:
 
 ## Features
 
-- Syntax highlighting for Leia keywords, builtins, directives, strings, numbers,
-  comments, and common standard library modules.
+- Syntax highlighting for the stable Leia keywords, contextual dialect forms,
+  exact `//leia:` directives, builtins, numbers, comments, and common standard
+  library modules.
+- String syntax for double-quoted, single-quoted, short raw backtick, and fenced
+  three-backtick raw strings.
 - Syntax highlighting for `leia.mod` module files.
 - `//` line comments and `/* ... */` block comments in Leia source.
 - Basic delimiter-oriented indentation.
@@ -57,3 +60,12 @@ from `tools/tree-sitter-leia` and define or consume a downstream `leia-ts-mode`.
 ```
 
 Use `leia` as the grammar symbol and `source.leia` as the language scope.
+
+## Tests
+
+Run the byte compiler and ERT suite from this directory:
+
+```sh
+emacs -Q --batch -L . -f batch-byte-compile leia-mode.el leia-mode-test.el
+emacs -Q --batch -L . -l leia-mode-test.el -f ert-run-tests-batch-and-exit
+```

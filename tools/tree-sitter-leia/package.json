@@ -1,6 +1,6 @@
 {
   "name": "tree-sitter-leia",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Leia grammar for tree-sitter",
   "private": true,
   "main": "grammar.js",
@@ -20,5 +20,5 @@
       "grammar": "leia"
     }
   ],
-  "license": "UNLICENSED"
+  "license": "Apache-2.0"
 }

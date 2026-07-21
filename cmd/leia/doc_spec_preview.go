@@ -36,10 +36,10 @@ var specPreviewChapters = []struct {
 var (
 	specPreviewGeneratedStart = "<!-- BEGIN GENERATED SPEC CHAPTERS -->"
 	specPreviewGeneratedEnd   = "<!-- END GENERATED SPEC CHAPTERS -->"
-	specPreviewKeywords       = wordSet("break case continue defer default else elseif fallthrough for go goto if import in range return select switch chan const func var")
+	specPreviewKeywords       = wordSet("break chan const continue defer else elseif for func go goto if in range return var")
 	specPreviewConstants      = wordSet("false nil true")
-	specPreviewBuiltins       = wordSet("assert close delete error getmetatable ipairs len make next pairs pcall print rawequal rawget rawlen rawset require select setmetatable spread tonumber tostring type xpcall")
-	specPreviewOpRE           = regexp.MustCompile(`\+\+|--|\+=|-=|\*=|/=|%=|:=|==|!=|<=|>=|&&|\|\||&\^|<<|>>|<-|\.\.\.|\.\.|\*\*|[+\-*/%=<>!#&|^]`)
+	specPreviewBuiltins       = wordSet("assert cap close collectgarbage dofile error getmetatable ipairs len load loadfile loadstring next pairs pcall print rawequal rawget rawlen rawset require select setmetatable spread tonumber tostring type unpack xpcall")
+	specPreviewOpRE           = regexp.MustCompile(`\.\.\.|\+\+|--|\+=|-=|\*=|/=|:=|==|!=|<=|>=|&&|\|\||&\^|<<|>>|<-|\.\.|\*\*|[+\-*/%=<>!#&|^]`)
 	specPreviewNumberRE       = regexp.MustCompile(`(?i)(?:0x[0-9a-f](?:_?[0-9a-f])*|0b[01](?:_?[01])*|0o[0-7](?:_?[0-7])*|(?:[0-9](?:_?[0-9])*)\.(?:[0-9](?:_?[0-9])*)?(?:e[+-]?[0-9](?:_?[0-9])*)?|(?:[0-9](?:_?[0-9])*)e[+-]?[0-9](?:_?[0-9])*|[0-9](?:_?[0-9])*)`)
 	specPreviewIdentRE        = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 	specPreviewOLRE           = regexp.MustCompile(`^\d+\. `)
@@ -195,7 +195,11 @@ func renderSpecPreview(specDir string) (string, error) {
 		ident := specPreviewSlug(chapter.Title)
 		fmt.Fprintf(&nav, `<li><a href="#%s">%s</a></li>`, ident, html.EscapeString(chapter.Title))
 		sections.WriteString("<section>")
-		sections.WriteString(specPreviewMarkdownToHTML(string(data), ident))
+		chapterText := string(data)
+		if chapter.File == "index.md" {
+			chapterText = stripGeneratedSpecChapters(chapterText)
+		}
+		sections.WriteString(specPreviewMarkdownToHTML(chapterText, ident))
 		sections.WriteString("</section>")
 	}
 	grammar, err := os.ReadFile(filepath.Join(specDir, "grammar.ebnf"))
@@ -222,6 +226,14 @@ func specPreviewMarkdownToHTML(text, prefix string) string {
 	codeInfo := ""
 	inUL := false
 	inOL := false
+	ids := make(map[string]int)
+	uniqueID := func(base string) string {
+		ids[base]++
+		if ids[base] == 1 {
+			return base
+		}
+		return fmt.Sprintf("%s-%d", base, ids[base])
+	}
 
 	closeParagraph := func() {
 		if len(paragraph) > 0 {
@@ -311,17 +323,17 @@ func specPreviewMarkdownToHTML(text, prefix string) string {
 		case strings.HasPrefix(line, "# "):
 			closeParagraph()
 			closeLists()
-			out = append(out, fmt.Sprintf(`<h2 id="%s">%s</h2>`, prefix, html.EscapeString(strings.TrimSpace(line[2:]))))
+			out = append(out, fmt.Sprintf(`<h2 id="%s">%s</h2>`, uniqueID(prefix), html.EscapeString(strings.TrimSpace(line[2:]))))
 		case strings.HasPrefix(line, "## "):
 			closeParagraph()
 			closeLists()
 			title := strings.TrimSpace(line[3:])
-			out = append(out, fmt.Sprintf(`<h3 id="%s-%s">%s</h3>`, prefix, specPreviewSlug(title), html.EscapeString(title)))
+			out = append(out, fmt.Sprintf(`<h3 id="%s">%s</h3>`, uniqueID(prefix+"-"+specPreviewSlug(title)), html.EscapeString(title)))
 		case strings.HasPrefix(line, "### "):
 			closeParagraph()
 			closeLists()
 			title := strings.TrimSpace(line[4:])
-			out = append(out, fmt.Sprintf(`<h4 id="%s-%s">%s</h4>`, prefix, specPreviewSlug(title), html.EscapeString(title)))
+			out = append(out, fmt.Sprintf(`<h4 id="%s">%s</h4>`, uniqueID(prefix+"-"+specPreviewSlug(title)), html.EscapeString(title)))
 		case strings.HasPrefix(line, "- "):
 			closeParagraph()
 			if !inUL {
@@ -463,7 +475,8 @@ func specPreviewHighlightLeia(source string) string {
 			i = end
 			continue
 		}
-		if source[i] == '"' {
+		if source[i] == '"' || source[i] == '\'' {
+			quote := source[i]
 			j := i + 1
 			escaped := false
 			for j < len(source) {
@@ -472,7 +485,7 @@ func specPreviewHighlightLeia(source string) string {
 					escaped = false
 				} else if current == '\\' {
 					escaped = true
-				} else if current == '"' {
+				} else if current == quote {
 					j++
 					break
 				}
@@ -657,6 +670,9 @@ nav {
   border-right:1px solid var(--line);
   padding-right:20px;
 }
+.toc-details > summary {
+  display:none;
+}
 nav h2 {
   font-size:13px;
   text-transform:uppercase;
@@ -713,6 +729,16 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 @media (max-width:900px) {
   .shell { display:block; padding:20px; }
   nav { position:static; max-height:none; border-right:0; border-bottom:1px solid var(--line); padding:0 0 18px; margin-bottom:24px; }
+  .toc-details > summary {
+    display:list-item;
+    cursor:pointer;
+    color:var(--blue-dark);
+    font-size:14px;
+    font-weight:600;
+    padding:8px 0;
+  }
+  .toc-details[open] > summary { margin-bottom:6px; }
+  nav h2 { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0, 0, 0, 0); white-space:nowrap; border:0; }
   nav ol { columns:2; }
   .topbar { padding:0 18px; }
 }
@@ -722,7 +748,7 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <body>
 <div class="topbar"><span class="brand">Leia</span><span>Language Specification</span></div>
 <div class="shell">
-<nav aria-label="Table of contents"><h2>Contents</h2><ol>{nav}</ol></nav>
+<nav aria-label="Table of contents"><details class="toc-details" open><summary>Contents</summary><h2>Contents</h2><ol>{nav}</ol></details></nav>
 <main>
 <header>
 <h1>The Leia Programming Language Specification</h1>
@@ -732,6 +758,13 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <footer>Generated locally from the current worktree: <code>docs/spec/</code>.</footer>
 </main>
 </div>
+<script>
+(function () {
+  var details = document.querySelector(".toc-details");
+  var mobile = window.matchMedia("(max-width: 900px)");
+  if (details && mobile.matches) details.removeAttribute("open");
+})();
+</script>
 </body>
 </html>
 `

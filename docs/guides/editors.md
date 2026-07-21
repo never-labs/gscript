@@ -53,7 +53,7 @@ scripts/run.sh editor
 scripts/run.sh editor --json
 ```
 
-If the tree-sitter CLI is available and you want the full corpus check:
+If the tree-sitter CLI is available and you want the parser corpus check:
 
 ```bash
 npm --prefix tools/tree-sitter-leia ci
@@ -89,7 +89,7 @@ For a local checkout:
 (add-to-list 'auto-mode-alist '("\\.leia\\'" . leia-mode))
 ```
 
-Use `M-x lsp` or another LSP client to connect to `leia-lsp`.
+Run `M-x leia-eglot-setup`, then use `M-x eglot` to connect to `leia-lsp`.
 
 ## Neovim, Helix, And Zed
 
